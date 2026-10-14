@@ -25,13 +25,21 @@ function createClient(): PrismaClient {
   return new PrismaClient({ adapter });
 }
 
-// Reuse a single client across hot-reloads in development.
-// Production (serverless) creates one client per module instance, cached here.
-// NOTE: a real DATABASE_URL is required before the first query runs;
-// build/typecheck do not connect.
-export const prisma: PrismaClient =
-  globalForPrisma.prisma ?? createClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+function getOrCreateClient(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createClient();
+  }
+  return globalForPrisma.prisma;
 }
+
+// Lazily create the client on first use (not at import time) so that
+// `next build` / typecheck succeed even when DATABASE_URL is not set
+// (e.g. Vercel build before env vars are configured). A real
+// DATABASE_URL is still required before the first query runs.
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = getOrCreateClient();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
