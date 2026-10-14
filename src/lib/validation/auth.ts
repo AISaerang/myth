@@ -24,6 +24,19 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password wajib diisi."),
 });
 
+// Personal invite token from /masuk/[token]: opaque base64url string.
+// Shape-checked only; validity is decided server-side with a generic
+// error so callers never learn whether a token exists.
+export const inviteTokenSchema = z
+  .string()
+  .trim()
+  .min(20, "Link undangan tidak valid.")
+  .max(128, "Link undangan tidak valid.")
+  .regex(
+    /^[A-Za-z0-9_-]+$/,
+    "Link undangan tidak valid.",
+  );
+
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Password saat ini wajib diisi."),

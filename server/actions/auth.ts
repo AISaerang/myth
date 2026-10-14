@@ -3,10 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import {
-  SESSION_COOKIE_NAME,
-  SESSION_TTL_SECONDS,
-} from "@/lib/session-token";
+import { sessionCookieOptions, SESSION_COOKIE_NAME } from "@/lib/session-cookie";
 import {
   changePasswordSchema,
   firstIssueMessage,
@@ -31,16 +28,6 @@ import {
 export interface ActionState {
   ok: boolean;
   error?: string;
-}
-
-function sessionCookieOptions() {
-  return {
-    httpOnly: true as const,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    path: "/",
-    maxAge: SESSION_TTL_SECONDS,
-  };
 }
 
 async function throttleKey(username: string): Promise<string> {

@@ -40,6 +40,7 @@ model User {
 
   @@index([role, isActive])
   sessions Session[]
+  loginTokens LoginToken[]
   person   Person?
 }
 
@@ -136,6 +137,23 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+// Undangan login personal (magic link). Hanya hash SHA-256 yang
+// disimpan; token mentah tampil sekali ke admin (docs/06).
+// Single-use (usedAt) + kedaluwarsa 7 hari.
+model LoginToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  // Plain user id (no FK): preserves history even if accounts change.
+  createdById String
+  createdAt   DateTime @default(now())
 
   @@index([userId, expiresAt])
 }

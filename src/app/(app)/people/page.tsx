@@ -8,6 +8,7 @@ import { CreateUserForm } from "./CreateUserForm";
 import {
   ActiveToggleForm,
   EditUserForm,
+  InviteLinkForm,
   ResetPasswordForm,
 } from "./UserRowForms";
 
@@ -65,6 +66,7 @@ export default async function PeoplePage() {
                       userId={u.id}
                       username={u.username}
                     />
+                    <InviteLinkForm userId={u.id} username={u.username} />
                     <ActiveToggleForm
                       userId={u.id}
                       isActive={u.isActive}

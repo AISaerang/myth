@@ -8,6 +8,7 @@ import {
   setUserActiveAction,
   updateUserAction,
 } from "@server/actions/admin-users";
+import { createInviteAction } from "@server/actions/invites";
 
 function HiddenUserId({ userId }: { userId: string }) {
   return <input type="hidden" name="userId" value={userId} />;
@@ -41,6 +42,44 @@ export function ResetPasswordForm({
         <Alert tone="warning" title={`Password baru ${state.username ?? username} — sekali tampil`}>
           <p className="select-all rounded bg-white/60 px-2 py-1 font-mono text-sm font-semibold dark:bg-black/40">
             {state.temporaryPassword}
+          </p>
+        </Alert>
+      ) : null}
+    </div>
+  );
+}
+
+export function InviteLinkForm({
+  userId,
+  username,
+  disabled,
+}: {
+  userId: string;
+  username: string;
+  disabled?: boolean;
+}) {
+  const [state, formAction, pending] = useActionState(createInviteAction, {
+    ok: false,
+  });
+  return (
+    <div className="flex flex-col gap-2">
+      <form action={formAction}>
+        <HiddenUserId userId={userId} />
+        <Button type="submit" variant="secondary" size="sm" disabled={disabled || pending}>
+          {pending ? "Membuat…" : "Buat link undangan"}
+        </Button>
+      </form>
+      {!state.ok && state.error ? (
+        <Alert tone="danger">{state.error}</Alert>
+      ) : null}
+      {state.ok && state.inviteLink ? (
+        <Alert tone="warning" title={`Link undangan ${state.username ?? username} — sekali tampil`}>
+          <p>
+            Berlaku 7 hari, sekali pakai. Kirim lewat kanal privat (bukan
+            grup chat):
+          </p>
+          <p className="mt-2 select-all break-all rounded bg-white/60 px-2 py-1 font-mono text-sm font-semibold dark:bg-black/40">
+            {state.inviteLink}
           </p>
         </Alert>
       ) : null}
