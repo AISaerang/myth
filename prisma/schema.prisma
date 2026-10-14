@@ -1,0 +1,502 @@
+// Logical model for Music Team Hub (docs/05-DATABASE-SCHEMA.md).
+// Implemented incrementally; history-preserving. IDs use CUID.
+// Timestamps stored in UTC, displayed in Asia/Jakarta.
+//
+// Phase 0: authentication identity only (User + Role).
+// Phase 1: opaque sessions + audit log for sensitive actions.
+// Phase 2: event brief + personnel profiles + skills/instruments.
+// Phase 3: songs, batches, assignments, arrangement versions, materials.
+// Phase 4: practice progress + tasks/blockers. (relatedRehearsalId
+// menyusul Phase 5 bersama model Rehearsal.)
+// Phase 5: rehearsals + attendance, equipment, decision log, readiness.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  // Always stored normalized (lowercase, trimmed); unique.
+  // Normalization is enforced at the application layer (see src/lib/username.ts).
+  username           String    @unique
+  displayName        String
+  passwordHash       String
+  role               Role      @default(USER)
+  mustChangePassword Boolean   @default(true)
+  isActive           Boolean   @default(true)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([role, isActive])
+  sessions Session[]
+  person   Person?
+}
+
+enum EventStatus {
+  DRAFT
+  PENDING_CONFIRMATION
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model Event {
+  id                    String      @id @default(cuid())
+  name                  String
+  description           String?
+  eventDate             DateTime?
+  // HH:mm strings; eventDate carries the calendar day.
+  startTime             String?
+  endTime               String?
+  timezone              String      @default("Asia/Jakarta")
+  venue                 String?
+  theme                 String?
+  targetDurationMinutes Int?
+  eventStatus           EventStatus @default(DRAFT)
+  liturgicalFlowUrl     String?
+  committeePicName      String?
+  // Restricted: admin eyes only (docs/05-DATABASE-SCHEMA.md).
+  committeePicContact   String?
+  notes                 String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  songs   Song[]
+  batches SongBatch[]
+  tasks   Task[]
+  rehearsals Rehearsal[]
+  equipment  EquipmentItem[]
+  decisions  DecisionLog[]
+
+  @@index([eventStatus, eventDate])
+}
+
+model Person {
+  id           String   @id @default(cuid())
+  userId       String?  @unique
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  displayName  String
+  congregation String?
+  // Restricted: admin eyes only.
+  contact      String?
+  notes        String?
+  isConfirmed  Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  skills PersonSkill[]
+
+  assignments SongAssignment[]
+  progress    PracticeProgress[]
+  assignedTasks Task[] @relation("TaskAssignee")
+  attendance  RehearsalAttendance[]
+  assignedEquipment EquipmentItem[] @relation("EquipmentAssignee")
+
+  @@index([isActive, isConfirmed])
+}
+
+model InstrumentSkill {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  people PersonSkill[]
+  assignments SongAssignment[]
+}
+
+model PersonSkill {
+  personId          String
+  person            Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
+  instrumentSkillId String
+  instrumentSkill   InstrumentSkill @relation(fields: [instrumentSkillId], references: [id], onDelete: Restrict)
+  proficiencyNote   String?
+  createdAt         DateTime        @default(now())
+
+  @@id([personId, instrumentSkillId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  // SHA-256 hex of the opaque token. The raw token lives only in the
+  // HttpOnly cookie, never in the database (docs/06-AUTHENTICATION-RBAC.md).
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  summary     String
+  // Never secrets (docs/01-PRD.md). Enforced by code review + tests.
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+enum SongStatus {
+  DRAFT
+  SOURCE_SHARED
+  ARRANGEMENT_IN_PROGRESS
+  REFERENCE_READY
+  PRACTICING
+  NEEDS_REVIEW
+  READY_FOR_REHEARSAL
+  REHEARSAL_READY
+  FINAL_LOCKED
+}
+
+enum BatchStatus {
+  DRAFT
+  PUBLISHED
+  REVIEWING
+  COMPLETED
+  ARCHIVED
+}
+
+enum MaterialCategory {
+  ORIGINAL
+  ARRANGEMENT_REFERENCE
+  PART_GUIDE
+  CHORD_CHART
+  LYRICS
+  CLICK_CUE
+  SEQUENCER
+  REHEARSAL_RECORDING
+  FINAL_ASSET
+  OTHER
+}
+
+model Song {
+  id                       String             @id @default(cuid())
+  eventId                  String
+  event                    Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title                    String
+  artistOrAuthor           String?
+  liturgicalFunction       String?
+  key                      String?
+  bpm                      Int?
+  timeSignature            String?
+  estimatedDurationSeconds Int?
+  originalReferenceUrl     String?
+  arrangementNotes         String?
+  status                   SongStatus         @default(DRAFT)
+  isPublished              Boolean            @default(false)
+  isFinalLocked            Boolean            @default(false)
+  activeArrangementVersionId String?
+  activeVersion            ArrangementVersion? @relation("SongActiveVersion", fields: [activeArrangementVersionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  // Plain user id (no FK): preserves history even if accounts change.
+  createdById              String
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  versions    ArrangementVersion[] @relation("SongVersions")
+  materials   SongMaterial[]
+  assignments SongAssignment[]
+  batchItems  SongBatchItem[]
+  progress    PracticeProgress[]
+  tasks       Task[]
+  rehearsalItems RehearsalSong[]
+  decisions   DecisionLog[]
+
+  @@index([eventId, status])
+  @@index([eventId, isPublished])
+}
+
+model SongBatch {
+  id             String        @id @default(cuid())
+  eventId        String
+  event          Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  releaseAt      DateTime?
+  targetReviewAt DateTime?
+  status         BatchStatus   @default(DRAFT)
+  createdById    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  items SongBatchItem[]
+
+  @@index([eventId, status])
+}
+
+model SongBatchItem {
+  songBatchId String
+  batch       SongBatch @relation(fields: [songBatchId], references: [id], onDelete: Cascade)
+  songId      String
+  song        Song      @relation(fields: [songId], references: [id], onDelete: Cascade)
+  sortOrder   Int       @default(0)
+
+  @@id([songBatchId, songId])
+}
+
+model SongAssignment {
+  id                String           @id @default(cuid())
+  songId            String
+  song              Song             @relation(fields: [songId], references: [id], onDelete: Cascade)
+  personId          String
+  person            Person           @relation(fields: [personId], references: [id], onDelete: Restrict)
+  instrumentSkillId String?
+  instrumentSkill   InstrumentSkill? @relation(fields: [instrumentSkillId], references: [id], onDelete: SetNull)
+  assignmentNote    String?
+  isPrimary         Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([songId, personId])
+  @@index([personId])
+}
+
+model ArrangementVersion {
+  id             String   @id @default(cuid())
+  songId         String
+  song           Song     @relation("SongVersions", fields: [songId], references: [id], onDelete: Cascade)
+  versionLabel   String
+  changeSummary  String
+  key            String?
+  bpm            Int?
+  grooveNotes    String?
+  structureNotes String?
+  referenceUrl   String?
+  isActive       Boolean  @default(false)
+  isFinal        Boolean  @default(false)
+  createdById    String
+  createdAt      DateTime @default(now())
+
+  activeFor Song[]        @relation("SongActiveVersion")
+  materials SongMaterial[]
+
+  @@index([songId, isActive])
+}
+
+model SongMaterial {
+  id                   String              @id @default(cuid())
+  songId               String
+  song                 Song                @relation(fields: [songId], references: [id], onDelete: Cascade)
+  arrangementVersionId String?
+  arrangementVersion   ArrangementVersion? @relation(fields: [arrangementVersionId], references: [id], onDelete: SetNull)
+  title                String
+  category             MaterialCategory
+  url                  String
+  versionLabel         String?
+  description          String?
+  isActive             Boolean             @default(true)
+  createdById          String
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([songId, category, isActive])
+}
+
+enum PracticeStatus {
+  NOT_STARTED
+  LEARNING
+  TRIED_WITH_REFERENCE
+  NEEDS_HELP
+  READY_FOR_REHEARSAL
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model PracticeProgress {
+  id          String         @id @default(cuid())
+  songId      String
+  song        Song           @relation(fields: [songId], references: [id], onDelete: Cascade)
+  personId    String
+  person      Person         @relation(fields: [personId], references: [id], onDelete: Restrict)
+  status      PracticeStatus @default(NOT_STARTED)
+  note        String?
+  // Plain user id (no FK): preserves history even if accounts change.
+  updatedById String
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([songId, personId])
+  @@index([personId, status])
+}
+
+model Task {
+  id                String        @id @default(cuid())
+  eventId           String
+  event             Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  status            TaskStatus    @default(TODO)
+  priority          TaskPriority  @default(MEDIUM)
+  dueAt             DateTime?
+  assigneePersonId  String?
+  assignee          Person?       @relation("TaskAssignee", fields: [assigneePersonId], references: [id], onDelete: SetNull)
+  relatedSongId     String?
+  relatedSong       Song?         @relation(fields: [relatedSongId], references: [id], onDelete: SetNull)
+  relatedRehearsalId String?
+  relatedRehearsal  Rehearsal?    @relation(fields: [relatedRehearsalId], references: [id], onDelete: SetNull)
+  createdById       String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([eventId, status])
+  @@index([assigneePersonId, status])
+  @@index([eventId, dueAt])
+}
+
+enum RehearsalType {
+  ONLINE_MONITORING
+  ONSITE_SECTIONAL
+  FULL_REHEARSAL
+  TECHNICAL_REHEARSAL
+  EVENT_DAY_SOUNDCHECK
+  OTHER
+}
+
+enum RehearsalStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum AttendanceStatus {
+  EXPECTED
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum EquipmentStatus {
+  NOT_CHECKED
+  NEEDED
+  CONFIRMED
+  TESTED
+  BLOCKED
+  NOT_APPLICABLE
+}
+
+enum DecisionType {
+  MUSICAL
+  EVENT
+  TECHNICAL
+  PERSONNEL
+  OTHER
+}
+
+model Rehearsal {
+  id                String           @id @default(cuid())
+  eventId           String
+  event             Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title             String
+  type              RehearsalType
+  startsAt          DateTime
+  endsAt            DateTime?
+  venueOrMeetingUrl String?
+  agenda            String?
+  status            RehearsalStatus  @default(SCHEDULED)
+  notes             String?
+  createdById       String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  songs      RehearsalSong[]
+  attendance RehearsalAttendance[]
+  tasks      Task[]
+  decisions  DecisionLog[]
+
+  @@index([eventId, startsAt])
+  @@index([eventId, status])
+}
+
+model RehearsalSong {
+  rehearsalId String
+  rehearsal   Rehearsal @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  songId      String
+  song        Song      @relation(fields: [songId], references: [id], onDelete: Cascade)
+  sortOrder   Int       @default(0)
+
+  @@id([rehearsalId, songId])
+}
+
+model RehearsalAttendance {
+  id          String           @id @default(cuid())
+  rehearsalId String
+  rehearsal   Rehearsal        @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  personId    String
+  person      Person           @relation(fields: [personId], references: [id], onDelete: Restrict)
+  status      AttendanceStatus @default(EXPECTED)
+  note        String?
+
+  @@unique([rehearsalId, personId])
+  @@index([personId])
+}
+
+model EquipmentItem {
+  id               String          @id @default(cuid())
+  eventId          String
+  event            Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name             String
+  category         String
+  quantity         Int             @default(1)
+  status           EquipmentStatus @default(NOT_CHECKED)
+  ownerOrSource    String?
+  assigneePersonId String?
+  assignee         Person?         @relation("EquipmentAssignee", fields: [assigneePersonId], references: [id], onDelete: SetNull)
+  dueAt            DateTime?
+  notes            String?
+  createdById      String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([eventId, status])
+}
+
+model DecisionLog {
+  id                String          @id @default(cuid())
+  eventId           String
+  event             Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title             String
+  decisionType      DecisionType
+  decisionText      String
+  reason            String?
+  decidedBy         String?
+  relatedSongId     String?
+  relatedSong       Song?           @relation(fields: [relatedSongId], references: [id], onDelete: SetNull)
+  relatedRehearsalId String?
+  relatedRehearsal  Rehearsal?      @relation(fields: [relatedRehearsalId], references: [id], onDelete: SetNull)
+  createdById       String
+  createdAt         DateTime        @default(now())
+
+  @@index([eventId, createdAt])
+}

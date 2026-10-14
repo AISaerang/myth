@@ -1,0 +1,66 @@
+# 04 — UI/UX Design
+
+## Principles
+Mobile-first, ringkas, Bahasa Indonesia konsisten, status memakai teks + warna, tidak mengandalkan warna saja, minim tabel lebar, accessible forms, loading/empty/error states.
+
+## Navigation
+Admin: Dashboard, Event Brief, Lagu, Batch, Personel & Akses, Tasks/Blockers, Rehearsal, Equipment & Teknis, Decisions/Notes, Settings.  
+User: Beranda, Lagu Saya, Task Saya, Rehearsal, Materi/Drive, Profil & Password.
+
+## Login page
+Brand, username, password, tombol Masuk, error generik, instruksi hubungi admin. Tidak ada sign-up. Jangan simpan password di localStorage.
+
+## Admin dashboard
+- Header nama event, tanggal/status konfirmasi, lokasi.
+- Summary: total lagu, lagu perlu perhatian, progres batch, overdue task, blocker teknis, rehearsal berikutnya.
+- Needs attention list.
+- Song readiness.
+- Upcoming rehearsals.
+- Latest updates.
+- Technical checklist.
+
+Angka dashboard harus dapat diklik menuju data yang perlu ditindaklanjuti.
+
+## User dashboard
+- Event dan rehearsal berikutnya.
+- Lagu yang ditugaskan.
+- Task aktif.
+- Materi terbaru.
+- Tombol cepat Update progres.
+Jangan tampilkan kontak pribadi personel lain.
+
+## Song list/detail
+Song list menampilkan judul, fungsi liturgi, key, BPM, batch, status, penugasan, updated date. Mobile memakai cards.
+
+Song detail:
+1. Overview.
+2. Musical direction: groove, dynamics, intro, structure, ending, transitions.
+3. Assigned personnel/instruments.
+4. Materials and active version.
+5. Practice progress.
+6. Version history.
+7. Tasks/issues.
+8. Decision notes.
+
+Materi aktif harus mudah dikenali; versi lama ditandai superseded/archive.
+
+## Practice status
+Pilihan: Belum mulai; Sedang dipelajari; Sudah mencoba dengan referensi; Perlu bantuan; Siap untuk rehearsal. Catatan opsional, timestamp otomatis. User hanya mengubah status sendiri.
+
+## Batch page
+Nama, release date, target review, lagu, progress, jumlah personel yang update, blocker, Publish/Unpublish, Mark reviewed.
+
+## Rehearsal page
+Tipe, tanggal/jam, lokasi/link, agenda, lagu, attendance, catatan, keputusan, action items. Status: scheduled/completed/cancelled/rescheduled.
+
+## Equipment page
+Checklist mobile: item, kategori, PIC, sumber/pemilik, status, due date, notes. Filter belum dicek, butuh konfirmasi, blocked, tested.
+
+## People & Access
+Tambah/edit personel, username, role, skill, assignment, deactivate, reset password. Password sementara hanya terlihat sekali; admin tidak dapat melihat password lama.
+
+## Design system
+Gunakan Button, Input, Select, Badge, Card, Dialog, Tabs, Table, Alert, Toast, Skeleton, Empty State. Status: green ready/done; amber in progress/review; red blocked/overdue; gray draft/not checked. Pastikan kontras baik, focus state terlihat, target sentuh cukup besar.
+
+## Responsive/accessibility
+Label input, keyboard navigation, semantik HTML, focus state, tidak wajib drag-and-drop, uji mobile/tablet/desktop. Error harus membantu tanpa menampilkan stack trace.
