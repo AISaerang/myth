@@ -105,7 +105,13 @@ export default async function DashboardPage() {
         <AdminTimelineCard
           eventId={event.id}
           eventName={event.name}
-          eventDate={event.eventDate}
+          event={{
+            eventDate: event.eventDate,
+            venue: event.venue,
+            startTime: event.startTime,
+            endTime: event.endTime,
+            eventStatus: event.eventStatus,
+          }}
         />
 
         {c.blockedTasks + c.overdueTasks + c.blockedEquipment + c.helpNeeded > 0 ? (
@@ -318,7 +324,13 @@ export default async function DashboardPage() {
         userId={user.id}
         eventId={event.id}
         eventName={event.name}
-        eventDate={event.eventDate}
+        event={{
+          eventDate: event.eventDate,
+          venue: event.venue,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          eventStatus: event.eventStatus,
+        }}
       />
 
       {data.myTasks.length > 0 ? (

@@ -10,6 +10,39 @@ export type TimelineKind =
   | "task"
   | "equipment";
 
+export type TimelineDetail =
+  | {
+      kind: "hday";
+      venue: string | null;
+      startTime: string | null;
+      endTime: string | null;
+      eventStatus: string;
+    }
+  | {
+      kind: "batch";
+      songs: {
+        id: string;
+        title: string;
+        status: string;
+        isPublished: boolean;
+      }[];
+    }
+  | {
+      kind: "rehearsal";
+      type: string;
+      songs: { id: string; title: string }[];
+      presentCount: number;
+      recordedCount: number;
+      myAttendance?: string | null;
+    }
+  | {
+      kind: "task";
+      priority: string;
+      assignee: string | null;
+      relatedSong: string | null;
+    }
+  | { kind: "equipment"; assignee: string | null };
+
 export interface TimelineItem {
   id: string;
   kind: TimelineKind;
@@ -19,6 +52,7 @@ export interface TimelineItem {
   end: Date | null;
   status: string;
   done: boolean;
+  detail: TimelineDetail;
 }
 
 export interface TimelineData {
@@ -27,6 +61,14 @@ export interface TimelineData {
   unscheduled: TimelineItem[];
   rangeStart: Date | null;
   rangeEnd: Date | null;
+}
+
+export interface TimelineEvent {
+  eventDate: Date | null;
+  venue: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  eventStatus: string;
 }
 
 const KIND_ORDER: Record<TimelineKind, number> = {
@@ -62,9 +104,7 @@ function assemble(
     return { hDay, items: [], unscheduled, rangeStart: null, rangeEnd: null };
   }
   const starts = dated.map((i) => (i.start as Date).getTime());
-  const ends = dated.map((i) =>
-    (i.end ?? i.start as Date).getTime(),
-  );
+  const ends = dated.map((i) => (i.end ?? (i.start as Date)).getTime());
   if (hDay) {
     starts.push(hDay.getTime());
     ends.push(hDay.getTime());
@@ -88,60 +128,120 @@ export function isItemOverdue(item: TimelineItem, now: Date): boolean {
   return daysUntil(date, now) < 0;
 }
 
+function hDayItem(event: TimelineEvent): TimelineItem {
+  return {
+    id: "hday",
+    kind: "hday",
+    title: "Hari H",
+    href: "/event",
+    start: event.eventDate,
+    end: null,
+    status: "EVENT",
+    done: false,
+    detail: {
+      kind: "hday",
+      venue: event.venue,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      eventStatus: event.eventStatus,
+    },
+  };
+}
+
 // Full event timeline for admins (docs/08): H-day + batches +
-// rehearsals + open tasks + equipment dues.
+// rehearsals + open tasks + equipment dues, each with breakdown detail.
 export async function getEventTimeline(
   eventId: string,
-  eventDate: Date | null,
+  event: TimelineEvent | null,
   now: Date = new Date(),
 ): Promise<TimelineData> {
-  const [batches, rehearsals, tasks, equipment] = await Promise.all([
-    prisma.songBatch.findMany({
-      where: { eventId },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        releaseAt: true,
-        targetReviewAt: true,
-      },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.rehearsal.findMany({
-      where: { eventId, status: { not: "CANCELLED" } },
-      select: { id: true, title: true, type: true, status: true, startsAt: true },
-      orderBy: { startsAt: "asc" },
-    }),
-    prisma.task.findMany({
-      where: { eventId, status: { notIn: ["DONE", "CANCELLED"] } },
-      select: { id: true, title: true, status: true, dueAt: true },
-      orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }],
-    }),
-    prisma.equipmentItem.findMany({
-      where: {
-        eventId,
-        status: { notIn: ["TESTED", "NOT_APPLICABLE"] },
-        dueAt: { not: null },
-      },
-      select: { id: true, name: true, status: true, dueAt: true },
-      orderBy: { dueAt: "asc" },
-    }),
-  ]);
-  const items: TimelineItem[] = [
-    ...(eventDate
-      ? [
-          {
-            id: "hday",
-            kind: "hday" as const,
-            title: "Hari H",
-            href: "/event",
-            start: eventDate,
-            end: null,
-            status: "EVENT",
-            done: false,
+  const [batches, rehearsals, tasks, equipment, attendance] =
+    await Promise.all([
+      prisma.songBatch.findMany({
+        where: { eventId },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          releaseAt: true,
+          targetReviewAt: true,
+          items: {
+            select: {
+              song: {
+                select: {
+                  id: true,
+                  title: true,
+                  status: true,
+                  isPublished: true,
+                },
+              },
+            },
+            orderBy: { sortOrder: "asc" },
           },
-        ]
-      : []),
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.rehearsal.findMany({
+        where: { eventId, status: { not: "CANCELLED" } },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          status: true,
+          startsAt: true,
+          songs: {
+            select: { song: { select: { id: true, title: true } } },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+        orderBy: { startsAt: "asc" },
+      }),
+      prisma.task.findMany({
+        where: { eventId, status: { notIn: ["DONE", "CANCELLED"] } },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          dueAt: true,
+          assignee: { select: { displayName: true } },
+          relatedSong: { select: { title: true } },
+        },
+        orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }],
+      }),
+      prisma.equipmentItem.findMany({
+        where: {
+          eventId,
+          status: { notIn: ["TESTED", "NOT_APPLICABLE"] },
+          dueAt: { not: null },
+        },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          dueAt: true,
+          assignee: { select: { displayName: true } },
+        },
+        orderBy: { dueAt: "asc" },
+      }),
+      prisma.rehearsalAttendance.findMany({
+        where: { rehearsal: { eventId } },
+        select: { rehearsalId: true, status: true },
+      }),
+    ]);
+  const presentByRehearsal = new Map<string, { present: number; total: number }>();
+  for (const a of attendance) {
+    const entry = presentByRehearsal.get(a.rehearsalId) ?? {
+      present: 0,
+      total: 0,
+    };
+    entry.total += 1;
+    if (a.status === "PRESENT" || a.status === "LATE") entry.present += 1;
+    presentByRehearsal.set(a.rehearsalId, entry);
+  }
+  const hDay = event?.eventDate ?? null;
+  const items: TimelineItem[] = [
+    ...(event && hDay ? [hDayItem(event)] : []),
     ...batches.map((b) => ({
       id: `batch-${b.id}`,
       kind: "batch" as const,
@@ -151,17 +251,31 @@ export async function getEventTimeline(
       end: b.targetReviewAt,
       status: b.status,
       done: b.status === "COMPLETED" || b.status === "ARCHIVED",
+      detail: {
+        kind: "batch" as const,
+        songs: b.items.map((i) => i.song),
+      },
     })),
-    ...rehearsals.map((r) => ({
-      id: `rehearsal-${r.id}`,
-      kind: "rehearsal" as const,
-      title: r.title,
-      href: `/rehearsals/${r.id}`,
-      start: r.startsAt,
-      end: null,
-      status: r.status,
-      done: r.status === "COMPLETED",
-    })),
+    ...rehearsals.map((r) => {
+      const counts = presentByRehearsal.get(r.id) ?? { present: 0, total: 0 };
+      return {
+        id: `rehearsal-${r.id}`,
+        kind: "rehearsal" as const,
+        title: r.title,
+        href: `/rehearsals/${r.id}`,
+        start: r.startsAt,
+        end: null,
+        status: r.status,
+        done: r.status === "COMPLETED",
+        detail: {
+          kind: "rehearsal" as const,
+          type: r.type,
+          songs: r.songs.map((s) => s.song),
+          presentCount: counts.present,
+          recordedCount: counts.total,
+        },
+      };
+    }),
     ...tasks.map((t) => ({
       id: `task-${t.id}`,
       kind: "task" as const,
@@ -171,6 +285,12 @@ export async function getEventTimeline(
       end: null,
       status: t.status,
       done: false,
+      detail: {
+        kind: "task" as const,
+        priority: t.priority,
+        assignee: t.assignee?.displayName ?? null,
+        relatedSong: t.relatedSong?.title ?? null,
+      },
     })),
     ...equipment.map((e) => ({
       id: `equipment-${e.id}`,
@@ -181,9 +301,13 @@ export async function getEventTimeline(
       end: null,
       status: e.status,
       done: false,
+      detail: {
+        kind: "equipment" as const,
+        assignee: e.assignee?.displayName ?? null,
+      },
     })),
   ];
-  return assemble(eventDate, items, now);
+  return assemble(hDay, items, now);
 }
 
 // Personal timeline: H-day + batches holding my published songs +
@@ -192,86 +316,99 @@ export async function getEventTimeline(
 export async function getUserTimeline(
   userId: string,
   eventId: string,
-  eventDate: Date | null,
+  event: TimelineEvent | null,
   now: Date = new Date(),
 ): Promise<TimelineData> {
+  const hDay = event?.eventDate ?? null;
   const person = await prisma.person.findUnique({ where: { userId } });
   if (!person) {
     return assemble(
-      eventDate,
-      eventDate
-        ? [
-            {
-              id: "hday",
-              kind: "hday",
-              title: "Hari H",
-              href: "/event",
-              start: eventDate,
-              end: null,
-              status: "EVENT",
-              done: false,
-            },
-          ]
-        : [],
+      hDay,
+      event && hDay ? [hDayItem(event)] : [],
       now,
     );
   }
-  const [myBatches, rehearsals, myTasks, myEquipment] = await Promise.all([
-    prisma.songBatch.findMany({
-      where: {
-        eventId,
-        items: {
-          some: {
-            song: {
-              isPublished: true,
-              assignments: { some: { personId: person.id } },
+  const [myBatches, rehearsals, myTasks, myEquipment, attendance] =
+    await Promise.all([
+      prisma.songBatch.findMany({
+        where: {
+          eventId,
+          items: {
+            some: {
+              song: {
+                isPublished: true,
+                assignments: { some: { personId: person.id } },
+              },
             },
           },
         },
-      },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        releaseAt: true,
-        targetReviewAt: true,
-      },
-    }),
-    prisma.rehearsal.findMany({
-      where: {
-        eventId,
-        status: { in: ["SCHEDULED", "RESCHEDULED"] },
-        startsAt: { gte: now },
-      },
-      select: { id: true, title: true, type: true, status: true, startsAt: true },
-      orderBy: { startsAt: "asc" },
-    }),
-    listRelevantTasks(userId, eventId),
-    prisma.equipmentItem.findMany({
-      where: {
-        eventId,
-        assigneePersonId: person.id,
-        status: { notIn: ["TESTED", "NOT_APPLICABLE"] },
-        dueAt: { not: null },
-      },
-      select: { id: true, name: true, status: true, dueAt: true },
-    }),
-  ]);
-  const items: TimelineItem[] = [
-    ...(eventDate
-      ? [
-          {
-            id: "hday",
-            kind: "hday" as const,
-            title: "Hari H",
-            href: "/event",
-            start: eventDate,
-            end: null,
-            status: "EVENT",
-            done: false,
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          releaseAt: true,
+          targetReviewAt: true,
+          items: {
+            where: {
+              song: {
+                isPublished: true,
+                assignments: { some: { personId: person.id } },
+              },
+            },
+            select: {
+              song: {
+                select: {
+                  id: true,
+                  title: true,
+                  status: true,
+                  isPublished: true,
+                },
+              },
+            },
+            orderBy: { sortOrder: "asc" },
           },
-        ]
-      : []),
+        },
+      }),
+      prisma.rehearsal.findMany({
+        where: {
+          eventId,
+          status: { in: ["SCHEDULED", "RESCHEDULED"] },
+          startsAt: { gte: now },
+        },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          status: true,
+          startsAt: true,
+          songs: {
+            select: { song: { select: { id: true, title: true } } },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+        orderBy: { startsAt: "asc" },
+      }),
+      listRelevantTasks(userId, eventId),
+      prisma.equipmentItem.findMany({
+        where: {
+          eventId,
+          assigneePersonId: person.id,
+          status: { notIn: ["TESTED", "NOT_APPLICABLE"] },
+          dueAt: { not: null },
+        },
+        select: { id: true, name: true, status: true, dueAt: true },
+      }),
+      prisma.rehearsalAttendance.findMany({
+        where: { personId: person.id },
+        select: { rehearsalId: true, status: true },
+      }),
+    ]);
+  const myAttendance = new Map(attendance.map((a) => [a.rehearsalId, a.status]));
+  const mySongIds = new Set(
+    myBatches.flatMap((b) => b.items.map((i) => i.song.id)),
+  );
+  const items: TimelineItem[] = [
+    ...(event && hDay ? [hDayItem(event)] : []),
     ...myBatches.map((b) => ({
       id: `batch-${b.id}`,
       kind: "batch" as const,
@@ -281,17 +418,34 @@ export async function getUserTimeline(
       end: b.targetReviewAt,
       status: b.status,
       done: b.status === "COMPLETED" || b.status === "ARCHIVED",
+      detail: {
+        kind: "batch" as const,
+        songs: b.items.map((i) => i.song),
+      },
     })),
-    ...rehearsals.map((r) => ({
-      id: `rehearsal-${r.id}`,
-      kind: "rehearsal" as const,
-      title: r.title,
-      href: `/rehearsals/${r.id}`,
-      start: r.startsAt,
-      end: null,
-      status: r.status,
-      done: false,
-    })),
+    ...rehearsals.map((r) => {
+      const ownSongs = r.songs
+        .map((s) => s.song)
+        .filter((s) => mySongIds.has(s.id));
+      return {
+        id: `rehearsal-${r.id}`,
+        kind: "rehearsal" as const,
+        title: r.title,
+        href: `/rehearsals/${r.id}`,
+        start: r.startsAt,
+        end: null,
+        status: r.status,
+        done: false,
+        detail: {
+          kind: "rehearsal" as const,
+          type: r.type,
+          songs: ownSongs,
+          presentCount: 0,
+          recordedCount: 0,
+          myAttendance: myAttendance.get(r.id) ?? null,
+        },
+      };
+    }),
     ...myTasks
       .filter((t) => t.dueAt)
       .map((t) => ({
@@ -303,6 +457,12 @@ export async function getUserTimeline(
         end: null,
         status: t.status,
         done: false,
+        detail: {
+          kind: "task" as const,
+          priority: t.priority,
+          assignee: t.assignee?.displayName ?? null,
+          relatedSong: t.relatedSong?.title ?? null,
+        },
       })),
     ...myEquipment.map((e) => ({
       id: `equipment-${e.id}`,
@@ -313,7 +473,8 @@ export async function getUserTimeline(
       end: null,
       status: e.status,
       done: false,
+      detail: { kind: "equipment" as const, assignee: null },
     })),
   ];
-  return assemble(eventDate, items, now);
+  return assemble(hDay, items, now);
 }

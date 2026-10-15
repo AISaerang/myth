@@ -10,6 +10,8 @@ import {
   isItemOverdue,
   itemLabel,
   type TimelineData,
+  type TimelineDetail,
+  type TimelineEvent,
   type TimelineItem,
 } from "@server/services/timeline-service";
 
@@ -165,6 +167,70 @@ function GanttChart({ data, now }: { data: TimelineData; now: Date }) {
   );
 }
 
+function DetailLines({ detail }: { detail: TimelineDetail }) {
+  switch (detail.kind) {
+    case "hday":
+      return (
+        <p>
+          {[detail.venue, detail.startTime && detail.endTime
+            ? `${detail.startTime}–${detail.endTime}`
+            : detail.startTime,
+          detail.eventStatus]
+            .filter(Boolean)
+            .join(" · ") || "Detail menyusul."}
+        </p>
+      );
+    case "batch":
+      if (detail.songs.length === 0) return <p>Belum ada lagu.</p>;
+      return (
+        <ul className="flex flex-col gap-1">
+          {detail.songs.map((s) => (
+            <li key={s.id} className="flex flex-wrap items-center gap-2">
+              <Link href={`/songs/${s.id}`} className="font-medium underline">
+                {s.title}
+              </Link>
+              {!s.isPublished ? <Badge tone="neutral">Draft</Badge> : null}
+              <span className="text-xs text-zinc-500">{s.status}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    case "rehearsal":
+      return (
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-zinc-500">
+            {detail.type}
+            {detail.recordedCount > 0
+              ? ` · hadir ${detail.presentCount}/${detail.recordedCount}`
+              : ""}
+            {detail.myAttendance ? ` · saya: ${detail.myAttendance}` : ""}
+          </p>
+          {detail.songs.length > 0 ? (
+            <p>{detail.songs.map((s) => s.title).join(" · ")}</p>
+          ) : (
+            <p className="text-zinc-500">Lagu menyusul.</p>
+          )}
+        </div>
+      );
+    case "task":
+      return (
+        <p>
+          {[detail.assignee ? `PIC ${detail.assignee}` : null,
+            detail.relatedSong ? `Lagu: ${detail.relatedSong}` : null,
+            `Prioritas ${detail.priority}`]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      );
+    case "equipment":
+      return (
+        <p>
+          {detail.assignee ? `PIC ${detail.assignee}` : "Tanpa PIC"}
+        </p>
+      );
+  }
+}
+
 function TimelineBody({ data, now }: { data: TimelineData; now: Date }) {
   if (!data.rangeStart || !data.rangeEnd || data.items.length === 0) {
     return (
@@ -194,6 +260,34 @@ function TimelineBody({ data, now }: { data: TimelineData; now: Date }) {
           </ul>
         </div>
       ) : null}
+      {data.items.length > 0 ? (
+        <div>
+          <p className="mb-1 text-sm font-medium">Rincian per tonggak</p>
+          <div className="flex flex-col gap-2">
+            {data.items.map((item) => (
+              <details
+                key={item.id}
+                className="rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+              >
+                <summary className="cursor-pointer font-medium">
+                  {item.title}{" "}
+                  <span className="ml-1 inline-flex align-middle">
+                    <ItemBadge item={item} now={now} />
+                  </span>
+                </summary>
+                <div className="mt-2 text-zinc-600 dark:text-zinc-400">
+                  <DetailLines detail={item.detail} />
+                  <p className="mt-1">
+                    <Link href={item.href} className="underline">
+                      Buka {KIND_LABEL[item.kind].toLowerCase()}
+                    </Link>
+                  </p>
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -201,22 +295,22 @@ function TimelineBody({ data, now }: { data: TimelineData; now: Date }) {
 export async function AdminTimelineCard({
   eventId,
   eventName,
-  eventDate,
+  event,
 }: {
   eventId: string;
   eventName: string;
-  eventDate: Date | null;
+  event: TimelineEvent;
 }) {
   const now = new Date();
-  const data = await getEventTimeline(eventId, eventDate, now);
-  const hLabel = hDayLabel(eventDate, now);
+  const data = await getEventTimeline(eventId, event, now);
+  const hLabel = hDayLabel(event.eventDate, now);
   return (
     <Card
       title={`Timeline ke Hari H${hLabel ? ` · ${hLabel}` : ""}`}
     >
       <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
         {eventName}
-        {eventDate ? ` · ${shortDate(eventDate)}` : " · tanggal belum diisi"}
+        {event.eventDate ? ` · ${shortDate(event.eventDate)}` : " · tanggal belum diisi"}
       </p>
       <TimelineBody data={data} now={now} />
     </Card>
@@ -227,23 +321,23 @@ export async function UserTimelineCard({
   userId,
   eventId,
   eventName,
-  eventDate,
+  event,
 }: {
   userId: string;
   eventId: string;
   eventName: string;
-  eventDate: Date | null;
+  event: TimelineEvent;
 }) {
   const now = new Date();
-  const data = await getUserTimeline(userId, eventId, eventDate, now);
-  const hLabel = hDayLabel(eventDate, now);
+  const data = await getUserTimeline(userId, eventId, event, now);
+  const hLabel = hDayLabel(event.eventDate, now);
   return (
     <Card
       title={`Timeline ke Hari H${hLabel ? ` · ${hLabel}` : ""}`}
     >
       <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
         {eventName}
-        {eventDate ? ` · ${shortDate(eventDate)}` : ""}
+        {event.eventDate ? ` · ${shortDate(event.eventDate)}` : ""}
       </p>
       <TimelineBody data={data} now={now} />
     </Card>
