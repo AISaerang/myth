@@ -14,6 +14,7 @@ import { OverdueBadge, TaskPriorityBadge, TaskStatusBadge } from "../../tasks/Wo
 import { isTaskOverdue } from "@/lib/task-status";
 import { SongStatusBadge } from "../../songs/SongStatusBadge";
 import { AttendanceBadge, RehearsalStatusBadge, RehearsalTypeBadge } from "../OpsBadges";
+import { RehearsalSongMover } from "@/components/ui/MoveButtons";
 import { RehearsalForm, toLocalInput } from "../RehearsalForm";
 import {
   AttendanceCard,
@@ -103,15 +104,30 @@ export default async function RehearsalDetailPage({
           <EmptyState title="Belum ada lagu ditentukan" />
         ) : (
           <ul className="flex flex-col gap-1">
-            {rehearsal.songs.map((s) => (
+            {rehearsal.songs.map((s, index) => (
               <li
                 key={s.songId}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
               >
-                <Link href={`/songs/${s.songId}`} className="font-medium underline">
-                  {s.song.title}
-                </Link>
-                <SongStatusBadge status={s.song.status} />
+                <span className="flex items-center gap-2">
+                  <span className="w-6 text-center text-xs text-zinc-500">
+                    {index + 1}
+                  </span>
+                  <Link href={`/songs/${s.songId}`} className="font-medium underline">
+                    {s.song.title}
+                  </Link>
+                </span>
+                <span className="flex items-center gap-2">
+                  {admin ? (
+                    <RehearsalSongMover
+                      rehearsalId={rehearsal.id}
+                      orderedIds={rehearsal.songs.map((x) => x.songId)}
+                      index={index}
+                      title={s.song.title}
+                    />
+                  ) : null}
+                  <SongStatusBadge status={s.song.status} />
+                </span>
               </li>
             ))}
           </ul>

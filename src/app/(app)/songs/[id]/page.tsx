@@ -8,6 +8,7 @@ import { isAdmin } from "@/lib/permissions";
 import { getSong } from "@server/services/song-service";
 import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-service";
 import { getMyProgress, getSongProgress } from "@server/services/progress-service";
+import { listChordCharts } from "@server/services/chord-service";
 import { listSongTasks } from "@server/services/task-service";
 import { prisma } from "@/lib/db";
 import { formatJakarta } from "@/lib/format";
@@ -19,6 +20,7 @@ import {
   CorrectProgressForm,
   MyProgressForm,
 } from "./ProgressForms";
+import { ChordChartSection } from "./ChordChartSection";
 import {
   OverdueBadge,
   PracticeStatusBadge,
@@ -140,6 +142,8 @@ export default async function SongDetailPage({
       ) : null}
 
       <SongProgress songId={song.id} admin={admin} userId={user.id} />
+
+      <SongChordChart songId={song.id} admin={admin} />
 
       <Card title="Materi aktif">
         {song.materials.filter((m) => m.isActive).length === 0 ? (
@@ -317,6 +321,17 @@ export default async function SongDetailPage({
       <SongTasks songId={song.id} />
     </div>
   );
+}
+
+async function SongChordChart({
+  songId,
+  admin,
+}: {
+  songId: string;
+  admin: boolean;
+}) {
+  const charts = await listChordCharts(songId);
+  return <ChordChartSection songId={songId} admin={admin} charts={charts} />;
 }
 
 async function SongProgress({

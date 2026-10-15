@@ -1,7 +1,9 @@
 "use server";
-
 import { revalidatePath } from "next/cache";
+
 import { redirect } from "next/navigation";
+
+import { z } from "zod";
 import { requireActionAdmin } from "@/lib/auth";
 import { canTransitionBatch } from "@/lib/batch-status";
 import { firstIssueMessage } from "@/lib/validation/auth";
@@ -115,6 +117,35 @@ export async function removeSongFromBatchAction(
   const songId = String(formData.get("songId") ?? "");
   if (!batchId || !songId) return { ok: false, error: "Data tidak valid." };
   await removeSongFromBatch(batchId, songId);
+  revalidateBatches(batchId);
+  return { ok: true };
+}
+
+const orderedIdsSchema = z
+  .array(z.string().min(1))
+  .min(1, "Daftar urutan kosong.");
+
+export async function reorderBatchItemsAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireActionAdmin();
+  const batchId = String(formData.get("batchId") ?? "");
+  let ordered: unknown = [];
+  try {
+    ordered = JSON.parse(String(formData.get("orderedIds") ?? "[]"));
+  } catch {
+    return { ok: false, error: "Format urutan tidak valid." };
+  }
+  const parsed = orderedIdsSchema.safeParse(ordered);
+  if (!batchId || !parsed.success) {
+    return { ok: false, error: "Data tidak valid." };
+  }
+  const { reorderBatchItems } = await import(
+    "@server/services/batch-service"
+  );
+  const result = await reorderBatchItems(batchId, parsed.data);
+  if (!result.ok) return { ok: false, error: result.error };
   revalidateBatches(batchId);
   return { ok: true };
 }

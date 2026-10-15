@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { requireActionAdmin } from "@/lib/auth";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
@@ -88,6 +89,31 @@ export async function setRehearsalSongsAction(
   if (!rehearsalId) return { ok: false, error: "Rehearsal tidak valid." };
   const songIds = formData.getAll("songIds").map(String);
   const result = await setRehearsalSongs(rehearsalId, songIds);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateOps(rehearsalId);
+  return { ok: true };
+}
+
+export async function reorderRehearsalSongsAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireActionAdmin();
+  const rehearsalId = String(formData.get("rehearsalId") ?? "");
+  let ordered: unknown = [];
+  try {
+    ordered = JSON.parse(String(formData.get("orderedIds") ?? "[]"));
+  } catch {
+    return { ok: false, error: "Format urutan tidak valid." };
+  }
+  const parsed = z.array(z.string().min(1)).min(1).safeParse(ordered);
+  if (!rehearsalId || !parsed.success) {
+    return { ok: false, error: "Data tidak valid." };
+  }
+  const { reorderRehearsalSongs } = await import(
+    "@server/services/rehearsal-service"
+  );
+  const result = await reorderRehearsalSongs(rehearsalId, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateOps(rehearsalId);
   return { ok: true };

@@ -8,6 +8,7 @@ import { listSongs } from "@server/services/song-service";
 import { SongStatusBadge } from "../../songs/SongStatusBadge";
 import { BatchForm } from "../BatchForm";
 import { BatchStatusBadge } from "../BatchStatusBadge";
+import { BatchItemMover } from "@/components/ui/MoveButtons";
 import {
   AddSongForm,
   BatchStatusChanger,
@@ -65,15 +66,26 @@ export default async function BatchDetailPage({
             <p className="text-sm text-zinc-500">Belum ada lagu.</p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {batch.items.map((item) => (
+              {batch.items.map((item, index) => (
                 <li
                   key={item.songId}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
-                  <Link href={`/songs/${item.songId}`} className="font-medium underline">
-                    {item.song.title}
-                  </Link>
                   <span className="flex items-center gap-2">
+                    <span className="w-6 text-center text-xs text-zinc-500">
+                      {index + 1}
+                    </span>
+                    <Link href={`/songs/${item.songId}`} className="font-medium underline">
+                      {item.song.title}
+                    </Link>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <BatchItemMover
+                      batchId={batch.id}
+                      orderedIds={batch.items.map((i) => i.songId)}
+                      index={index}
+                      title={item.song.title}
+                    />
                     <SongStatusBadge status={item.song.status} />
                     <RemoveSongButton
                       batchId={batch.id}

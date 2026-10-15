@@ -152,8 +152,36 @@ export async function setRehearsalSongs(
   return { ok: true };
 }
 
-export async function upsertAttendance(
-  input: AttendanceInput,
+// Susun ulang urutan lagu dalam rehearsal (penting untuk full
+// rehearsal urutan liturgi). Daftar id harus persis berisi lagu sesi.
+export async function reorderRehearsalSongs(
+  rehearsalId: string,
+  orderedSongIds: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const rehearsal = await prisma.rehearsal.findUnique({
+    where: { id: rehearsalId },
+    include: { songs: { select: { songId: true } } },
+  });
+  if (!rehearsal) return { ok: false, error: "Rehearsal tidak ditemukan." };
+  const current = new Set(rehearsal.songs.map((s) => s.songId));
+  if (
+    orderedSongIds.length !== current.size ||
+    !orderedSongIds.every((id) => current.has(id))
+  ) {
+    return { ok: false, error: "Daftar urutan tidak cocok dengan isi sesi." };
+  }
+  await prisma.$transaction(
+    orderedSongIds.map((songId, index) =>
+      prisma.rehearsalSong.update({
+        where: { rehearsalId_songId: { rehearsalId, songId } },
+        data: { sortOrder: index },
+      }),
+    ),
+  );
+  return { ok: true };
+}
+
+export async function upsertAttendance(  input: AttendanceInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const rehearsal = await prisma.rehearsal.findUnique({
     where: { id: input.rehearsalId },

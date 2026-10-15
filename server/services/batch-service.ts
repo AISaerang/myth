@@ -167,3 +167,32 @@ export async function removeSongFromBatch(
     .delete({ where: { songBatchId_songId: { songBatchId: batchId, songId } } })
     .catch(() => {});
 }
+
+// Susun ulang urutan lagu dalam batch (tombol naik/turun di UI).
+// Daftar id harus persis berisi lagu-lagu batch (tanpa tambah/kurang).
+export async function reorderBatchItems(
+  batchId: string,
+  orderedSongIds: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const batch = await prisma.songBatch.findUnique({
+    where: { id: batchId },
+    include: { items: { select: { songId: true } } },
+  });
+  if (!batch) return { ok: false, error: "Batch tidak ditemukan." };
+  const current = new Set(batch.items.map((i) => i.songId));
+  if (
+    orderedSongIds.length !== current.size ||
+    !orderedSongIds.every((id) => current.has(id))
+  ) {
+    return { ok: false, error: "Daftar urutan tidak cocok dengan isi batch." };
+  }
+  await prisma.$transaction(
+    orderedSongIds.map((songId, index) =>
+      prisma.songBatchItem.update({
+        where: { songBatchId_songId: { songBatchId: batchId, songId } },
+        data: { sortOrder: index },
+      }),
+    ),
+  );
+  return { ok: true };
+}

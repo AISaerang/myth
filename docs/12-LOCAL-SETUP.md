@@ -172,3 +172,27 @@ npm.cmd run seed:event       # event + 9 personel + 19 lagu + 3 batch + materi +
 - [x] `typecheck`, `lint` bersih, `test` 53/53, `build` lolos (20 rute)
 - [ ] 2 lagu Praise belum masuk seed ("Satukanlah Hati Kami", "Obor Pembangunan") — menunggu keputusan MD
 - [ ] Push GitHub → env Vercel → deploy `myth.vercel.app` → smoke login produksi
+
+## 14. Status Lirik & Chord + Sort Manual (terverifikasi 15 Okt 2026)
+
+- [x] Model `ChordChart` (ChordPro inline, basis C, satu aktif per lagu, transaksional + audit)
+- [x] Transpose engine: mayor/minor/slash-chord/kres-mol, normalisasi nada asal → C saat simpan
+- [x] Viewer latihan 3 mode (Lirik+Chord / Lirik saja / Chord saja) + geser nada ±½, reset ke C
+- [x] Input admin: tempel ChordPro + nada asal → tersimpan sebagai C; riwayat + aktifkan/hapus
+- [x] Contoh live: "Bapa Sentuh Hatiku" (G→C terverifikasi di DB)
+- [x] Sort manual: tombol naik/turun urutan lagu di batch & rehearsal (sortOrder transaksional, hanya admin)
+- [x] `typecheck`, `lint` bersih, `test` 82/82, `build` lolos (22 rute)
+- [ ] Enrichment metadata menunggu persetujuan MD (2 lagu ambigu + Joyful Gathering + key TBD)
+
+## 15. Status Setlist Final 21 Nov (terverifikasi 15 Okt 2026)
+
+Rundown resmi: ice breaking → opening → praise → worship → persembahan → berkat → closing.
+- [x] 14 lagu aktif dalam 4 batch manggung (Ice Breaking 4, Opening&Praise 4, Worship 3, Persembahan/Berkat/Closing 3)
+- [x] 4 lagu diarsipkan (Yesus Baik, Ku Hidup, Oceans, NNBT 15): unpublish + unassign + DRAFT, histori utuh
+- [x] Batch lama diganti (1 PUBLISHED diarsipkan, 2 DRAFT dihapus); sortOrder = urutan manggung
+- [x] Assignment: band ke 14 lagu, singers ke 14 lagu (112 via seed)
+- [x] Enrichment: artis/key/BPM/fungsi liturgi baru (Opening/Berkat/Closing/Ice breaking)
+- [x] ChordPro: NDC (D→C), Sungguh Indah Robert&Lea (A→C), Bapa Sentuh (G→C) — basis C terverifikasi
+- [x] `typecheck`, `lint` bersih, `test` 82/82, `build` lolos (22 rute)
+- [ ] Joyful Gathering (artis/key/link) + key NNBT/ASM TBD — MD lengkapi via UI
+- [ ] "Satukanlah Hati Kami" tidak masuk setlist (tidak di-seed)

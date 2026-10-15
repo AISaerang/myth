@@ -9,6 +9,7 @@
 // Phase 4: practice progress + tasks/blockers. (relatedRehearsalId
 // menyusul Phase 5 bersama model Rehearsal.)
 // Phase 5: rehearsals + attendance, equipment, decision log, readiness.
+// Phase 6: chord charts (ChordPro, dinormalisasi ke C) + manual sort.
 
 generator client {
   provider = "prisma-client"
@@ -237,6 +238,7 @@ model Song {
   tasks       Task[]
   rehearsalItems RehearsalSong[]
   decisions   DecisionLog[]
+  chordCharts ChordChart[]
 
   @@index([eventId, status])
   @@index([eventId, isPublished])
@@ -326,6 +328,23 @@ model SongMaterial {
   updatedAt            DateTime            @updatedAt
 
   @@index([songId, category, isActive])
+}
+
+model ChordChart {
+  id           String   @id @default(cuid())
+  songId       String
+  song         Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  // ChordPro inline: chord di dalam [kurung], lirik di luarnya.
+  // Selalu dinormalisasi ke C saat disimpan (lihat src/lib/chords.ts).
+  content      String   @db.Text
+  baseKey      String   @default("C")
+  originalKey  String?
+  label        String?
+  isActive     Boolean  @default(true)
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  @@index([songId, isActive])
 }
 
 enum PracticeStatus {

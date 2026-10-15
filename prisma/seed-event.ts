@@ -39,9 +39,16 @@ const DATA_PATH = "prisma/seed-data.local.json";
 
 interface SeedSong {
   title: string;
+  artistOrAuthor?: string;
   liturgicalFunction?: string;
   status: string;
+  key?: string;
+  bpm?: number;
+  timeSignature?: string;
+  estimatedDurationSeconds?: number;
+  arrangementNotes?: string;
   originalReferenceUrl?: string;
+  chordChart?: { originalKey: string; label?: string; content: string };
 }
 
 interface SeedBatch {
@@ -157,19 +164,67 @@ async function ensureSong(
   const existing = await prisma.song.findFirst({
     where: { eventId, title: { equals: s.title } },
   });
+  const targetStatus = parseSongStatus(s.status);
   const songId =
     existing?.id ??
     (await (async () => {
       const created = await createSong(actorId, {
         eventId,
         title: s.title,
+        artistOrAuthor: s.artistOrAuthor,
         liturgicalFunction: s.liturgicalFunction,
+        key: s.key,
+        bpm: s.bpm,
+        timeSignature: s.timeSignature,
+        estimatedDurationSeconds: s.estimatedDurationSeconds,
+        arrangementNotes: s.arrangementNotes,
         originalReferenceUrl: s.originalReferenceUrl,
-        status: parseSongStatus(s.status),
+        status: targetStatus,
       });
       if (!created.ok) throw new Error(`Lagu gagal: ${created.error}`);
       return created.id;
     })());
+
+  // Sync metadata lagu yang sudah ada (non-destruktif; final lock dihormati).
+  if (existing) {
+    const want = {
+      artistOrAuthor: s.artistOrAuthor || null,
+      liturgicalFunction: s.liturgicalFunction || null,
+      key: s.key || undefined,
+      bpm: s.bpm,
+      timeSignature: s.timeSignature || undefined,
+      estimatedDurationSeconds: s.estimatedDurationSeconds,
+      arrangementNotes: s.arrangementNotes || null,
+      originalReferenceUrl: s.originalReferenceUrl || undefined,
+    };
+    const differs =
+      (existing.artistOrAuthor ?? null) !== want.artistOrAuthor ||
+      (existing.liturgicalFunction ?? null) !== want.liturgicalFunction ||
+      (existing.key ?? undefined) !== want.key ||
+      (existing.bpm ?? undefined) !== want.bpm ||
+      (existing.timeSignature ?? undefined) !== want.timeSignature ||
+      (existing.estimatedDurationSeconds ?? undefined) !==
+        want.estimatedDurationSeconds ||
+      (existing.arrangementNotes ?? null) !== want.arrangementNotes ||
+      (existing.originalReferenceUrl ?? undefined) !== want.originalReferenceUrl ||
+      existing.status !== targetStatus;
+    if (differs && !existing.isFinalLocked) {
+      const { updateSong } = await import("@server/services/song-service");
+      const updated = await updateSong(actorId, songId, {
+        title: existing.title,
+        artistOrAuthor: s.artistOrAuthor,
+        liturgicalFunction: s.liturgicalFunction,
+        key: s.key,
+        bpm: s.bpm,
+        timeSignature: s.timeSignature,
+        estimatedDurationSeconds: s.estimatedDurationSeconds,
+        arrangementNotes: s.arrangementNotes,
+        originalReferenceUrl: s.originalReferenceUrl,
+        status: targetStatus,
+      });
+      if (!updated.ok) console.log(` Lewati sync ${s.title}: ${updated.error}`);
+    }
+  }
 
   if (s.originalReferenceUrl) {
     let version = await prisma.arrangementVersion.findFirst({
@@ -205,6 +260,22 @@ async function ensureSong(
         url: s.originalReferenceUrl,
         versionLabel: "v01",
       }).catch(() => {});
+    }
+  }
+
+  if (s.chordChart) {
+    const { saveChordChart, getActiveChordChart } = await import(
+      "@server/services/chord-service"
+    );
+    const active = await getActiveChordChart(songId);
+    if (!active) {
+      const saved = await saveChordChart(actorId, {
+        songId,
+        content: s.chordChart.content,
+        originalKey: s.chordChart.originalKey,
+        label: s.chordChart.label,
+      });
+      if (!saved.ok) throw new Error(`Chord chart gagal: ${saved.error}`);
     }
   }
   return songId;
@@ -253,6 +324,10 @@ async function main(): Promise<void> {
   }
 
   let songCount = 0;
+  const activeTitles = new Set<string>();
+  for (const b of data.batches) {
+    for (const s of b.songs) activeTitles.add(s.title.toLowerCase());
+  }
   for (const b of data.batches) {
     let batch = await prisma.songBatch.findFirst({
       where: { eventId: event.id, name: { equals: b.name } },
@@ -288,9 +363,96 @@ async function main(): Promise<void> {
     }
   }
 
+  const archived = await archiveStaleSongs(actorId, event.id, activeTitles);
+  await reconcileStaleBatches(actorId, event.id, data.batches.map((b) => b.name));
+
   console.log(
-    `Seed selesai: event "${event.name}", ${data.persons.length} personel, ${songCount} entri lagu, ${data.batches.length} batch.`,
+    `Seed selesai: event "${event.name}", ${data.persons.length} personel, ${songCount} entri lagu, ${data.batches.length} batch, ${archived} lagu diarsipkan.`,
   );
+}
+
+// Lagu event yang tak lagi di JSON: lepas assignment + batch, unpublish,
+// kembali DRAFT. Histori (progres, versi, materi, audit) dipertahankan.
+async function archiveStaleSongs(
+  actorId: string,
+  eventId: string,
+  activeTitles: Set<string>,
+): Promise<number> {
+  const { AuditAction, writeAudit } = await import("@/lib/audit");
+  const songs = await prisma.song.findMany({ where: { eventId } });
+  let count = 0;
+  for (const song of songs) {
+    if (activeTitles.has(song.title.toLowerCase())) continue;
+    const [assignments, items] = await Promise.all([
+      prisma.songAssignment.count({ where: { songId: song.id } }),
+      prisma.songBatchItem.count({ where: { songId: song.id } }),
+    ]);
+    if (
+      !song.isPublished &&
+      assignments === 0 &&
+      items === 0 &&
+      song.status === "DRAFT"
+    ) {
+      continue; // Sudah arsip.
+    }
+    await prisma.$transaction([
+      prisma.songAssignment.deleteMany({ where: { songId: song.id } }),
+      prisma.songBatchItem.deleteMany({ where: { songId: song.id } }),
+      prisma.song.update({
+        where: { id: song.id },
+        data: { isPublished: false, status: "DRAFT" },
+      }),
+    ]);
+    await writeAudit({
+      actorUserId: actorId,
+      action: AuditAction.SONG_UPDATED,
+      entityType: "Song",
+      entityId: song.id,
+      summary: `"${song.title}" diarsipkan (keluar dari setlist).`,
+      metadata: { title: song.title, archived: "true" },
+    });
+    count += 1;
+  }
+  return count;
+}
+
+// Batch event yang tak lagi di JSON: hapus bila masih DRAFT (scaffolding),
+// arsipkan (status ARCHIVED + kosongkan isi) bila sudah diproses lanjut.
+async function reconcileStaleBatches(
+  actorId: string,
+  eventId: string,
+  activeNames: string[],
+): Promise<void> {
+  const { AuditAction, writeAudit } = await import("@/lib/audit");
+  const wanted = new Set(activeNames.map((n) => n.toLowerCase()));
+  const batches = await prisma.songBatch.findMany({ where: { eventId } });
+  for (const batch of batches) {
+    if (wanted.has(batch.name.toLowerCase())) continue;
+    if (batch.status === "DRAFT") {
+      await prisma.songBatchItem.deleteMany({
+        where: { songBatchId: batch.id },
+      });
+      await prisma.songBatch.delete({ where: { id: batch.id } });
+      console.log(` Batch lama dihapus: ${batch.name}`);
+    } else {
+      await prisma.$transaction([
+        prisma.songBatchItem.deleteMany({ where: { songBatchId: batch.id } }),
+        prisma.songBatch.update({
+          where: { id: batch.id },
+          data: { status: "ARCHIVED" },
+        }),
+      ]);
+      await writeAudit({
+        actorUserId: actorId,
+        action: AuditAction.BATCH_STATUS_CHANGED,
+        entityType: "SongBatch",
+        entityId: batch.id,
+        summary: `Batch "${batch.name}" diarsipkan (struktur rundown berubah).`,
+        metadata: { name: batch.name, to: "ARCHIVED" },
+      });
+      console.log(` Batch lama diarsipkan: ${batch.name}`);
+    }
+  }
 }
 
 main()
