@@ -16,7 +16,7 @@ function createClient(): PrismaClient {
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database: decodeURIComponent(url.pathname.replace(/^\//, "")),
-    connectionLimit: 5,
+    connectionLimit: 15,
     // TiDB Serverless can cold-start; allow generous connect time.
     connectTimeout: 30_000,
     acquireTimeout: 30_000,

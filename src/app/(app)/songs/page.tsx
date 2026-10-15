@@ -65,7 +65,10 @@ export default async function SongsPage({
     );
   }
 
-  const events = await listEvents();
+  const [events, current] = await Promise.all([
+    listEvents(),
+    getCurrentEvent(),
+  ]);
   if (events.length === 0) {
     return (
       <EmptyState
@@ -74,7 +77,6 @@ export default async function SongsPage({
       />
     );
   }
-  const current = await getCurrentEvent();
   const eventId =
     params.eventId && events.some((e) => e.id === params.eventId)
       ? params.eventId

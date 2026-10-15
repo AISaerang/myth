@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { SessionUser } from "@/lib/permissions";
@@ -7,12 +8,16 @@ import { SESSION_COOKIE_NAME } from "@/lib/session-token";
 import { findSessionUser } from "@server/services/session-service";
 
 // Path alias @server -> ./server (see tsconfig.json).
-export async function getSessionUser(): Promise<SessionUser | null> {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE_NAME)?.value;
-  if (!token) return null;
-  return findSessionUser(token);
-}
+// Memoized per request: layout + page guards share one DB lookup
+// instead of paying the session JOIN twice per navigation.
+export const getSessionUser = cache(
+  async (): Promise<SessionUser | null> => {
+    const store = await cookies();
+    const token = store.get(SESSION_COOKIE_NAME)?.value;
+    if (!token) return null;
+    return findSessionUser(token);
+  },
+);
 
 // Page guard: must be logged in with a fresh (non-temporary) password.
 export async function requireFreshUser(): Promise<SessionUser> {

@@ -38,7 +38,10 @@ export default async function TasksPage({
   const params = await searchParams;
   const admin = isAdmin(user);
 
-  const events = await listEvents();
+  const [events, current] = await Promise.all([
+    listEvents(),
+    getCurrentEvent(),
+  ]);
   if (events.length === 0) {
     return (
       <EmptyState
@@ -47,7 +50,6 @@ export default async function TasksPage({
       />
     );
   }
-  const current = await getCurrentEvent();
   const eventId =
     params.eventId && events.some((e) => e.id === params.eventId)
       ? params.eventId
@@ -59,6 +61,17 @@ export default async function TasksPage({
   const all = admin
     ? await listTasks(eventId)
     : await listRelevantTasks(user.id, eventId);
+
+  // One profile lookup per page (was N+1: two queries per task row).
+  // Per-row forms only need to know whether this user is the PIC.
+  const myPersonId = admin
+    ? null
+    : (
+        await prisma.person.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        })
+      )?.id ?? null;
 
   const visible = all.filter((t) => {
     const overdue = isTaskOverdue(t.status, t.dueAt);
@@ -197,34 +210,18 @@ export default async function TasksPage({
                       />
                     </div>
                   </details>
-                ) : (
-                  <UserTaskAction taskId={t.id} status={t.status} userId={user.id} />
-                )}
+                ) : !admin &&
+                  myPersonId &&
+                  t.assigneePersonId === myPersonId ? (
+                  <div className="mt-2">
+                    <MyTaskStatusForm taskId={t.id} current={t.status} />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
         )}
       </Card>
-    </div>
-  );
-}
-
-async function UserTaskAction({
-  taskId,
-  status,
-  userId,
-}: {
-  taskId: string;
-  status: "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
-  userId: string;
-}) {
-  const person = await prisma.person.findUnique({ where: { userId } });
-  if (!person) return null;
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
-  if (!task || task.assigneePersonId !== person.id) return null;
-  return (
-    <div className="mt-2">
-      <MyTaskStatusForm taskId={taskId} current={status} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type { Event, EventStatus } from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
@@ -30,9 +31,7 @@ export function toPublicEvent(event: Event): PublicEvent {
 }
 
 export async function listEvents(): Promise<Event[]> {
-  return prisma.event.findMany({
-    orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
-  });
+  return listEventsCached();
 }
 
 export async function getEvent(id: string): Promise<Event | null> {
@@ -43,11 +42,23 @@ export async function getEvent(id: string): Promise<Event | null> {
 // user yang login; label DRAFT/PENDING tetap terlihat agar tidak
 // dikira final (docs/00).
 export async function getCurrentEvent(): Promise<Event | null> {
-  return prisma.event.findFirst({
+  return getCurrentEventCached();
+}
+
+// Memoized per request: pages often need both the list and the current
+// event (plus the layout's auth check) — one DB hit each per navigation.
+const listEventsCached = cache(() =>
+  prisma.event.findMany({
+    orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
+  }),
+);
+
+const getCurrentEventCached = cache(() =>
+  prisma.event.findFirst({
     where: { eventStatus: { not: "CANCELLED" } },
     orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
-  });
-}
+  }),
+);
 
 export async function createEvent(
   actorUserId: string,
