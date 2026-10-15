@@ -14,6 +14,7 @@ import {
 import { SongStatusBadge } from "../songs/SongStatusBadge";
 import { EventStatusBadge } from "../event/EventStatusBadge";
 import { RehearsalTypeBadge } from "../rehearsals/OpsBadges";
+import { AdminTimelineCard, UserTimelineCard } from "./TimelineCard";
 import { MATERIAL_CATEGORY_LABEL } from "../songs/material-labels";
 import {
   OverdueBadge,
@@ -100,6 +101,12 @@ export default async function DashboardPage() {
             <p className="text-sm text-zinc-500">Blocker teknis</p>
           </Link>
         </div>
+
+        <AdminTimelineCard
+          eventId={event.id}
+          eventName={event.name}
+          eventDate={event.eventDate}
+        />
 
         {c.blockedTasks + c.overdueTasks + c.blockedEquipment + c.helpNeeded > 0 ? (
           <Card title="Perlu ditindaklanjuti">
@@ -306,6 +313,13 @@ export default async function DashboardPage() {
           </ul>
         )}
       </Card>
+
+      <UserTimelineCard
+        userId={user.id}
+        eventId={event.id}
+        eventName={event.name}
+        eventDate={event.eventDate}
+      />
 
       {data.myTasks.length > 0 ? (
         <Card title={`Task aktifku (${data.myTasks.length})`}>
