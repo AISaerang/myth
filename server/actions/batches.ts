@@ -121,6 +121,20 @@ export async function removeSongFromBatchAction(
   return { ok: true };
 }
 
+export async function deleteBatchAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireActionAdmin();
+  const batchId = String(formData.get("batchId") ?? "");
+  if (!batchId) return { ok: false, error: "Batch tidak valid." };
+  const { deleteBatch } = await import("@server/services/batch-service");
+  const result = await deleteBatch(admin.id, batchId);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateBatches();
+  return { ok: true };
+}
+
 const orderedIdsSchema = z
   .array(z.string().min(1))
   .min(1, "Daftar urutan kosong.");

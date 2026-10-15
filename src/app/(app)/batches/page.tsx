@@ -8,11 +8,20 @@ import { listBatches } from "@server/services/batch-service";
 import { EventPicker } from "../songs/EventPicker";
 import { BatchForm } from "./BatchForm";
 import { BatchStatusBadge } from "./BatchStatusBadge";
+import { DeleteBatchButton } from "./DeleteBatchButton";
+
+type BatchFilter = "active" | "all" | "archived";
+
+const FILTERS: { value: BatchFilter; label: string }[] = [
+  { value: "active", label: "Aktif" },
+  { value: "all", label: "Semua" },
+  { value: "archived", label: "Arsip" },
+];
 
 export default async function BatchesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ eventId?: string }>;
+  searchParams: Promise<{ eventId?: string; filter?: string }>;
 }) {
   const user = await requireFreshUser();
   if (!isAdmin(user)) {
@@ -35,7 +44,18 @@ export default async function BatchesPage({
     params.eventId && events.some((e) => e.id === params.eventId)
       ? params.eventId
       : (current?.id ?? events[0].id);
-  const batches = await listBatches(eventId);
+  const filter: BatchFilter = FILTERS.some((f) => f.value === params.filter)
+    ? (params.filter as BatchFilter)
+    : "active";
+
+  const all = await listBatches(eventId);
+  const visible = all.filter((b) =>
+    filter === "all"
+      ? true
+      : filter === "archived"
+        ? b.status === "ARCHIVED"
+        : b.status !== "ARCHIVED",
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -47,25 +67,53 @@ export default async function BatchesPage({
         />
       </div>
       <BatchForm mode="create" eventId={eventId} />
-      <Card title={`Semua batch (${batches.length})`}>
-        {batches.length === 0 ? (
-          <EmptyState title="Belum ada batch di event ini" />
+      <nav aria-label="Filter batch" className="flex flex-wrap gap-1">
+        {FILTERS.map((f) => (
+          <Link
+            key={f.value}
+            href={`/batches?eventId=${eventId}&filter=${f.value}`}
+            aria-current={filter === f.value ? "page" : undefined}
+            className={`rounded-lg px-3 py-2 text-sm font-medium ${
+              filter === f.value
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            }`}
+          >
+            {f.label}
+          </Link>
+        ))}
+      </nav>
+      <Card title={`Batch (${visible.length})`}>
+        {visible.length === 0 ? (
+          <EmptyState
+            title={
+              filter === "archived"
+                ? "Tidak ada batch arsip"
+                : "Belum ada batch di event ini"
+            }
+          />
         ) : (
           <ul className="flex flex-col gap-2">
-            {batches.map((b) => (
-              <li key={b.id}>
+            {visible.map((b) => (
+              <li
+                key={b.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+              >
                 <Link
                   href={`/batches/${b.id}`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                  className="font-medium underline"
                 >
-                  <span>
-                    <span className="font-medium">{b.name}</span>
-                    <span className="block text-xs text-zinc-500">
-                      {b.items.length} lagu
-                    </span>
+                  {b.name}
+                  <span className="block text-xs font-normal text-zinc-500 no-underline">
+                    {b.items.length} lagu
                   </span>
-                  <BatchStatusBadge status={b.status} />
                 </Link>
+                <span className="flex items-center gap-2">
+                  <BatchStatusBadge status={b.status} />
+                  {b.items.length === 0 ? (
+                    <DeleteBatchButton batchId={b.id} batchName={b.name} />
+                  ) : null}
+                </span>
               </li>
             ))}
           </ul>

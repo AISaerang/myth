@@ -159,8 +159,7 @@ export async function addSongToBatch(
   return { ok: true };
 }
 
-export async function removeSongFromBatch(
-  batchId: string,
+export async function removeSongFromBatch(  batchId: string,
   songId: string,
 ): Promise<void> {
   await prisma.songBatchItem
@@ -194,5 +193,34 @@ export async function reorderBatchItems(
       }),
     ),
   );
+  return { ok: true };
+}
+
+// Hapus batch permanen. Hanya batch kosong (0 lagu) yang boleh dihapus;
+// batch berisi harus dikeluarkan dulu semua lagunya via UI.
+export async function deleteBatch(
+  actorUserId: string,
+  batchId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const batch = await prisma.songBatch.findUnique({
+    where: { id: batchId },
+    include: { _count: { select: { items: true } } },
+  });
+  if (!batch) return { ok: false, error: "Batch tidak ditemukan." };
+  if (batch._count.items > 0) {
+    return {
+      ok: false,
+      error: `Batch masih berisi ${batch._count.items} lagu; keluarkan dulu semuanya.`,
+    };
+  }
+  await prisma.songBatch.delete({ where: { id: batchId } });
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.BATCH_DELETED,
+    entityType: "SongBatch",
+    entityId: batchId,
+    summary: `Batch kosong "${batch.name}" dihapus permanen.`,
+    metadata: { name: batch.name },
+  });
   return { ok: true };
 }
