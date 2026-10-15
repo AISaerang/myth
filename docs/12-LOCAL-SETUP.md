@@ -213,3 +213,13 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 - [x] Unit test regresi payload edit (`validation-edit-forms.test.ts`)
 - [x] Selaraskan tipe `Role` Prisma (OBSERVER) di broadcast + people + opsi role
 - [x] `typecheck`, `lint` bersih, `test` 90/90, `build` lolos (22 rute), push + auto-deploy
+
+## 18. Role Observer/Pantau + Usulan (terverifikasi 15 Okt 2026)
+
+- [x] `Role` Prisma + migrasi `20261015193600_add_observer_role` (`ADMIN|USER|OBSERVER`)
+- [x] OBSERVER (label "Pantau"): read-only publish-only — dashboard pantau, semua lagu publish + progres semua personel, batch/rehearsal/equipment read, roster kehadiran read; DRAFT/kontak/invite/audit tidak terlihat (filter server-side)
+- [x] Usulan: USER + OBSERVER bisa buat task `TODO` tanpa PIC (judul `[Usulan - Part] …`, deskripsi min. 10 karakter, lagu wajib publish), revisi milik sendiri selama `TODO`; MD memoderasi via form task admin
+- [x] Guard: `canUpdateProgress` + `upsertMyProgress` menolak OBSERVER; semua mutasi lain tetap `requireActionAdmin`
+- [x] Broadcast: varian DM observer; `/people` bisa buat/ubah role OBSERVER
+- [x] Script `npm run onboard:observers` (Axcellent, Cantika — Imanuel Jakbar; Lorenzo — Eben Haezer Cikarang), password dibuang, akses via invite `/broadcast`
+- [x] `typecheck`, `lint` bersih, `test` 98/98

@@ -5,7 +5,7 @@ Logical model for Prisma. Implement incrementally; preserve history. IDs can use
 ## Entities
 
 ### User
-`id`, `username` unique/normalized, `displayName`, `passwordHash`, `role` (`ADMIN|USER`), `mustChangePassword`, `isActive`, `lastLoginAt?`, timestamps.
+`id`, `username` unique/normalized, `displayName`, `passwordHash`, `role` (`ADMIN|USER|OBSERVER`), `mustChangePassword`, `isActive`, `lastLoginAt?`, timestamps.
 
 ### Person
 `id`, `userId?` unique, `displayName`, `congregation?`, `contact?` restricted, `notes?`, `isConfirmed`, `isActive`, timestamps. Person separates operational identity from login identity; may be simplified by combining with User in early MVP.
@@ -63,4 +63,4 @@ Use transactions for version activation; archive rather than delete referenced s
 Unique username; indexes for event/status/published songs, batch status, progress person/song, task status/due/assignee, rehearsal starts/status, equipment status, audit entity/date.
 
 ## Authorization
-Admin can manage event records. User sees published/relevant data, assigned songs/tasks, and own progress. User cannot change other users' progress or roles. Enforce server-side.
+Admin can manage event records. User sees published/relevant data, assigned songs/tasks, and own progress. Observer (`OBSERVER`, label UI "Pantau") sees all published data and all personnel progress on published songs plus publish-scoped tasks, and may create suggestions (Task `TODO` without PIC, moderated by MD). Observer cannot see DRAFT songs, contacts, or manage anything. User cannot change other users' progress or roles. Enforce server-side.

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isObserver } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { getCurrentEvent } from "@server/services/event-service";
 import { listPersonnelForAdmin } from "@server/services/personnel-service";
@@ -32,6 +32,7 @@ export default async function RehearsalDetailPage({
   const rehearsal = await getRehearsal(id);
   if (!rehearsal) notFound();
   const admin = isAdmin(user);
+  const observer = isObserver(user);
 
   if (!admin) {
     // Personel hanya melihat rehearsal event berjalan.
@@ -141,6 +142,31 @@ export default async function RehearsalDetailPage({
 
       {admin ? (
         <AdminAttendance rehearsalId={rehearsal.id} />
+      ) : observer ? (
+        <Card title={`Kehadiran (${rehearsal.attendance.length})`}>
+          {rehearsal.attendance.length === 0 ? (
+            <p className="text-sm text-zinc-500">Belum ada data kehadiran.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {rehearsal.attendance.map((a) => (
+                <li
+                  key={a.personId}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                >
+                  <span className="font-medium">
+                    {a.person.displayName}
+                    {a.note ? (
+                      <span className="block text-xs font-normal text-zinc-500">
+                        {a.note}
+                      </span>
+                    ) : null}
+                  </span>
+                  <AttendanceBadge status={a.status} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       ) : (
         <Card title="Kehadiranku">
           {myAttendance ? (

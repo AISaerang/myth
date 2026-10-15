@@ -55,4 +55,11 @@ describe("direct message", () => {
       buildDirectMessage({ ...base, skills: ["Keyboard"], isAdmin: true }),
     ).toContain("ADMIN");
   });
+
+  it("uses the observer paragraph for OBSERVER accounts", () => {
+    const msg = buildDirectMessage({ ...base, isObserver: true });
+    expect(msg).toContain("Pemantau");
+    expect(msg).toContain("usulan");
+    expect(msg).not.toContain("bagian vokal");
+  });
 });

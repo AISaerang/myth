@@ -10,6 +10,7 @@ import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-se
 import { getMyProgress, getSongProgress } from "@server/services/progress-service";
 import { listChordCharts } from "@server/services/chord-service";
 import { listSongTasks } from "@server/services/task-service";
+import { listRehearsals } from "@server/services/rehearsal-service";
 import { prisma } from "@/lib/db";
 import { formatJakarta } from "@/lib/format";
 import { isTaskOverdue } from "@/lib/task-status";
@@ -20,6 +21,7 @@ import {
   CorrectProgressForm,
   MyProgressForm,
 } from "./ProgressForms";
+import { CreateSuggestionForm } from "../../tasks/TaskForms";
 import { ChordChartSection } from "./ChordChartSection";
 import {
   OverdueBadge,
@@ -323,6 +325,14 @@ export default async function SongDetailPage({
       </Card>
 
       <SongTasks songId={song.id} />
+
+      {!admin ? (
+        <SongSuggestion
+          eventId={song.eventId}
+          songId={song.id}
+          songTitle={song.title}
+        />
+      ) : null}
     </div>
   );
 }
@@ -437,8 +447,29 @@ async function SongProgress({
   );
 }
 
-async function SongTasks({ songId }: { songId: string }) {
-  const tasks = await listSongTasks(songId);
+async function SongSuggestion({
+  eventId,
+  songId,
+  songTitle,
+}: {
+  eventId: string;
+  songId: string;
+  songTitle: string;
+}) {
+  const rehearsals = await listRehearsals(eventId);
+  return (
+    <CreateSuggestionForm
+      eventId={eventId}
+      context={{
+        songs: [{ id: songId, title: songTitle }],
+        rehearsals: rehearsals.map((r) => ({ id: r.id, title: r.title })),
+      }}
+      defaultSongId={songId}
+    />
+  );
+}
+
+async function SongTasks({ songId }: { songId: string }) {  const tasks = await listSongTasks(songId);
   if (tasks.length === 0) return null;
   return (
     <Card title={`Task terkait (${tasks.length})`}>

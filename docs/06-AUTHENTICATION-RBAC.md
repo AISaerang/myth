@@ -3,7 +3,9 @@
 ## Roles
 **ADMIN:** manages accounts, event, people, songs, batches, assignments, versions, materials, tasks, rehearsals, equipment, decisions, all progress, and audit logs.
 
-**USER:** views relevant published/assigned songs and materials; updates own practice progress; views relevant tasks and rehearsals; may update own profile/password. Cannot create users, change roles, access settings, or modify another user's progress.
+**USER:** views relevant published/assigned songs and materials; updates own practice progress; views relevant tasks and rehearsals; may update own profile/password and send suggestions. Cannot create users, change roles, access settings, or modify another user's progress.
+
+**OBSERVER (label UI "Pantau"):** read-only monitor plus suggester. Views all *published* songs/materials, all personnel progress on published songs, publish-scoped tasks, batches, rehearsals, equipment, and team roster. May create suggestions (Task `TODO` without PIC, min. 10-char description, moderated by MD) and revise own suggestions while still `TODO`. Cannot see DRAFT songs, contacts, invite links, or audit; cannot mutate anything else. Enforced server-side (publish filter in services, `requireActionAdmin` on all other mutations).
 
 ## Manual accounts
 - No public registration.
@@ -45,17 +47,19 @@ Use environment variables or a secure one-time admin command. It must be idempot
 For each server request: validate session; active account; role; event scope; ownership/assignment; schema; then mutate. Log sensitive actions. Hidden UI is not authorization.
 
 ## Access matrix
-| Area | Admin | User |
-|---|---|---|
-| Dashboard | All summaries | Personal summaries |
-| Event | Read/write | Published read |
-| Songs/materials | CRUD/publish/lock | Read relevant published/assigned |
-| Practice progress | Read all/admin correction audited | Own only |
-| People/accounts | CRUD/reset/deactivate | Limited team info |
-| Tasks | CRUD/assign | Relevant; update assigned if enabled |
-| Rehearsal | CRUD/attendance/notes | Read; own attendance if enabled |
-| Equipment | CRUD | Read relevant |
-| Settings/roles/audit | Full | None |
+| Area | Admin | Observer (Pantau) | User |
+|---|---|---|---|
+| Dashboard | All summaries | Published-only summaries | Personal summaries |
+| Event | Read/write | Published read | Published read |
+| Songs/materials | CRUD/publish/lock | Read published + all progress | Read relevant published/assigned |
+| Practice progress | Read all/admin correction audited | Read all (published) | Own only |
+| Suggestions (Task TODO) | Triage all | Create own, revise while TODO | Create own, revise while TODO |
+| People/accounts | CRUD/reset/deactivate | Limited team info | Limited team info |
+| Tasks | CRUD/assign | Read publish-scoped | Relevant; update assigned if enabled |
+| Rehearsal | CRUD/attendance/notes | Read (+ attendance roster) | Read; own attendance if enabled |
+| Equipment | CRUD | Read | Read relevant |
+| Decisions | Full | None | None |
+| Settings/roles/audit | Full | None | None |
 
 ## Required security tests
 Direct URL access by user denied; User A cannot mutate User B's progress; role cannot be self-updated; inactive account blocked; first login requires password change; logs contain no secrets.

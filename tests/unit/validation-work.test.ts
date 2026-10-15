@@ -12,6 +12,7 @@ import {
 } from "@/lib/task-status";
 import {
   progressSchema,
+  suggestionSchema,
   taskSchema,
   taskStatusUpdateSchema,
 } from "@/lib/validation/work";
@@ -95,5 +96,39 @@ describe("task validation", () => {
     expect(taskStatusUpdateSchema.safeParse({ status: "DONE" }).success).toBe(
       true,
     );
+  });
+});
+
+describe("suggestion validation", () => {
+  const base = {
+    eventId: "e1",
+    title: "[Usulan - Guitar Lead] Intro dibuat lebih lembut",
+    description: "Bagian intro sebaiknya dimainkan dengan clean tone dan volume rendah.",
+  };
+
+  it("accepts a minimal suggestion", () => {
+    expect(suggestionSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("rejects short descriptions and titles", () => {
+    expect(
+      suggestionSchema.safeParse({ ...base, description: "kurang" }).success,
+    ).toBe(false);
+    expect(suggestionSchema.safeParse({ ...base, title: "Hi" }).success).toBe(
+      false,
+    );
+    expect(
+      suggestionSchema.safeParse({ ...base, eventId: "" }).success,
+    ).toBe(false);
+  });
+
+  it("accepts optional song/rehearsal relations", () => {
+    expect(
+      suggestionSchema.safeParse({
+        ...base,
+        relatedSongId: "s1",
+        relatedRehearsalId: "r1",
+      }).success,
+    ).toBe(true);
   });
 });

@@ -5,7 +5,8 @@ Mobile-first, ringkas, Bahasa Indonesia konsisten, status memakai teks + warna, 
 
 ## Navigation
 Admin: Dashboard, Event Brief, Lagu, Batch, Personel & Akses, Tasks/Blockers, Rehearsal, Equipment & Teknis, Decisions/Notes, Settings.  
-User: Beranda, Lagu Saya, Task Saya, Rehearsal, Materi/Drive, Profil & Password.
+User: Beranda, Lagu Saya, Task Saya, Rehearsal, Materi/Drive, Profil & Password.  
+Observer (Pantau): Dashboard pantau, Event Brief, Lagu (semua publish), Batch (read-only), Tasks & Usulan, Rehearsal, Equipment & Teknis, Profil & Password. Tanpa Personel & Akses, Broadcast, Keputusan, dan semua form admin.
 
 ## Login page
 Brand, username, password, tombol Masuk, error generik, instruksi hubungi admin. Tidak ada sign-up. Jangan simpan password di localStorage.

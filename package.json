@@ -17,6 +17,7 @@
     "db:migrate": "prisma migrate dev",
     "bootstrap:admin": "tsx --env-file=.env scripts/bootstrap-admin.ts",
     "onboard:personnel": "tsx --env-file=.env scripts/bulk-create-personnel.ts",
+    "onboard:observers": "tsx --env-file=.env scripts/onboard-observers.ts",
     "seed:event": "tsx --env-file=.env prisma/seed-event.ts"
   },
   "dependencies": {

@@ -6,7 +6,9 @@ Membuat hub operasional untuk persiapan tim musik dari pembagian lagu hingga har
 ## Personas
 **Admin/MD:** mengelola event brief, personel, lagu, batch, materi, progres semua personel, task, rehearsal, equipment, keputusan, dan akun.
 
-**User/personel:** melihat lagu yang ditugaskan, materi aktif, task sendiri, jadwal rehearsal, dan memperbarui progres latihan.
+**User/personel:** melihat lagu yang ditugaskan, materi aktif, task sendiri, jadwal rehearsal, memperbarui progres latihan, dan mengirim usulan.
+
+**Observer/pemantau:** melihat semua lagu publish, progres semua personel di lagu publish, task/batch/rehearsal/equipment terkait, serta mengirim usulan (termasuk teknis per part) yang dimoderasi MD. Tidak bisa mengubah data musikal maupun akun.
 
 **Panitia/PIC:** pemilik keputusan acara keseluruhan. Tidak perlu role aplikasi di MVP; role baca saja dapat ditambahkan bila dibutuhkan.
 
@@ -36,7 +38,7 @@ Kategori: Original, Arrangement Reference, Part Guide, Chord Chart, Lyrics, Clic
 Status: `NOT_STARTED`, `LEARNING`, `TRIED_WITH_REFERENCE`, `NEEDS_HELP`, `READY_FOR_REHEARSAL`. User hanya mengubah progres sendiri; admin melihat semua.
 
 ### Tasks/issues
-Judul, deskripsi, PIC, due date, prioritas, status, relasi lagu/rehearsal/equipment. Status: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `CANCELLED`. Blocker harus punya owner dan tindak lanjut.
+Judul, deskripsi, PIC, due date, prioritas, status, relasi lagu/rehearsal/equipment. Status: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `CANCELLED`. Blocker harus punya owner dan tindak lanjut. Usulan dari USER/OBSERVER dibuat sebagai task `TODO` tanpa PIC (prioritas `MEDIUM`, deskripsi min. 10 karakter, lagu terkait wajib publish) dan dimoderasi MD; pemilik boleh revisi selama masih `TODO`.
 
 ### Rehearsals
 Online monitoring, onsite sectional, full rehearsal, technical rehearsal/gladi bersih, event-day soundcheck. Simpan waktu, lokasi/link, agenda, lagu, attendance, notes, decisions, action items.

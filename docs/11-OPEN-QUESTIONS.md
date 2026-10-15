@@ -22,7 +22,7 @@ Do not present unresolved information as confirmed.
 - [x] Confirm app name/domain → **MYTH (Music Youth Team Hub)**, `https://myth-yg.vercel.app` (`myth` sudah dipakai orang).
 - [x] Choose managed database → **TiDB Cloud Serverless** (`music_team_hub`, provider mysql).
 - [ ] Decide if manual Drive links are enough for MVP.
-- [ ] Decide if email notifications or read-only committee role are needed.
+- [x] Decide if email notifications or read-only committee role are needed → **read-only committee role = `OBSERVER` (label "Pantau"), implemented 15 Okt 2026**: publish-only read-all + suggestions moderated by MD. Email notifications still deferred.
 - [ ] Store contact data only if operationally necessary.
 
 ## Boundary reminder

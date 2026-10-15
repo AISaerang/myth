@@ -24,7 +24,7 @@ Audit logs, responsive QA, security tests, backup/restore notes, deployment runb
 ## Priority
 **P0:** auth/RBAC, event brief, people, songs/batches/materials, progress, tasks, rehearsal, equipment, Drive links.  
 **P1:** audit, attendance, decision log, in-app notices, roster/song export.  
-**P2:** Drive API/picker, email notifications, calendar export, read-only committee role, PWA, multi-event.
+**P2:** Drive API/picker, email notifications, calendar export, PWA, multi-event. (Read-only committee role sudah diimplementasikan sebagai `OBSERVER`/Pantau.)
 
 ## Build by vertical slice
 1. Admin login → create user → user first login/password change.

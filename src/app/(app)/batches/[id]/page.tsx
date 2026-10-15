@@ -26,10 +26,71 @@ export default async function BatchDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdminUser();
+  const user = await requireFreshUser();
+  const admin = isAdmin(user);
+  const observer = isObserver(user);
+  if (!admin && !observer) {
+    await requireAdminUser();
+  }
   const { id } = await params;
   const batch = await getBatch(id);
   if (!batch) notFound();
+
+  if (observer) {
+    const published = batch.items.filter((i) => i.song.isPublished);
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+            {batch.name}
+          </h1>
+          <BatchStatusBadge status={batch.status} />
+        </div>
+        {batch.description ? (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {batch.description}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-4 text-sm text-zinc-600 dark:text-zinc-400">
+          {batch.releaseAt ? (
+            <span>
+              Rilis: {formatJakarta(batch.releaseAt, { hour: undefined, minute: undefined })}
+            </span>
+          ) : null}
+          {batch.targetReviewAt ? (
+            <span>
+              Target review:{" "}
+              {formatJakarta(batch.targetReviewAt, { hour: undefined, minute: undefined })}
+            </span>
+          ) : null}
+        </div>
+        <Card title={`Lagu publish dalam batch (${published.length})`}>
+          {published.length === 0 ? (
+            <p className="text-sm text-zinc-500">Belum ada lagu publish di batch ini.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {published.map((item, index) => (
+                <li
+                  key={item.songId}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-6 text-center text-xs text-zinc-500">
+                      {index + 1}
+                    </span>
+                    <Link href={`/songs/${item.songId}`} className="font-medium underline">
+                      {item.song.title}
+                    </Link>
+                  </span>
+                  <SongStatusBadge status={item.song.status} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+    );
+  }
 
   const eventSongs = await listSongs(batch.eventId);
   const inBatch = new Set(batch.items.map((i) => i.songId));

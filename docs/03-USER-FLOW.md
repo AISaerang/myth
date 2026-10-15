@@ -16,6 +16,13 @@
 6. Admin mengirimkan melalui kanal privat, bukan grup.
 7. User login dan mengganti password.
 
+## Observer/pemantau
+1. Admin membuat akun `OBSERVER` (Personel & Akses), kirim link undangan via japri.
+2. Observer login, ganti password, membuka dashboard pantau (lagu publish saja).
+3. Observer memantau progres semua personel, batch, rehearsal, dan equipment.
+4. Observer mengirim usulan per lagu/part (judul `[Usulan - Part] …`, min. 10 karakter).
+5. MD mereview: melengkapi PIC/prioritas/tenggat, menindaklanjuti atau menutup usulan.
+
 ## Event brief
 1. Admin isi nama, tanggal/jam, lokasi, tema, durasi, PIC, link rundown/liturgi.
 2. Tandai draft/pending/confirmed.

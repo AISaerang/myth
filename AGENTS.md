@@ -5,7 +5,7 @@ Sebelum coding, baca seluruh dokumen di `docs/`. Periksa repo dan konvensi yang 
 ## Aturan utama
 - Bangun bertahap; jangan mencoba mengimplementasikan seluruh aplikasi sekaligus.
 - Gunakan TypeScript strict, Next.js App Router, Prisma 7, TiDB Cloud Serverless (MySQL-compatible), validasi server-side (misalnya Zod), dan session auth yang aman.
-- Role MVP hanya `ADMIN` dan `USER`; public registration tidak ada.
+- Role `ADMIN` dan `USER`, plus `OBSERVER` (label UI "Pantau", read-only publish-only + pengusul via task TODO yang dimoderasi MD); public registration tidak ada.
 - MD bertanggung jawab atas arah musikal, aransemen, kesiapan lagu, dan rehearsal musikal. Panitia/PIC wilayah tetap pemilik konsep acara, rundown final, durasi, dan koordinasi non-musikal.
 - Google Drive menyimpan file besar; aplikasi menyimpan metadata/link.
 - Semua mutasi harus memiliki validasi dan authorization di server. Menyembunyikan tombol bukan authorization.

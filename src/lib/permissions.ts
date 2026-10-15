@@ -45,10 +45,12 @@ export function canManageAccounts(user: SessionUser): boolean {
 
 // Practice progress ownership (used from Phase 4; defined now so the
 // rule is centralized): users mutate only their own progress,
-// admins may correct anyone's (audited).
+// admins may correct anyone's (audited). OBSERVER never mutates
+// progress (pemantau + pengusul saja).
 export function canUpdateProgress(
   actor: SessionUser,
   targetUserId: string,
 ): boolean {
+  if (actor.role === "OBSERVER") return false;
   return actor.id === targetUserId || actor.role === "ADMIN";
 }

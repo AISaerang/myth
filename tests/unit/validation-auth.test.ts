@@ -53,7 +53,7 @@ describe("auth validation", () => {
     expect(ok.success).toBe(true);
   });
 
-  it("restricts new account roles to ADMIN|USER", () => {
+  it("restricts new account roles to ADMIN|USER|OBSERVER", () => {
     expect(
       createUserSchema.safeParse({
         username: "pemain1",
@@ -68,5 +68,14 @@ describe("auth validation", () => {
     });
     expect(ok.success).toBe(true);
     if (ok.success) expect(ok.data.username).toBe("pemain1");
+  });
+
+  it("accepts OBSERVER as a read-only monitor role", () => {
+    const ok = createUserSchema.safeParse({
+      username: "axcellent",
+      displayName: "Axcellent",
+      role: "OBSERVER",
+    });
+    expect(ok.success).toBe(true);
   });
 });
