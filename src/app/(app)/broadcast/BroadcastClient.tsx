@@ -56,6 +56,7 @@ export function DirectMessageCard({
     skills: recipient.skills,
     assignmentCount: recipient.assignmentCount,
     isAdmin: recipient.role === "ADMIN",
+    isObserver: recipient.role === "OBSERVER",
   });
   const [message, setMessage] = useState(initial);
   const [inviteError, setInviteError] = useState<string | null>(null);

@@ -103,6 +103,106 @@ export async function getAdminReadiness(eventId: string, now: Date = new Date())
   };
 }
 
+// Dashboard pemantau (OBSERVER): seperti admin tapi Publish-only.
+// Tidak ada kontak pribadi, invite, password, atau audit sensitif.
+// DRAFT internal tidak pernah masuk angka maupun list.
+export async function getObserverDashboard(eventId: string, now: Date = new Date()) {
+  const [
+    songs,
+    batches,
+    tasks,
+    equipment,
+    upcomingRehearsals,
+    helpNeeded,
+  ] = await Promise.all([
+    prisma.song.findMany({
+      where: { eventId, isPublished: true },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        isPublished: true,
+        _count: { select: { assignments: true } },
+      },
+      orderBy: { title: "asc" },
+    }),
+    prisma.songBatch.findMany({
+      where: { eventId, status: { not: "ARCHIVED" } },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        _count: { select: { items: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.task.findMany({
+      where: {
+        eventId,
+        OR: [
+          { relatedSongId: null },
+          { relatedSong: { isPublished: true } },
+        ],
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        dueAt: true,
+        assignee: { select: { displayName: true } },
+      },
+    }),
+    prisma.equipmentItem.findMany({
+      where: { eventId },
+      select: { id: true, name: true, status: true, assignee: { select: { displayName: true } } },
+    }),
+    prisma.rehearsal.findMany({
+      where: {
+        eventId,
+        status: { in: ["SCHEDULED", "RESCHEDULED"] },
+        startsAt: { gte: now },
+      },
+      select: { id: true, title: true, type: true, startsAt: true },
+      orderBy: { startsAt: "asc" },
+      take: 3,
+    }),
+    prisma.practiceProgress.findMany({
+      where: { song: { eventId, isPublished: true }, status: "NEEDS_HELP" },
+      select: {
+        song: { select: { id: true, title: true } },
+        person: { select: { displayName: true } },
+        note: true,
+      },
+    }),
+  ]);
+
+  const overdueTasks = tasks.filter((t) => isTaskOverdue(t.status, t.dueAt, now));
+  const blockedTasks = tasks.filter((t) => t.status === "BLOCKED");
+  const blockedEquipment = equipment.filter((e) => e.status === "BLOCKED");
+  const attentionSongs = songs.filter((s) => s.status === "NEEDS_REVIEW");
+
+  return {
+    songs,
+    batches,
+    overdueTasks,
+    blockedTasks,
+    blockedEquipment,
+    attentionSongs,
+    helpNeeded,
+    upcomingRehearsals,
+    equipment,
+    counts: {
+      totalSongs: songs.length,
+      attentionSongs: attentionSongs.length,
+      overdueTasks: overdueTasks.length,
+      blockedTasks: blockedTasks.length,
+      blockedEquipment: blockedEquipment.length,
+      helpNeeded: helpNeeded.length,
+    },
+  };
+}
+
 // Dashboard personal personel (docs/01, docs/04).
 export async function getUserDashboard(userId: string, eventId: string, now: Date = new Date()) {
   const person = await prisma.person.findUnique({ where: { userId } });

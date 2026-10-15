@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isObserver } from "@/lib/permissions";
 import { getSong } from "@server/services/song-service";
 import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-service";
 import { getMyProgress, getSongProgress } from "@server/services/progress-service";
@@ -58,8 +58,12 @@ export default async function SongDetailPage({
   const song = await getSong(id);
   if (!song) notFound();
   const admin = isAdmin(user);
+  const observer = isObserver(user);
 
-  if (!admin) {
+  if (observer) {
+    // Pemantau: boleh membuka semua lagu Publish, tanpa assignment.
+    if (!song.isPublished) notFound();
+  } else if (!admin) {
     // Personel hanya boleh membuka lagu yang dipublikasi dan ditugaskan.
     const person = await prisma.person.findUnique({
       where: { userId: user.id },
@@ -70,7 +74,7 @@ export default async function SongDetailPage({
     if (!song.isPublished || !assigned) notFound();
   }
 
-  const myAssignment = !admin
+  const myAssignment = !admin && !observer
     ? song.assignments[0]
     : undefined;
 
@@ -141,7 +145,7 @@ export default async function SongDetailPage({
         </Card>
       ) : null}
 
-      <SongProgress songId={song.id} admin={admin} userId={user.id} />
+      <SongProgress songId={song.id} admin={admin} observer={observer} userId={user.id} />
 
       <SongChordChart songId={song.id} admin={admin} />
 
@@ -337,12 +341,50 @@ async function SongChordChart({
 async function SongProgress({
   songId,
   admin,
+  observer,
   userId,
 }: {
   songId: string;
   admin: boolean;
+  observer: boolean;
   userId: string;
 }) {
+  if (observer) {
+    const progress = await getSongProgress(songId);
+    const total = progress.length;
+    const ready = progress.filter((p) => p.status === "READY_FOR_REHEARSAL").length;
+    const needHelp = progress.filter((p) => p.status === "NEEDS_HELP");
+    return (
+      <Card title={`Progres personel (${ready}/${total} siap)`}>
+        {needHelp.length > 0 ? (
+          <p className="mb-3 text-sm font-medium text-red-700 dark:text-red-400">
+            Perlu bantuan: {needHelp.map((p) => p.person.displayName).join(", ")}
+          </p>
+        ) : null}
+        {progress.length === 0 ? (
+          <EmptyState title="Belum ada yang update progres" />
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {progress.map((p) => (
+              <li
+                key={`${p.songId}-${p.personId}`}
+                className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{p.person.displayName}</span>
+                  {!p.person.isActive ? <Badge tone="neutral">Nonaktif</Badge> : null}
+                  <PracticeStatusBadge status={p.status} />
+                </div>
+                {p.note ? (
+                  <p className="mt-1 text-zinc-600 dark:text-zinc-400">{p.note}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    );
+  }
   if (!admin) {
     const current = await getMyProgress(userId, songId);
     return (

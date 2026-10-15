@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAdminUser } from "@/lib/auth";
 import { formatJakarta } from "@/lib/format";
+import { roleLabel } from "@/lib/permissions";
 import { listUsers } from "@server/services/user-service";
 import { CreateUserForm } from "./CreateUserForm";
 import {
@@ -37,7 +38,7 @@ export default async function PeoplePage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold">{u.displayName}</p>
                     <Badge tone={u.role === "ADMIN" ? "success" : "neutral"}>
-                      {u.role}
+                      {roleLabel(u.role)}
                     </Badge>
                     {u.isActive ? (
                       <Badge tone="success">Aktif</Badge>

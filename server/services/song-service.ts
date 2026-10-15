@@ -52,6 +52,28 @@ export async function listMySongs(userId: string, eventId: string) {
   });
 }
 
+// Lagu untuk pemantau: semua yang sudah Publish (tanpa perlu
+// assignment). DRAFT internal tidak pernah bocor ke observer.
+export async function listPublishedSongsForObserver(eventId: string) {
+  return prisma.song.findMany({
+    where: { eventId, isPublished: true },
+    include: {
+      activeVersion: { select: { id: true, versionLabel: true } },
+      assignments: {
+        include: {
+          person: { select: { id: true, displayName: true } },
+          instrumentSkill: { select: { id: true, name: true } },
+        },
+        orderBy: { person: { displayName: "asc" } },
+      },
+      batchItems: {
+        include: { batch: { select: { id: true, name: true, status: true } } },
+      },
+    },
+    orderBy: [{ status: "asc" }, { title: "asc" }],
+  });
+}
+
 export async function getSong(id: string) {
   return prisma.song.findUnique({
     where: { id },

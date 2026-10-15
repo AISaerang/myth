@@ -11,6 +11,7 @@ import {
   batchAssignmentSchema,
   batchSchema,
   batchStatusSchema,
+  batchUpdateSchema,
 } from "@/lib/validation/song";
 import {
   addSongToBatch,
@@ -32,9 +33,20 @@ function revalidateBatches(batchId?: string): void {
   if (batchId) revalidatePath(`/batches/${batchId}`);
 }
 
-function parseBatchForm(formData: FormData, withEvent: boolean) {
+function parseBatchForm(formData: FormData) {
   return batchSchema.safeParse({
-    ...(withEvent ? { eventId: formData.get("eventId") } : {}),
+    eventId: formData.get("eventId"),
+    name: formData.get("name"),
+    description: formData.get("description") || undefined,
+    releaseAt: formData.get("releaseAt") || undefined,
+    targetReviewAt: formData.get("targetReviewAt") || undefined,
+    status: formData.get("status") ?? "DRAFT",
+  });
+}
+
+function parseBatchUpdateForm(formData: FormData) {
+  // Form edit tidak mengirim eventId; status diubah via aksi status khusus.
+  return batchUpdateSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") || undefined,
     releaseAt: formData.get("releaseAt") || undefined,
@@ -48,7 +60,7 @@ export async function createBatchAction(
   formData: FormData,
 ): Promise<ActionState> {
   const admin = await requireActionAdmin();
-  const parsed = parseBatchForm(formData, true);
+  const parsed = parseBatchForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
@@ -65,13 +77,12 @@ export async function updateBatchAction(
   const admin = await requireActionAdmin();
   const id = String(formData.get("batchId") ?? "");
   if (!id) return { ok: false, error: "Batch tidak valid." };
-  const parsed = parseBatchForm(formData, false);
+  const parsed = parseBatchUpdateForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const { status: _status, eventId: _event, ...input } = parsed.data;
+  const { status: _status, ...input } = parsed.data;
   void _status;
-  void _event;
   const result = await updateBatch(admin.id, id, input);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateBatches(id);

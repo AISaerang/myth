@@ -55,6 +55,10 @@ export const changePasswordSchema = z
     path: ["newPassword"],
   });
 
+export const roleSchema = z.enum(["ADMIN", "USER", "OBSERVER"], {
+  message: "Role harus ADMIN, USER, atau OBSERVER.",
+});
+
 export const createUserSchema = z.object({
   username: usernameSchema,
   displayName: z
@@ -62,9 +66,7 @@ export const createUserSchema = z.object({
     .trim()
     .min(2, "Nama tampilan minimal 2 karakter.")
     .max(100, "Nama tampilan maksimal 100 karakter."),
-  role: z.enum(["ADMIN", "USER"], {
-    message: "Role harus ADMIN atau USER.",
-  }),
+  role: roleSchema,
 });
 
 export const updateUserSchema = z.object({
@@ -73,9 +75,7 @@ export const updateUserSchema = z.object({
     .trim()
     .min(2, "Nama tampilan minimal 2 karakter.")
     .max(100, "Nama tampilan maksimal 100 karakter."),
-  role: z.enum(["ADMIN", "USER"], {
-    message: "Role harus ADMIN atau USER.",
-  }),
+  role: roleSchema,
 });
 
 export function firstIssueMessage(error: z.ZodError): string {

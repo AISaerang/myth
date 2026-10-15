@@ -25,11 +25,18 @@ export async function getSongProgress(songId: string) {
 
 // Personel memperbarui progresnya sendiri (docs/01: user hanya
 // mengubah progres sendiri). Harus ditugaskan di lagu itu.
+// OBSERVER tidak boleh update progres (pemantau + pengusul saja).
 export async function upsertMyProgress(
   userId: string,
   input: ProgressInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const person = await prisma.person.findUnique({ where: { userId } });
+  const [user, person] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
+    prisma.person.findUnique({ where: { userId } }),
+  ]);
+  if (user?.role === "OBSERVER") {
+    return { ok: false, error: "Akun pemantau tidak bisa update progres latihan." };
+  }
   if (!person || !person.isActive) {
     return { ok: false, error: "Profil personel tidak aktif." };
   }

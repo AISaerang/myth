@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isObserver, roleLabel } from "@/lib/permissions";
 import { requireFreshUser } from "@/lib/auth";
 import { logoutAction } from "@server/actions/auth";
 
@@ -10,6 +10,8 @@ export default async function AppLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   const user = await requireFreshUser();
+  const admin = isAdmin(user);
+  const observer = isObserver(user);
 
   return (
     <div className="flex flex-col gap-4">
@@ -37,9 +39,9 @@ export default async function AppLayout({
             href="/songs"
             className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
           >
-            {isAdmin(user) ? "Lagu" : "Lagu Saya"}
+            {admin ? "Lagu" : observer ? "Lagu" : "Lagu Saya"}
           </Link>
-          {isAdmin(user) ? (
+          {admin || observer ? (
             <Link
               href="/batches"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -51,7 +53,7 @@ export default async function AppLayout({
             href="/tasks"
             className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
           >
-            {isAdmin(user) ? "Tasks" : "Task Saya"}
+            {admin ? "Tasks" : observer ? "Tasks & Usulan" : "Task Saya"}
           </Link>
           <Link
             href="/rehearsals"
@@ -65,7 +67,7 @@ export default async function AppLayout({
           >
             Equipment
           </Link>
-          {isAdmin(user) ? (
+          {admin ? (
             <Link
               href="/decisions"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -73,7 +75,7 @@ export default async function AppLayout({
               Keputusan
             </Link>
           ) : null}
-          {isAdmin(user) ? (
+          {admin ? (
             <Link
               href="/people"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -81,7 +83,7 @@ export default async function AppLayout({
               Personel &amp; Akses
             </Link>
           ) : null}
-          {isAdmin(user) ? (
+          {admin ? (
             <Link
               href="/broadcast"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -94,8 +96,8 @@ export default async function AppLayout({
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
             {user.displayName}
           </span>
-          <Badge tone={user.role === "ADMIN" ? "success" : "neutral"}>
-            {user.role}
+          <Badge tone={admin ? "success" : "neutral"}>
+            {roleLabel(user.role)}
           </Badge>
           <form action={logoutAction}>
             <Button type="submit" variant="secondary" size="sm">

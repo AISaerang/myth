@@ -2,17 +2,17 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isObserver } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { isTaskOverdue } from "@/lib/task-status";
 import { prisma } from "@/lib/db";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
 import { listPersonnelForAdmin } from "@server/services/personnel-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
-import { listSongs } from "@server/services/song-service";
-import { listRelevantTasks, listTasks } from "@server/services/task-service";
+import { listMySongs, listPublishedSongsForObserver, listSongs } from "@server/services/song-service";
+import { listObserverTasks, listRelevantTasks, listTasks } from "@server/services/task-service";
 import { EventPicker } from "../songs/EventPicker";
-import { CreateTaskForm, EditTaskForm, MyTaskStatusForm } from "./TaskForms";
+import { CreateSuggestionForm, CreateTaskForm, EditSuggestionForm, EditTaskForm, MyTaskStatusForm } from "./TaskForms";
 import {
   OverdueBadge,
   TaskPriorityBadge,
@@ -37,6 +37,7 @@ export default async function TasksPage({
   const user = await requireFreshUser();
   const params = await searchParams;
   const admin = isAdmin(user);
+  const observer = isObserver(user);
 
   const [events, current] = await Promise.all([
     listEvents(),
@@ -60,7 +61,9 @@ export default async function TasksPage({
 
   const all = admin
     ? await listTasks(eventId)
-    : await listRelevantTasks(user.id, eventId);
+    : observer
+      ? await listObserverTasks(eventId)
+      : await listRelevantTasks(user.id, eventId);
 
   // One profile lookup per page (was N+1: two queries per task row).
   // Per-row forms only need to know whether this user is the PIC.
@@ -99,13 +102,27 @@ export default async function TasksPage({
         listSongs(eventId).then((s) => s.map((x) => ({ id: x.id, title: x.title }))),
         listRehearsals(eventId).then((r) => r.map((x) => ({ id: x.id, title: x.title }))),
       ])
-    : [[], [], []];
+    : observer
+      ? await Promise.all([
+          [] as { id: string; displayName: string }[],
+          listPublishedSongsForObserver(eventId).then((s) =>
+            s.map((x) => ({ id: x.id, title: x.title })),
+          ),
+          listRehearsals(eventId).then((r) => r.map((x) => ({ id: x.id, title: x.title }))),
+        ])
+      : await Promise.all([
+          [] as { id: string; displayName: string }[],
+          listMySongs(user.id, eventId).then((s) =>
+            s.map((x) => ({ id: x.id, title: x.title })),
+          ),
+          listRehearsals(eventId).then((r) => r.map((x) => ({ id: x.id, title: x.title }))),
+        ]);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-          {admin ? "Tasks & Blockers" : "Task Saya"}
+          {admin ? "Tasks & Blockers" : observer ? "Tasks & Usulan" : "Task Saya"}
         </h1>
         {admin ? (
           <EventPicker
@@ -154,7 +171,9 @@ export default async function TasksPage({
 
       {admin ? (
         <CreateTaskForm eventId={eventId} context={{ people, songs, rehearsals }} />
-      ) : null}
+      ) : (
+        <CreateSuggestionForm eventId={eventId} context={{ songs, rehearsals }} />
+      )}
 
       <Card title={`${visible.length} task`}>
         {visible.length === 0 ? (

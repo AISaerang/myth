@@ -30,6 +30,7 @@ export interface DirectMessageInput {
   skills: string[];
   assignmentCount: number;
   isAdmin?: boolean;
+  isObserver?: boolean;
 }
 
 const FIRST_NAME = (displayName: string) => displayName.split(" ")[0];
@@ -75,8 +76,14 @@ export function buildDirectMessage(input: DirectMessageInput): string {
     "",
     "Saat pertama masuk kamu diminta buat password sendiri ya.",
     "",
-    VARIANT_PARAGRAPH[variant],
   ];
+  if (input.isObserver) {
+    lines.push(
+      "Akun kamu *Pemantau* — tidak ada lagu/task yang ditugaskan, itu normal ya. Kamu bisa memantau progres semua tim di lagu yang sudah publish dan memberi *usulan* per lagu (termasuk teknis per part, mis. tulis judul [Usulan - Guitar Lead] ...); MD akan mereview setiap usulan.",
+    );
+  } else {
+    lines.push(VARIANT_PARAGRAPH[variant]);
+  }
   if (input.isAdmin) {
     lines.push(
       "Catatan: akun kamu ADMIN — kamu juga bisa mempublikasikan lagu, mereview progres personel, dan mengelola akun dari dashboard.",

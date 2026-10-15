@@ -3,9 +3,9 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isObserver } from "@/lib/permissions";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
-import { listMySongs, listSongs } from "@server/services/song-service";
+import { listMySongs, listPublishedSongsForObserver, listSongs } from "@server/services/song-service";
 import { EventPicker } from "./EventPicker";
 import { SongForm } from "./SongForm";
 import { SongStatusBadge } from "./SongStatusBadge";
@@ -17,6 +17,56 @@ export default async function SongsPage({
 }) {
   const user = await requireFreshUser();
   const params = await searchParams;
+
+  if (isObserver(user)) {
+    const current = await getCurrentEvent();
+    if (!current) {
+      return (
+        <EmptyState
+          title="Belum ada lagu"
+          description="Lagu yang sudah dipublish akan tampil di sini."
+        />
+      );
+    }
+    const songs = await listPublishedSongsForObserver(current.id);
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+          Lagu
+        </h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Mode pantau: hanya lagu yang sudah publish. Klik lagu untuk melihat
+          progres semua personel dan memberi usulan.
+        </p>
+        {songs.length === 0 ? (
+          <EmptyState
+            title="Belum ada lagu publish"
+            description="Lagu yang sudah dipublish akan tampil di sini."
+          />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {songs.map((s) => (
+              <li key={s.id}>
+                <Link
+                  href={`/songs/${s.id}`}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+                >
+                  <span>
+                    <span className="font-medium">{s.title}</span>
+                    <span className="block text-xs text-zinc-500">
+                      {[s.key ? `Key ${s.key}` : null, s.bpm ? `${s.bpm} BPM` : null, s.liturgicalFunction].filter(Boolean).join(" · ") ||
+                        `${s.assignments.length} personel`}
+                    </span>
+                  </span>
+                  <SongStatusBadge status={s.status} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   if (!isAdmin(user)) {
     const current = await getCurrentEvent();

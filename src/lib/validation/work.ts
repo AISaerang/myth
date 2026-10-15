@@ -65,5 +65,27 @@ export const taskStatusUpdateSchema = z.object({
   status: taskStatusSchema,
 });
 
+// Usulan dari USER/OBSERVER (docs/11: dimoderasi MD).
+// Client hanya boleh mengisi judul + deskripsi + relasi lagu/rehearsal.
+// Status dipaksa TODO, prioritas dibatasi LOW/MEDIUM, tanpa PIC/tenggat —
+// MD yang melengkapi saat moderasi. Minimal 10 karakter deskripsi agar
+// usulan teknis per part bisa ditindaklanjuti.
+export const suggestionSchema = z.object({
+  eventId: z.string().min(1, "Event tidak valid."),
+  title: z
+    .string()
+    .trim()
+    .min(3, "Judul minimal 3 karakter.")
+    .max(150, "Judul maksimal 150 karakter."),
+  description: z
+    .string()
+    .trim()
+    .min(10, "Jelaskan usulan minimal 10 karakter.")
+    .max(2000, "Usulan maksimal 2000 karakter."),
+  relatedSongId: z.string().min(1).optional(),
+  relatedRehearsalId: z.string().min(1).optional(),
+});
+
 export type ProgressInput = z.infer<typeof progressSchema>;
 export type TaskInput = z.infer<typeof taskSchema>;
+export type SuggestionInput = z.infer<typeof suggestionSchema>;

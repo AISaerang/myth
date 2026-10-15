@@ -23,6 +23,7 @@ datasource db {
 enum Role {
   ADMIN
   USER
+  OBSERVER
 }
 
 model User {

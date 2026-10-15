@@ -9,6 +9,7 @@ import {
   assignmentSchema,
   materialSchema,
   songSchema,
+  songUpdateSchema,
 } from "@/lib/validation/song";
 import {
   activateVersion,
@@ -32,9 +33,25 @@ function revalidateSongs(songId?: string): void {
   if (songId) revalidatePath(`/songs/${songId}`);
 }
 
-function parseSongForm(formData: FormData, withEvent: boolean) {
+function parseSongForm(formData: FormData) {
   return songSchema.safeParse({
-    ...(withEvent ? { eventId: formData.get("eventId") } : {}),
+    eventId: formData.get("eventId"),
+    title: formData.get("title"),
+    artistOrAuthor: formData.get("artistOrAuthor") || undefined,
+    liturgicalFunction: formData.get("liturgicalFunction") || undefined,
+    key: formData.get("key") || undefined,
+    bpm: formData.get("bpm") || undefined,
+    timeSignature: formData.get("timeSignature") || undefined,
+    estimatedDurationSeconds: formData.get("estimatedDurationSeconds") || undefined,
+    originalReferenceUrl: formData.get("originalReferenceUrl") || undefined,
+    arrangementNotes: formData.get("arrangementNotes") || undefined,
+    status: formData.get("status"),
+  });
+}
+
+function parseSongUpdateForm(formData: FormData) {
+  // Form edit tidak mengirim eventId (lagu tidak pindah event).
+  return songUpdateSchema.safeParse({
     title: formData.get("title"),
     artistOrAuthor: formData.get("artistOrAuthor") || undefined,
     liturgicalFunction: formData.get("liturgicalFunction") || undefined,
@@ -53,7 +70,7 @@ export async function createSongAction(
   formData: FormData,
 ): Promise<ActionState> {
   const admin = await requireActionAdmin();
-  const parsed = parseSongForm(formData, true);
+  const parsed = parseSongForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
@@ -70,13 +87,11 @@ export async function updateSongAction(
   const admin = await requireActionAdmin();
   const id = String(formData.get("songId") ?? "");
   if (!id) return { ok: false, error: "Lagu tidak valid." };
-  const parsed = parseSongForm(formData, false);
+  const parsed = parseSongUpdateForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const { eventId: _event, ...input } = parsed.data;
-  void _event;
-  const result = await updateSong(admin.id, id, input);
+  const result = await updateSong(admin.id, id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(id);
   return { ok: true };

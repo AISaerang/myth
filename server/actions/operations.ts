@@ -9,7 +9,9 @@ import {
   attendanceSchema,
   decisionSchema,
   equipmentSchema,
+  equipmentUpdateSchema,
   rehearsalSchema,
+  rehearsalUpdateSchema,
 } from "@/lib/validation/operations";
 import { createDecision } from "@server/services/decision-service";
 import {
@@ -32,9 +34,23 @@ function revalidateOps(rehearsalId?: string): void {
   if (rehearsalId) revalidatePath(`/rehearsals/${rehearsalId}`);
 }
 
-function parseRehearsalForm(formData: FormData, withEvent: boolean) {
+function parseRehearsalForm(formData: FormData) {
   return rehearsalSchema.safeParse({
-    ...(withEvent ? { eventId: formData.get("eventId") } : {}),
+    eventId: formData.get("eventId"),
+    title: formData.get("title"),
+    type: formData.get("type"),
+    startsAt: formData.get("startsAt") || undefined,
+    endsAt: formData.get("endsAt") || undefined,
+    venueOrMeetingUrl: formData.get("venueOrMeetingUrl") || undefined,
+    agenda: formData.get("agenda") || undefined,
+    status: formData.get("status") ?? "SCHEDULED",
+    notes: formData.get("notes") || undefined,
+  });
+}
+
+function parseRehearsalUpdateForm(formData: FormData) {
+  // Form edit tidak mengirim eventId (rehearsal tidak pindah event).
+  return rehearsalUpdateSchema.safeParse({
     title: formData.get("title"),
     type: formData.get("type"),
     startsAt: formData.get("startsAt") || undefined,
@@ -51,7 +67,7 @@ export async function createRehearsalAction(
   formData: FormData,
 ): Promise<ActionState> {
   const admin = await requireActionAdmin();
-  const parsed = parseRehearsalForm(formData, true);
+  const parsed = parseRehearsalForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
@@ -68,13 +84,11 @@ export async function updateRehearsalAction(
   const admin = await requireActionAdmin();
   const id = String(formData.get("rehearsalId") ?? "");
   if (!id) return { ok: false, error: "Rehearsal tidak valid." };
-  const parsed = parseRehearsalForm(formData, false);
+  const parsed = parseRehearsalUpdateForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const { eventId: _event, ...input } = parsed.data;
-  void _event;
-  const result = await updateRehearsal(admin.id, id, input);
+  const result = await updateRehearsal(admin.id, id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateOps(id);
   return { ok: true };
@@ -139,9 +153,23 @@ export async function upsertAttendanceAction(
   return { ok: true };
 }
 
-function parseEquipmentForm(formData: FormData, withEvent: boolean) {
+function parseEquipmentForm(formData: FormData) {
   return equipmentSchema.safeParse({
-    ...(withEvent ? { eventId: formData.get("eventId") } : {}),
+    eventId: formData.get("eventId"),
+    name: formData.get("name"),
+    category: formData.get("category"),
+    quantity: formData.get("quantity") || undefined,
+    status: formData.get("status") ?? "NOT_CHECKED",
+    ownerOrSource: formData.get("ownerOrSource") || undefined,
+    assigneePersonId: formData.get("assigneePersonId") || undefined,
+    dueAt: formData.get("dueAt") || undefined,
+    notes: formData.get("notes") || undefined,
+  });
+}
+
+function parseEquipmentUpdateForm(formData: FormData) {
+  // Form edit tidak mengirim eventId (item tidak pindah event).
+  return equipmentUpdateSchema.safeParse({
     name: formData.get("name"),
     category: formData.get("category"),
     quantity: formData.get("quantity") || undefined,
@@ -158,7 +186,7 @@ export async function createEquipmentAction(
   formData: FormData,
 ): Promise<ActionState> {
   const admin = await requireActionAdmin();
-  const parsed = parseEquipmentForm(formData, true);
+  const parsed = parseEquipmentForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
@@ -175,13 +203,11 @@ export async function updateEquipmentAction(
   const admin = await requireActionAdmin();
   const id = String(formData.get("itemId") ?? "");
   if (!id) return { ok: false, error: "Item tidak valid." };
-  const parsed = parseEquipmentForm(formData, false);
+  const parsed = parseEquipmentUpdateForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const { eventId: _event, ...input } = parsed.data;
-  void _event;
-  const result = await updateEquipment(admin.id, id, input);
+  const result = await updateEquipment(admin.id, id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateOps();
   return { ok: true };

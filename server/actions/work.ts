@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { requireActionAdmin, requireActionUser } from "@/lib/auth";
+import { canSuggest } from "@/lib/permissions";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
   progressSchema,
+  suggestionSchema,
   taskSchema,
   taskStatusUpdateSchema,
 } from "@/lib/validation/work";
@@ -13,8 +15,10 @@ import {
   upsertMyProgress,
 } from "@server/services/progress-service";
 import {
+  createSuggestion,
   createTask,
   updateMyTaskStatus,
+  updateOwnSuggestion,
   updateTask,
 } from "@server/services/task-service";
 import type { ActionState } from "./auth";
@@ -63,9 +67,9 @@ export async function correctProgressAction(
   return { ok: true };
 }
 
-function parseTaskForm(formData: FormData, withEvent: boolean) {
+function parseTaskForm(formData: FormData) {
   return taskSchema.safeParse({
-    ...(withEvent ? { eventId: formData.get("eventId") } : {}),
+    eventId: formData.get("eventId"),
     title: formData.get("title"),
     description: formData.get("description") || undefined,
     status: formData.get("status") ?? "TODO",
@@ -87,7 +91,7 @@ export async function createTaskAction(
   formData: FormData,
 ): Promise<ActionState> {
   const admin = await requireActionAdmin();
-  const parsed = parseTaskForm(formData, true);
+  const parsed = parseTaskForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
@@ -105,11 +109,11 @@ export async function updateTaskAction(
   const id = String(formData.get("taskId") ?? "");
   const eventId = String(formData.get("eventId") ?? "");
   if (!id || !eventId) return { ok: false, error: "Data tidak valid." };
-  const parsed = parseTaskForm(formData, false);
+  const parsed = parseTaskForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await updateTask(id, { ...parsed.data, eventId });
+  const result = await updateTask(id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateTasks(parsed.data.relatedSongId);
   return { ok: true };
@@ -130,5 +134,55 @@ export async function updateMyTaskStatusAction(
   const result = await updateMyTaskStatus(user.id, taskId, parsed.data.status);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateTasks();
+  return { ok: true };
+}
+
+// Usulan dari USER/OBSERVER (docs/11): siapa pun yang login boleh usul,
+// MD memoderasi. Server memaksa TODO + prioritas MEDIUM + tanpa PIC.
+export async function createSuggestionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireActionUser();
+  if (!canSuggest(user) && user.role !== "ADMIN") {
+    return { ok: false, error: "Role kamu tidak bisa memberi usulan." };
+  }
+  const parsed = suggestionSchema.safeParse({
+    eventId: formData.get("eventId"),
+    title: formData.get("title"),
+    description: formData.get("description"),
+    relatedSongId: formData.get("relatedSongId") || undefined,
+    relatedRehearsalId: formData.get("relatedRehearsalId") || undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  const result = await createSuggestion(user.id, parsed.data);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateTasks(parsed.data.relatedSongId);
+  return { ok: true };
+}
+
+// Revisi usulan milik sendiri selama masih TODO (belum dimoderasi).
+export async function updateOwnSuggestionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireActionUser();
+  const taskId = String(formData.get("taskId") ?? "");
+  if (!taskId) return { ok: false, error: "Data tidak valid." };
+  const parsed = suggestionSchema.safeParse({
+    eventId: formData.get("eventId"),
+    title: formData.get("title"),
+    description: formData.get("description"),
+    relatedSongId: formData.get("relatedSongId") || undefined,
+    relatedRehearsalId: formData.get("relatedRehearsalId") || undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  const result = await updateOwnSuggestion(user.id, taskId, parsed.data);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateTasks(parsed.data.relatedSongId);
   return { ok: true };
 }

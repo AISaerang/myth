@@ -3,12 +3,13 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isObserver } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { isTaskOverdue } from "@/lib/task-status";
 import { getCurrentEvent } from "@server/services/event-service";
 import {
   getAdminReadiness,
+  getObserverDashboard,
   getUserDashboard,
 } from "@server/services/dashboard-service";
 import { SongStatusBadge } from "../songs/SongStatusBadge";
@@ -246,6 +247,176 @@ export default async function DashboardPage() {
                 </li>
               ))}
             </ul>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  if (isObserver(user)) {
+    const data = await getObserverDashboard(event.id);
+    const c = data.counts;
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+            {event.name}
+          </h1>
+          <EventStatusBadge status={event.eventStatus} />
+          <Badge tone="neutral">Pantau</Badge>
+        </div>
+        {event.eventDate ? (
+          <p className="text-sm text-zinc-500">
+            {formatJakarta(event.eventDate, { hour: undefined, minute: undefined })}
+            {event.venue ? ` · ${event.venue}` : ""}
+          </p>
+        ) : null}
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Mode pantau: hanya lagu yang sudah publish. Usulan bisa dikirim dari
+          halaman Tasks &amp; Usulan atau detail lagu.
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Link href="/songs" className={linkCard}>
+            <p className="text-2xl font-bold">{c.totalSongs}</p>
+            <p className="text-sm text-zinc-500">Lagu publish</p>
+          </Link>
+          <Link href="/songs" className={linkCard}>
+            <p className="text-2xl font-bold">{c.attentionSongs}</p>
+            <p className="text-sm text-zinc-500">Lagu perlu review</p>
+          </Link>
+          <Link href="/batches" className={linkCard}>
+            <p className="text-2xl font-bold">{data.batches.length}</p>
+            <p className="text-sm text-zinc-500">Batch aktif</p>
+          </Link>
+          <Link href="/tasks?filter=overdue" className={linkCard}>
+            <p className="text-2xl font-bold">{c.overdueTasks}</p>
+            <p className="text-sm text-zinc-500">Task terlambat</p>
+          </Link>
+          <Link href="/tasks?filter=blocked" className={linkCard}>
+            <p className="text-2xl font-bold">{c.blockedTasks}</p>
+            <p className="text-sm text-zinc-500">Task blocked</p>
+          </Link>
+          <Link href="/equipment?filter=BLOCKED" className={linkCard}>
+            <p className="text-2xl font-bold">{c.blockedEquipment}</p>
+            <p className="text-sm text-zinc-500">Blocker teknis</p>
+          </Link>
+        </div>
+
+        {c.blockedTasks + c.overdueTasks + c.blockedEquipment + c.helpNeeded > 0 ? (
+          <Card title="Perlu ditindaklanjuti">
+            <ul className="flex flex-col gap-2 text-sm">
+              {data.blockedTasks.map((t) => (
+                <li key={`bt-${t.id}`}>
+                  <Badge tone="danger">Blocked</Badge>{" "}
+                  <Link href="/tasks" className="font-medium underline">
+                    {t.title}
+                  </Link>
+                  {t.assignee ? ` — PIC ${t.assignee.displayName}` : " — tanpa PIC"}
+                </li>
+              ))}
+              {data.overdueTasks
+                .filter((t) => t.status !== "BLOCKED")
+                .map((t) => (
+                  <li key={`ot-${t.id}`}>
+                    <Badge tone="danger">Terlambat</Badge>{" "}
+                    <Link href="/tasks" className="font-medium underline">
+                      {t.title}
+                    </Link>
+                  </li>
+                ))}
+              {data.blockedEquipment.map((e) => (
+                <li key={`be-${e.id}`}>
+                  <Badge tone="danger">Teknis</Badge>{" "}
+                  <Link href="/equipment" className="font-medium underline">
+                    {e.name}
+                  </Link>
+                  {e.assignee ? ` — PIC ${e.assignee.displayName}` : " — tanpa PIC"}
+                </li>
+              ))}
+              {data.helpNeeded.map((h, i) => (
+                <li key={`ph-${i}`}>
+                  <Badge tone="danger">Perlu bantuan</Badge>{" "}
+                  <Link href={`/songs/${h.song.id}`} className="font-medium underline">
+                    {h.song.title}
+                  </Link>{" "}
+                  — {h.person.displayName}
+                  {h.note ? `: ${h.note}` : ""}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : (
+          <Card title="Perlu ditindaklanjuti">
+            <p className="text-sm text-zinc-500">
+              Nihil — semua terpantau aman.
+            </p>
+          </Card>
+        )}
+
+        <Card title="Kesiapan lagu publish">
+          {data.songs.length === 0 ? (
+            <p className="text-sm text-zinc-500">Belum ada lagu publish.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {data.songs.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                >
+                  <Link href={`/songs/${s.id}`} className="font-medium underline">
+                    {s.title}
+                  </Link>
+                  <span className="flex items-center gap-1">
+                    <span className="text-xs text-zinc-500">
+                      {s._count.assignments} personel
+                    </span>
+                    <SongStatusBadge status={s.status} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="Rehearsal berikutnya">
+          {data.upcomingRehearsals.length === 0 ? (
+            <p className="text-sm text-zinc-500">Belum ada jadwal.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {data.upcomingRehearsals.map((r) => (
+                <li key={r.id}>
+                  <Link
+                    href={`/rehearsals/${r.id}`}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  >
+                    <span>
+                      <span className="font-medium">{r.title}</span>
+                      <span className="block text-xs text-zinc-500">
+                        {formatJakarta(r.startsAt)}
+                      </span>
+                    </span>
+                    <RehearsalTypeBadge type={r.type} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="Checklist teknis">
+          {data.equipment.length === 0 ? (
+            <p className="text-sm text-zinc-500">Belum ada item.</p>
+          ) : (
+            <p className="text-sm">
+              {data.equipment.filter((e) => e.status === "TESTED").length}/
+              {data.equipment.length} teruji ·{" "}
+              {data.equipment.filter((e) => e.status === "BLOCKED").length} blocked ·{" "}
+              {data.equipment.filter((e) => e.status === "NOT_CHECKED").length} belum dicek —{" "}
+              <Link href="/equipment" className="font-medium underline">
+                buka checklist
+              </Link>
+            </p>
           )}
         </Card>
       </div>

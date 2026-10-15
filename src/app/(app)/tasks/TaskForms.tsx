@@ -7,8 +7,10 @@ import { Card } from "@/components/ui/Card";
 import type { TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { TASK_PRIORITY_LABEL, TASK_STATUS_LABEL } from "@/lib/task-status";
 import {
+  createSuggestionAction,
   createTaskAction,
   updateMyTaskStatusAction,
+  updateOwnSuggestionAction,
   updateTaskAction,
 } from "@server/actions/work";
 
@@ -290,6 +292,177 @@ export function MyTaskStatusForm({
           {state.error}
         </span>
       ) : null}
+    </form>
+  );
+}
+
+export interface SuggestionFormContext {
+  songs: { id: string; title: string }[];
+  rehearsals: { id: string; title: string }[];
+}
+
+function SuggestionFields({
+  songs,
+  rehearsals,
+  defaults,
+}: SuggestionFormContext & {
+  defaults?: {
+    title?: string;
+    description?: string | null;
+    relatedSongId?: string | null;
+    relatedRehearsalId?: string | null;
+  };
+}) {
+  const d = defaults ?? {};
+  return (
+    <>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="suggestion-title" className="text-sm font-medium">
+          Judul usulan (tulis part bila teknis, mis. [Usulan - Guitar Lead])
+        </label>
+        <input
+          id="suggestion-title"
+          name="title"
+          required
+          minLength={3}
+          maxLength={150}
+          defaultValue={d.title ?? ""}
+          placeholder="[Usulan - Part] …"
+          className={inputClass}
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="suggestion-song" className="text-sm font-medium">
+            Lagu terkait (hanya yang publish)
+          </label>
+          <select
+            id="suggestion-song"
+            name="relatedSongId"
+            defaultValue={d.relatedSongId ?? ""}
+            className={inputClass}
+          >
+            <option value="">Tanpa lagu</option>
+            {songs.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="suggestion-rehearsal" className="text-sm font-medium">
+            Rehearsal terkait (opsional)
+          </label>
+          <select
+            id="suggestion-rehearsal"
+            name="relatedRehearsalId"
+            defaultValue={d.relatedRehearsalId ?? ""}
+            className={inputClass}
+          >
+            <option value="">Tanpa rehearsal</option>
+            {rehearsals.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="suggestion-desc" className="text-sm font-medium">
+          Penjelasan usulan (min. 10 karakter)
+        </label>
+        <textarea
+          id="suggestion-desc"
+          name="description"
+          required
+          rows={3}
+          minLength={10}
+          maxLength={2000}
+          defaultValue={d.description ?? ""}
+          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        />
+      </div>
+    </>
+  );
+}
+
+export function CreateSuggestionForm({
+  eventId,
+  context,
+  defaultSongId,
+}: {
+  eventId: string;
+  context: SuggestionFormContext;
+  defaultSongId?: string;
+}) {
+  const [state, formAction, pending] = useActionState(createSuggestionAction, {
+    ok: false,
+  });
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (state.ok) formRef.current?.reset();
+  }, [state]);
+  return (
+    <Card title="Beri usulan">
+      <form ref={formRef} action={formAction} className="flex flex-col gap-4">
+        <input type="hidden" name="eventId" value={eventId} />
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Usulan masuk sebagai task TODO dan direview MD sebelum ditindaklanjuti.
+        </p>
+        <SuggestionFields
+          songs={context.songs}
+          rehearsals={context.rehearsals}
+          defaults={defaultSongId ? { relatedSongId: defaultSongId } : undefined}
+        />
+        {!state.ok && state.error ? (
+          <Alert tone="danger">{state.error}</Alert>
+        ) : null}
+        {state.ok ? <Alert tone="info">Usulan terkirim; menunggu review MD.</Alert> : null}
+        <div>
+          <Button type="submit" disabled={pending}>
+            {pending ? "Mengirim…" : "Kirim usulan"}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+export function EditSuggestionForm({
+  taskId,
+  eventId,
+  context,
+  defaults,
+}: {
+  taskId: string;
+  eventId: string;
+  context: SuggestionFormContext;
+  defaults: {
+    title: string;
+    description: string | null;
+    relatedSongId: string | null;
+    relatedRehearsalId: string | null;
+  };
+}) {
+  const [state, formAction, pending] = useActionState(updateOwnSuggestionAction, {
+    ok: false,
+  });
+  return (
+    <form action={formAction} className="flex flex-col gap-4">
+      <input type="hidden" name="taskId" value={taskId} />
+      <input type="hidden" name="eventId" value={eventId} />
+      <SuggestionFields songs={context.songs} rehearsals={context.rehearsals} defaults={defaults} />
+      {!state.ok && state.error ? (
+        <Alert tone="danger">{state.error}</Alert>
+      ) : null}
+      {state.ok ? <Alert tone="info">Usulan diperbarui.</Alert> : null}
+      <div>
+        <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+          {pending ? "…" : "Simpan usulan"}
+        </Button>
+      </div>
     </form>
   );
 }

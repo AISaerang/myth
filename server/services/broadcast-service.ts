@@ -1,11 +1,12 @@
 import "server-only";
+import type { Role } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 
 export interface BroadcastRecipient {
   userId: string;
   username: string;
   displayName: string;
-  role: "ADMIN" | "USER";
+  role: Role;
   skills: string[];
   assignmentCount: number;
 }

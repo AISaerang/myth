@@ -216,5 +216,13 @@ export const materialSchema = z.object({
 export type SongInput = z.infer<typeof songSchema>;
 export type BatchInput = z.infer<typeof batchSchema>;
 export type AssignmentInput = z.infer<typeof assignmentSchema>;
+
+// Skema update: form edit tidak mengirim eventId (milik create saja).
+// Memakai omit eksplisit agar bug "expected string, received undefined"
+// pada seluruh form edit tidak terulang (lihat updateSongAction dkk).
+export const songUpdateSchema = songSchema.omit({ eventId: true });
+export const batchUpdateSchema = batchSchema.omit({ eventId: true });
+export type SongUpdateInput = z.infer<typeof songUpdateSchema>;
+export type BatchUpdateInput = z.infer<typeof batchUpdateSchema>;
 export type ArrangementVersionInput = z.infer<typeof arrangementVersionSchema>;
 export type MaterialInput = z.infer<typeof materialSchema>;
