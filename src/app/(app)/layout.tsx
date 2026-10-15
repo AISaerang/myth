@@ -81,6 +81,14 @@ export default async function AppLayout({
               Personel &amp; Akses
             </Link>
           ) : null}
+          {isAdmin(user) ? (
+            <Link
+              href="/broadcast"
+              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Broadcast
+            </Link>
+          ) : null}
         </nav>
         <div className="flex items-center gap-2">
           <span className="text-sm text-zinc-600 dark:text-zinc-400">

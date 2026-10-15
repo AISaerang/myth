@@ -23,6 +23,7 @@ Example username `AISaerang` is fine if unique. Do not use a guessable productio
 - The `/masuk/[token]` page never consumes the token on GET (chat-link previews must not burn it); redemption happens via POST, then a standard opaque session cookie is set.
 - Only the SHA-256 hash is stored (`LoginToken`); redemption is atomic (`usedAt`), throttled 5x/10 min per IP, and audited (`INVITE_CREATED`/`INVITE_REDEEMED`). Inactive accounts cannot redeem.
 - First-use links land on mandatory password setup when `mustChangePassword` is set, so username+password remains as fallback login.
+- The admin `/broadcast` page composes copy-ready WhatsApp onboarding texts from live data (group message + per-person DM with role variant, skill list, assignment count); invite links are generated per person on demand.
 
 ## Bootstrap admin
 Use environment variables or a secure one-time admin command. It must be idempotent, hash the password immediately, never log it, and be disabled/removed after setup. Never hardcode production credentials in source, seed data, docs, or OpenCode prompts.
