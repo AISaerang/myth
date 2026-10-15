@@ -7,7 +7,11 @@ import { z } from "zod";
 import { requireActionAdmin } from "@/lib/auth";
 import { canTransitionBatch } from "@/lib/batch-status";
 import { firstIssueMessage } from "@/lib/validation/auth";
-import { batchSchema, batchStatusSchema } from "@/lib/validation/song";
+import {
+  batchAssignmentSchema,
+  batchSchema,
+  batchStatusSchema,
+} from "@/lib/validation/song";
 import {
   addSongToBatch,
   createBatch,
@@ -16,6 +20,10 @@ import {
   setBatchStatus,
   updateBatch,
 } from "@server/services/batch-service";
+import {
+  assignBatchMembers,
+  type BatchAssignResult,
+} from "@server/services/song-service";
 import type { ActionState } from "./auth";
 
 function revalidateBatches(batchId?: string): void {
@@ -162,4 +170,40 @@ export async function reorderBatchItemsAction(
   if (!result.ok) return { ok: false, error: result.error };
   revalidateBatches(batchId);
   return { ok: true };
+}
+
+export interface BatchAssignState extends ActionState {
+  summary?: BatchAssignResult[];
+}
+
+// Assign sebatch: multiple personnel (each with own part) to checked
+// songs of one batch. Rows arrive as JSON (dynamic client rows).
+export async function assignBatchAction(
+  _prev: BatchAssignState,
+  formData: FormData,
+): Promise<BatchAssignState> {
+  const admin = await requireActionAdmin();
+  const batchId = String(formData.get("batchId") ?? "");
+  let payload: unknown = null;
+  try {
+    payload = JSON.parse(String(formData.get("payload") ?? "null"));
+  } catch {
+    return { ok: false, error: "Format data tidak valid." };
+  }
+  const parsed = batchAssignmentSchema.safeParse({
+    batchId,
+    ...(typeof payload === "object" && payload !== null ? payload : {}),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  const result = await assignBatchMembers(
+    admin.id,
+    parsed.data.batchId,
+    parsed.data.rows,
+    parsed.data.songIds,
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateBatches(batchId);
+  return { ok: true, summary: result.results };
 }

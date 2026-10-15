@@ -5,12 +5,17 @@ import { requireAdminUser } from "@/lib/auth";
 import { formatJakarta } from "@/lib/format";
 import { getBatch } from "@server/services/batch-service";
 import { listSongs } from "@server/services/song-service";
+import {
+  listPersonnelForAdmin,
+  listSkills,
+} from "@server/services/personnel-service";
 import { SongStatusBadge } from "../../songs/SongStatusBadge";
 import { BatchForm } from "../BatchForm";
 import { BatchStatusBadge } from "../BatchStatusBadge";
 import { BatchItemMover } from "@/components/ui/MoveButtons";
 import {
   AddSongForm,
+  AssignBatchForm,
   BatchStatusChanger,
   RemoveSongButton,
 } from "./BatchDetailForms";
@@ -28,6 +33,17 @@ export default async function BatchDetailPage({
   const eventSongs = await listSongs(batch.eventId);
   const inBatch = new Set(batch.items.map((i) => i.songId));
   const available = eventSongs.filter((s) => !inBatch.has(s.id));
+  const [people, skills] = await Promise.all([
+    listPersonnelForAdmin(),
+    listSkills(),
+  ]);
+  const activePeople = people
+    .filter((p) => p.isActive)
+    .map((p) => ({
+      id: p.id,
+      displayName: p.displayName,
+      skills: p.skills.map((s) => s.name),
+    }));
 
   return (
     <div className="flex flex-col gap-4">
@@ -99,6 +115,15 @@ export default async function BatchDetailPage({
           )}
           <AddSongForm batchId={batch.id} songs={available} />
         </div>
+      </Card>
+
+      <Card title="Assign sebatch">
+        <AssignBatchForm
+          batchId={batch.id}
+          people={activePeople}
+          skills={skills}
+          songs={batch.items.map((i) => ({ id: i.songId, title: i.song.title }))}
+        />
       </Card>
 
       <BatchForm

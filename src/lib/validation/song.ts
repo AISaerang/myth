@@ -149,6 +149,29 @@ export const assignmentSchema = z.object({
   ),
 });
 
+// Assign sebatch: several personnel (each with own part) applied to
+// checked songs of one batch in a single submit (docs/08).
+export const batchAssignmentRowSchema = z.object({
+  personId: z.string().min(1, "Personel tidak valid."),
+  instrumentSkillId: z.string().min(1).optional(),
+});
+
+export const batchAssignmentSchema = z
+  .object({
+    batchId: z.string().min(1, "Batch tidak valid."),
+    rows: z
+      .array(batchAssignmentRowSchema)
+      .min(1, "Tambahkan minimal 1 personel."),
+    songIds: z.array(z.string().min(1)).min(1, "Pilih minimal 1 lagu."),
+  })
+  .refine(
+    (v) => new Set(v.rows.map((r) => r.personId)).size === v.rows.length,
+    {
+      message: "Personel tidak boleh ganda.",
+      path: ["rows"],
+    },
+  );
+
 export const arrangementVersionSchema = z.object({
   songId: z.string().min(1, "Lagu tidak valid."),
   versionLabel: z

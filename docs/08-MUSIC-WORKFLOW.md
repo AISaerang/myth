@@ -29,6 +29,9 @@ Title, liturgical function, original reference, key, BPM, groove/feel, structure
 ## Batch plan
 Start with around two songs per batch; adjust by difficulty and schedule. Each batch has release date, target review, source reference, initial musical notes, and assigned musicians.
 
+## Assign sebatch
+Assignments stay per song (unique song+person pair with instrument part). The batch detail page offers a shortcut: pick several personnel (each with own part) plus checked songs, one submit. Existing pairs are skipped (reported per person), personnel must be active, and every created assignment is audited exactly like the manual flow. Fine corrections remain per song.
+
 ## Timeline ke Hari H (dashboard)
 A Gantt-style card on the dashboard reads the schedule from besok to H-day: H-day anchor (`Event.eventDate`), batch bars (`releaseAt` → `targetReviewAt`), rehearsal milestones (`startsAt`), task dues (`dueAt`), and equipment dues. Labels use Jakarta calendar days (`H-14`, `Hari ini`, `Terlambat N hari`, `Selesai`); song deadlines follow their batch (no per-song due field). Admins see everything; personnel see H-day plus their published songs' batches, upcoming rehearsals, relevant tasks, and assigned equipment. Undated items appear under "Belum terjadwal". Each dated milestone expands to a breakdown: batch songs with status/publish state, rehearsal song list + attendance count, task PIC/priority/related song, equipment PIC, and H-day venue/times. The timeline is only as complete as the dates admins enter — fill event date/time, batch dates, rehearsal schedule, and task dues for it to be useful.
 
