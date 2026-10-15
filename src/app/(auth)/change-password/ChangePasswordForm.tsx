@@ -16,7 +16,7 @@ export function ChangePasswordForm({ isFirstLogin }: { isFirstLogin: boolean }) 
       {isFirstLogin ? (
         <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
           Ini login pertamamu. Ganti password sementara dengan password
-          pribadimu (minimal 12 karakter).
+          pribadimu.
         </p>
       ) : null}
       <form action={formAction} className="flex flex-col gap-4">
@@ -35,7 +35,7 @@ export function ChangePasswordForm({ isFirstLogin }: { isFirstLogin: boolean }) 
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="newPassword" className="text-sm font-medium">
-            Password baru (min. 12 karakter)
+            Password baru
           </label>
           <input
             id="newPassword"
@@ -43,7 +43,7 @@ export function ChangePasswordForm({ isFirstLogin }: { isFirstLogin: boolean }) 
             type="password"
             autoComplete="new-password"
             required
-            minLength={12}
+            minLength={1}
             className="h-11 rounded-lg border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>

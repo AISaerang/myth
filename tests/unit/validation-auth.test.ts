@@ -23,7 +23,7 @@ describe("auth validation", () => {
     expect(parsed.success).toBe(false);
   });
 
-  it("requires matching, different, long-enough new passwords", () => {
+  it("requires matching, different, non-empty new passwords (TEMPORARY: no minimum length during onboarding)", () => {
     expect(
       changePasswordSchema.safeParse({
         currentPassword: "lama-sementara-1",
@@ -41,14 +41,14 @@ describe("auth validation", () => {
     expect(
       changePasswordSchema.safeParse({
         currentPassword: "lama-sementara-1",
-        newPassword: "pendek",
-        confirmPassword: "pendek",
+        newPassword: "",
+        confirmPassword: "",
       }).success,
     ).toBe(false);
     const ok = changePasswordSchema.safeParse({
       currentPassword: "lama-sementara-1",
-      newPassword: "baru-yang-kuat-123",
-      confirmPassword: "baru-yang-kuat-123",
+      newPassword: "pendek",
+      confirmPassword: "pendek",
     });
     expect(ok.success).toBe(true);
   });

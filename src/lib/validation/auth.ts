@@ -16,7 +16,10 @@ export const usernameSchema = z
 
 export const passwordSchema = z
   .string()
-  .min(12, "Password minimal 12 karakter.")
+  // TEMPORARY onboarding relaxation (was min 12): personil boleh memakai
+  // password pendek saat fase onboarding. WAJIB revert ke min 12 setelah
+  // badge "Password sementara" hilang semua di /people.
+  .min(1, "Password wajib diisi.")
   .max(256, "Password maksimal 256 karakter.");
 
 export const loginSchema = z.object({

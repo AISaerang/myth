@@ -29,7 +29,11 @@ Example username `AISaerang` is fine if unique. Do not use a guessable productio
 Use environment variables or a secure one-time admin command. It must be idempotent, hash the password immediately, never log it, and be disabled/removed after setup. Never hardcode production credentials in source, seed data, docs, or OpenCode prompts.
 
 ## Password/session
-- Recommend minimum 12 characters; allow paste/password managers.
+- Normal minimum 12 characters; allow paste/password managers.
+- ⚠️ TEMPORARY onboarding relaxation: minimum removed (any non-empty
+  password accepted) so personnel can start easily. MUST revert to 12
+  once every account clears `mustChangePassword` (check `/people`
+  badges). Bootstrap admin stays at 12.
 - No plaintext storage/logging.
 - Login errors are generic.
 - Cookies HttpOnly, Secure in production, SameSite appropriate.
