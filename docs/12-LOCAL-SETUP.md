@@ -23,7 +23,7 @@ Isi minimum untuk development:
 |---|---|---|
 | `DATABASE_URL` | `mysql://USER:PASSWORD@HOST:4000/music_team_hub?sslaccept=strict` | Koneksi TiDB Cloud (TLS) |
 | `AUTH_SECRET` | string acak panjang | Session auth |
-| `APP_URL` | `http://localhost:3000` (prod: `https://myth.vercel.app`) | Base URL aplikasi |
+| `APP_URL` | `http://localhost:3000` (prod: `https://myth-yg.vercel.app`) | Base URL aplikasi |
 
 Catatan: file `.env` (bukan `.env.local`) juga dibaca tooling Prisma
 pada Phase 0 ini. Keduanya di-ignore Git; yang boleh di-commit hanya
@@ -171,7 +171,7 @@ npm.cmd run seed:event       # event + 9 personel + 19 lagu + 3 batch + materi +
 - [x] Smoke auth live: login argon2 → session → logout OK
 - [x] `typecheck`, `lint` bersih, `test` 53/53, `build` lolos (20 rute)
 - [ ] 2 lagu Praise belum masuk seed ("Satukanlah Hati Kami", "Obor Pembangunan") — menunggu keputusan MD
-- [ ] Push GitHub → env Vercel → deploy `myth.vercel.app` → smoke login produksi
+- [x] Push GitHub → env Vercel (Production) → deploy `https://myth-yg.vercel.app` → smoke `/login` + `/` 200 OK (15 Okt 2026)
 
 ## 14. Status Lirik & Chord + Sort Manual (terverifikasi 15 Okt 2026)
 

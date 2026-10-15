@@ -19,7 +19,7 @@ Do not present unresolved information as confirmed.
 - [ ] Confirm venue sound system, monitor/IEM, inputs/outputs, DI, cables, power and playback backup.
 
 ## Application
-- [x] Confirm app name/domain → **MYTH (Music Youth Team Hub)**, `myth.vercel.app` (fallback `myth-hub`).
+- [x] Confirm app name/domain → **MYTH (Music Youth Team Hub)**, `https://myth-yg.vercel.app` (`myth` sudah dipakai orang).
 - [x] Choose managed database → **TiDB Cloud Serverless** (`music_team_hub`, provider mysql).
 - [ ] Decide if manual Drive links are enough for MVP.
 - [ ] Decide if email notifications or read-only committee role are needed.
