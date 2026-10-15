@@ -197,3 +197,10 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 - [x] Joyful Gathering: IT'S GEHC / Benzics Records, key F + ChordPro lengkap (basis C) — Verse 2 mirror Verse 1, MD rapikan di portal
 - [x] "Satukanlah Hati Kami" diabaikan sesuai arahan MD (tidak di-seed)
 - [ ] Key Ku Tak Pandang + NNBT 20 TBD — MD isi via UI
+
+## 16. Filter Arsip + Hapus Batch (terverifikasi 15 Okt 2026)
+
+- [x] Filter batch: Aktif (default, sembunyikan arsip) / Semua / Arsip
+- [x] Hapus batch kosong permanen (admin, konfirmasi 2 langkah, audit `BATCH_DELETED`, tolak bila berisi lagu)
+- [x] "Batch 1 — Praise" (arsip, 0 lagu) dihapus dari DB → tinggal 4 batch aktif
+- [x] `typecheck`, `lint` bersih, `test` 82/82, `build` lolos, push + deploy produksi Ready
