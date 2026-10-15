@@ -1,4 +1,4 @@
-# Music Team Hub — Specification
+# Music Youth Team Hub — Specification
 
 Portal privat untuk koordinasi persiapan tim musik ibadah pemuda wilayah GMIM Jabodetabek–Bandung.
 

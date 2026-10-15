@@ -1,7 +1,7 @@
 # 00 — Project Overview
 
 ## Produk
-**Music Team Hub**: aplikasi web privat untuk memusatkan koordinasi tim musik, materi lagu, progres latihan, rehearsal, dan kesiapan teknis.
+**Music Youth Team Hub**: aplikasi web privat untuk memusatkan koordinasi tim musik, materi lagu, progres latihan, rehearsal, dan kesiapan teknis.
 
 ## Konteks
 - Acara: Ibadah Pemuda Wilayah GMIM Jabodetabek–Bandung.

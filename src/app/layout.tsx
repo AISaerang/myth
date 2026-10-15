@@ -4,8 +4,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Music Team Hub",
-    template: "%s — Music Team Hub",
+    default: "Music Youth Team Hub",
+    template: "%s — Music Youth Team Hub",
   },
   description:
     "Portal privat koordinasi persiapan tim musik ibadah pemuda wilayah.",
@@ -26,7 +26,7 @@ export default function RootLayout({
         <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
           <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
             <p className="text-sm font-semibold tracking-tight">
-              Music Team Hub
+              Music Youth Team Hub
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Portal privat tim musik

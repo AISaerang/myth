@@ -5,7 +5,7 @@ Use manual Google Drive links first. Store title, category, URL, song/version re
 
 ## Suggested folder structure
 ```text
-Music Team Hub - [Event]/
+Music Youth Team Hub - [Event]/
   00 Event Brief & Liturgi/
   01 Original Songs/
   02 Arrangement References/

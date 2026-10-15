@@ -1,4 +1,4 @@
-// Logical model for Music Team Hub (docs/05-DATABASE-SCHEMA.md).
+// Logical model for Music Youth Team Hub (docs/05-DATABASE-SCHEMA.md).
 // Implemented incrementally; history-preserving. IDs use CUID.
 // Timestamps stored in UTC, displayed in Asia/Jakarta.
 //

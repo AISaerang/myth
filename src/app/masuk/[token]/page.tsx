@@ -15,7 +15,7 @@ export default async function MasukPage({
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-8">
       <div className="text-center">
-        <p className="text-lg font-bold tracking-tight">Music Team Hub</p>
+        <p className="text-lg font-bold tracking-tight">Music Youth Team Hub</p>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Portal privat tim musik
         </p>
