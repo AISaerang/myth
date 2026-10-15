@@ -194,5 +194,6 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 - [x] Enrichment: artis/key/BPM/fungsi liturgi baru (Opening/Berkat/Closing/Ice breaking)
 - [x] ChordPro: NDC (D→C), Sungguh Indah Robert&Lea (A→C), Bapa Sentuh (G→C) — basis C terverifikasi
 - [x] `typecheck`, `lint` bersih, `test` 82/82, `build` lolos (22 rute)
-- [ ] Joyful Gathering (artis/key/link) + key NNBT/ASM TBD — MD lengkapi via UI
-- [ ] "Satukanlah Hati Kami" tidak masuk setlist (tidak di-seed)
+- [x] Joyful Gathering: IT'S GEHC / Benzics Records, key F + ChordPro lengkap (basis C) — Verse 2 mirror Verse 1, MD rapikan di portal
+- [x] "Satukanlah Hati Kami" diabaikan sesuai arahan MD (tidak di-seed)
+- [ ] Key Ku Tak Pandang + NNBT 20 TBD — MD isi via UI
