@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAdminUser, requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isObserver } from "@/lib/permissions";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
 import { listBatches } from "@server/services/batch-service";
 import { EventPicker } from "../songs/EventPicker";
@@ -24,7 +24,7 @@ export default async function BatchesPage({
   searchParams: Promise<{ eventId?: string; filter?: string }>;
 }) {
   const user = await requireFreshUser();
-  if (!isAdmin(user)) {
+  if (!isAdmin(user) && !isObserver(user)) {
     // MVP: batch management is an MD/admin tool. Users follow their
     // assigned songs and the team roster instead.
     await requireAdminUser();
@@ -56,6 +56,7 @@ export default async function BatchesPage({
         ? b.status === "ARCHIVED"
         : b.status !== "ARCHIVED",
   );
+  const observer = isObserver(user);
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,7 +67,13 @@ export default async function BatchesPage({
           value={eventId}
         />
       </div>
-      <BatchForm mode="create" eventId={eventId} />
+      {observer ? (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Mode pantau: daftar batch read-only. Klik batch untuk melihat lagu-lagunya.
+        </p>
+      ) : (
+        <BatchForm mode="create" eventId={eventId} />
+      )}
       <nav aria-label="Filter batch" className="flex flex-wrap gap-1">
         {FILTERS.map((f) => (
           <Link
@@ -110,7 +117,7 @@ export default async function BatchesPage({
                 </Link>
                 <span className="flex items-center gap-2">
                   <BatchStatusBadge status={b.status} />
-                  {b.items.length === 0 ? (
+                  {!observer && b.items.length === 0 ? (
                     <DeleteBatchButton batchId={b.id} batchName={b.name} />
                   ) : null}
                 </span>

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/Card";
-import { requireAdminUser } from "@/lib/auth";
+import { requireAdminUser, requireFreshUser } from "@/lib/auth";
+import { isAdmin, isObserver } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { getBatch } from "@server/services/batch-service";
 import { listSongs } from "@server/services/song-service";

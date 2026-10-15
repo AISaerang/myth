@@ -230,6 +230,27 @@ export default async function TasksPage({
                     </div>
                   </details>
                 ) : !admin &&
+                  t.createdById === user.id &&
+                  t.status === "TODO" ? (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-sm font-medium underline">
+                      Ubah usulanku
+                    </summary>
+                    <div className="mt-2">
+                      <EditSuggestionForm
+                        taskId={t.id}
+                        eventId={eventId}
+                        context={{ songs, rehearsals }}
+                        defaults={{
+                          title: t.title,
+                          description: t.description,
+                          relatedSongId: t.relatedSongId,
+                          relatedRehearsalId: t.relatedRehearsalId,
+                        }}
+                      />
+                    </div>
+                  </details>
+                ) : !admin &&
                   myPersonId &&
                   t.assigneePersonId === myPersonId ? (
                   <div className="mt-2">

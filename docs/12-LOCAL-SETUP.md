@@ -205,3 +205,11 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 - [x] Hapus batch kosong permanen (admin, konfirmasi 2 langkah, audit `BATCH_DELETED`, tolak bila berisi lagu)
 - [x] "Batch 1 — Praise" (arsip, 0 lagu) dihapus dari DB → tinggal 4 batch aktif
 - [x] `typecheck`, `lint` bersih, `test` 82/82, `build` lolos, push + deploy produksi Ready
+
+## 17. Fix Form Edit Gagal Validasi (terverifikasi 15 Okt 2026)
+
+- [x] Bug: semua form edit (lagu, batch, task, rehearsal, equipment) selalu gagal `expected string, received undefined` karena skema mewajibkan `eventId` yang tidak dikirim form edit
+- [x] Skema update khusus (tanpa `eventId`; pola aman-Zod-v4 untuk skema ber-refine) + hapus kode mati
+- [x] Unit test regresi payload edit (`validation-edit-forms.test.ts`)
+- [x] Selaraskan tipe `Role` Prisma (OBSERVER) di broadcast + people + opsi role
+- [x] `typecheck`, `lint` bersih, `test` 90/90, `build` lolos (22 rute), push + auto-deploy
