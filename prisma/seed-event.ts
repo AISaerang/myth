@@ -30,6 +30,7 @@ import {
 import {
   addSongToBatch,
   createBatch,
+  updateBatch,
 } from "@server/services/batch-service";
 
 if (existsSync(".env.local")) loadDotenv({ path: ".env.local" });
@@ -54,9 +55,18 @@ interface SeedSong {
 interface SeedBatch {
   name: string;
   description?: string;
+  releaseAt?: string;
+  targetReviewAt?: string;
   assignBand: boolean;
   assignSingers: boolean;
   songs: SeedSong[];
+}
+
+function parseSeedDate(value: string | undefined, label: string): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(`${value}T00:00:00+07:00`);
+  if (Number.isNaN(d.getTime())) throw new Error(`${label} tidak valid: ${value}`);
+  return d;
 }
 
 interface SeedPerson {
@@ -337,11 +347,32 @@ async function main(): Promise<void> {
         eventId: event.id,
         name: b.name,
         description: b.description,
+        releaseAt: parseSeedDate(b.releaseAt, `releaseAt ${b.name}`),
+        targetReviewAt: parseSeedDate(b.targetReviewAt, `targetReviewAt ${b.name}`),
         status: "DRAFT",
       });
       if (!created.ok) throw new Error(`Batch gagal: ${created.error}`);
       batch = await prisma.songBatch.findUnique({ where: { id: created.id } });
       if (!batch) throw new Error("Batch hilang setelah dibuat.");
+    } else {
+      // Sync tanggal + deskripsi batch yang sudah ada.
+      const releaseAt = parseSeedDate(b.releaseAt, `releaseAt ${b.name}`);
+      const targetReviewAt = parseSeedDate(b.targetReviewAt, `targetReviewAt ${b.name}`);
+      const sameDay = (a: Date | null, c: Date | undefined) =>
+        (a?.getTime() ?? null) === (c?.getTime() ?? null);
+      if (
+        (batch.description ?? null) !== (b.description || null) ||
+        !sameDay(batch.releaseAt, releaseAt) ||
+        !sameDay(batch.targetReviewAt, targetReviewAt)
+      ) {
+        const updated = await updateBatch(actorId, batch.id, {
+          name: b.name,
+          description: b.description,
+          releaseAt,
+          targetReviewAt,
+        });
+        if (!updated.ok) console.log(` Lewati sync batch ${b.name}: ${updated.error}`);
+      }
     }
     for (const s of b.songs) {
       const songId = await ensureSong(actorId, event.id, s);

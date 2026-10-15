@@ -199,6 +199,13 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 - [x] "Satukanlah Hati Kami" diabaikan sesuai arahan MD (tidak di-seed)
 - [ ] Key Ku Tak Pandang + NNBT 20 TBD — MD isi via UI
 
+## 17. Timetable Live (terverifikasi 15 Okt 2026)
+
+Tanggal batch (rilis → target review): B1 15→19 Okt, B2 17→26 Okt, B3 24 Okt→2 Nov, B4 31 Okt→9 Nov.
+Rehearsal: monitoring online 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00 (WIB) — lagu per sesi sesuai batch plan.
+5 task awal (PIC: MD): konfirmasi venue, link Drive B1, review key/BPM, cek sound, click/cue.
+Belum dibuat (butuh info venue): item equipment. Lokasi/link rehearsal masih "menyusul" — MD/panitia adjust via portal.
+
 ## 16. Filter Arsip + Hapus Batch (terverifikasi 15 Okt 2026)
 
 - [x] Filter batch: Aktif (default, sembunyikan arsip) / Semua / Arsip
