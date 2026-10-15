@@ -193,6 +193,7 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 - [x] Assignment: band ke 14 lagu, singers ke 14 lagu (112 via seed)
 - [x] Enrichment: artis/key/BPM/fungsi liturgi baru (Opening/Berkat/Closing/Ice breaking)
 - [x] ChordPro: NDC (D→C), Sungguh Indah Robert&Lea (A→C), Bapa Sentuh (G→C) — basis C terverifikasi
+- [x] ChordPro 4 ASM (versi MD: Mentega D, Satu Anak G, Bapa Abraham D, Kucinta D) + 4 link referensi — basis C terverifikasi; total 8 chart live
 - [x] `typecheck`, `lint` bersih, `test` 82/82, `build` lolos (22 rute)
 - [x] Joyful Gathering: IT'S GEHC / Benzics Records, key F + ChordPro lengkap (basis C) — Verse 2 mirror Verse 1, MD rapikan di portal
 - [x] "Satukanlah Hati Kami" diabaikan sesuai arahan MD (tidak di-seed)
