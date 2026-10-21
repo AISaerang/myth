@@ -13,6 +13,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Chart legacy parser recognizes section headings (Verse/Chorus/Reff/Tagline/Prechorus/Interlude/Bridge/Modulation/Coda/Outro/Intro), keeps repeated sections, and ignores empty blocks.
 - Arrangement composition keeps item order/duplicates and applies label overrides.
 - Chart section/arrangement validation rejects empty labels/content, duplicate labels, invalid item payloads, and over-limit sequences.
+- Setlist lyric seed keeps unique labels, non-empty content, and arrangement items that reference existing sections.
 - Final lock requires intentional authorized action.
 - Overdue task and equipment blocker aggregation.
 - Cancelled rehearsal excluded from upcoming list.

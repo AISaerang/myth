@@ -52,6 +52,15 @@ npm.cmd run import:charts -- --dry-run  # daftar lagu yang akan diimpor
 npm.cmd run import:charts               # import + aransemen aktif
 ```
 
+Setlist fixed 10 lagu bisa diisi sekaligus. Tujuh lagu memakai chart aktif
+(lirik + chord); tiga lagu tanpa chart memakai data di
+`prisma/setlist-lyrics.ts`. Lagu yang sudah punya bagian/aransemen dilewati:
+
+```powershell
+npm.cmd run import:lyrics -- --dry-run  # lihat rencana per lagu
+npm.cmd run import:lyrics               # import master bagian + aransemen
+```
+
 Skrip `tsx` (bootstrap/seed) butuh dua flag env karena berjalan di luar
 bundler Next — jalankan persis seperti di `package.json`:
 

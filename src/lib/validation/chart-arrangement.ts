@@ -89,6 +89,30 @@ export const legacyChartImportSchema = z.object({
   name: arrangementName.optional(),
 });
 
+export const lyricsChartImportSchema = z.object({
+  songId,
+  name: arrangementName.optional(),
+  sections: z
+    .array(
+      z.object({
+        label: sectionLabel,
+        type: sectionType,
+        content: sectionContent,
+      }),
+    )
+    .min(1, "Minimal satu bagian.")
+    .max(100, "Maksimal 100 bagian."),
+  items: z
+    .array(
+      z.object({
+        label: sectionLabel,
+        labelOverride: z.string().trim().max(50).optional().nullable(),
+      }),
+    )
+    .min(1, "Aransemen minimal punya satu bagian.")
+    .max(100, "Aransemen maksimal 100 item."),
+});
+
 export type ChartSectionCreateInput = z.infer<typeof chartSectionCreateSchema>;
 export type ChartSectionUpdateInput = z.infer<typeof chartSectionUpdateSchema>;
 export type ChartArrangementCreateInput = z.infer<
@@ -100,3 +124,4 @@ export type ChartArrangementUpdateInput = z.infer<
 export type ChartArrangementItemsInput = z.infer<
   typeof chartArrangementItemsSchema
 >;
+export type LyricsChartImportInput = z.infer<typeof lyricsChartImportSchema>;

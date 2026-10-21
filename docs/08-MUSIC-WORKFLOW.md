@@ -40,6 +40,8 @@ MD mengelola master bagian lagu (Intro, Verse, Pre-Chorus, Chorus, Bridge, Inter
 
 Alur admin: impor chart lama (opsional) → review pecahan bagian → rapikan label/isi → susun urutan → aktifkan satu aransemen. Hanya satu aransemen aktif per lagu. Chart lama tetap menjadi fallback/riwayat dan tidak ditampilkan selama aransemen aktif ada. Perubahan sensitif dicatat di audit log.
 
+Setlist fixed 21 Nov 2026 dapat diisi sekaligus dengan `npm run import:lyrics` (idempoten; lagu yang sudah punya bagian/aransemen dilewati). Tujuh lagu memakai chart aktif sebagai master lirik + chord; tiga lagu tanpa chart memakai data lirik di `prisma/setlist-lyrics.ts`.
+
 ## Suno/reference workflow
 Original → MD arrangement concept → AI-assisted reference → MD review → optional instrument guides → publish version. AI can alter structure, harmony, timing, key, duration or instrumentation; it is not automatically authoritative or live-ready.
 

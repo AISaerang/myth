@@ -429,3 +429,8 @@ Obor pembangunan
 - Lirik Ku Tak Pandang, NNBT No. 20, dan Obor Pembangunan dari teks MD.
 - Typo ringan dirapikan: "Chours" → "Chorus", "sepertI" → "seperti".
 - Setelah WL memilih 2 lagu praise, template ini bisa ditambah 2 lagu tersebut.
+- 10 lagu di atas sudah masuk database sebagai master bagian + aransemen aktif
+  "Aransemen Utama". Tujuh lagu ber-chart memakai lirik + chord dari chart
+  aktif; tiga lagu tanpa chart berisi lirik saja dan siap ditambahi chord di
+  `/songs/[id]/chart`.
+- Praise tetap belum diimpor sampai WL memutuskan.

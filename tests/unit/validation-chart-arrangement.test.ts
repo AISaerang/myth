@@ -4,6 +4,7 @@ import {
   chartSectionCreateSchema,
   chartSectionUpdateSchema,
   legacyChartImportSchema,
+  lyricsChartImportSchema,
 } from "@/lib/validation/chart-arrangement";
 
 describe("chartSectionCreateSchema", () => {
@@ -79,5 +80,33 @@ describe("legacyChartImportSchema", () => {
     expect(
       legacyChartImportSchema.safeParse({ songId: "song-1" }).success,
     ).toBe(true);
+  });
+});
+
+describe("lyricsChartImportSchema", () => {
+  it("accepts master sections with an ordered arrangement", () => {
+    expect(
+      lyricsChartImportSchema.safeParse({
+        songId: "song-1",
+        sections: [
+          {
+            label: "Verse 1",
+            type: "VERSE",
+            content: "[C]Bapa sentuh hatiku",
+          },
+        ],
+        items: [{ label: "Verse 1" }, { label: "Verse 1" }],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects empty sections or items", () => {
+    expect(
+      lyricsChartImportSchema.safeParse({
+        songId: "song-1",
+        sections: [],
+        items: [],
+      }).success,
+    ).toBe(false);
   });
 });

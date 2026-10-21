@@ -12,6 +12,7 @@ import type {
   ChartArrangementUpdateInput,
   ChartSectionCreateInput,
   ChartSectionUpdateInput,
+  LyricsChartImportInput,
 } from "@/lib/validation/chart-arrangement";
 
 type Result =
@@ -398,6 +399,98 @@ export async function saveChartArrangementItems(
   return { ok: true };
 }
 
+export async function importLyricsChart(
+  actorUserId: string,
+  input: LyricsChartImportInput,
+): Promise<Result> {
+  const song = await prisma.song.findUnique({
+    where: { id: input.songId },
+    select: { id: true, title: true },
+  });
+  if (!song) return { ok: false, error: "Lagu tidak ditemukan." };
+
+  const [sectionCount, arrangementCount] = await Promise.all([
+    prisma.chartSection.count({ where: { songId: input.songId } }),
+    prisma.chartArrangement.count({ where: { songId: input.songId } }),
+  ]);
+  if (sectionCount > 0 || arrangementCount > 0) {
+    return {
+      ok: false,
+      error:
+        "Lagu sudah punya bagian/aransemen. Import hanya untuk lagu yang belum dimigrasi.",
+    };
+  }
+
+  const sectionLabels = new Set<string>();
+  for (const section of input.sections) {
+    if (sectionLabels.has(section.label)) {
+      return {
+        ok: false,
+        error: `Label bagian "${section.label}" duplikat.`,
+      };
+    }
+    sectionLabels.add(section.label);
+  }
+  for (const item of input.items) {
+    if (!sectionLabels.has(item.label)) {
+      return {
+        ok: false,
+        error: `Bagian "${item.label}" tidak ada di daftar bagian.`,
+      };
+    }
+  }
+
+  const name = input.name?.trim() || "Aransemen Utama";
+  const result = await prisma.$transaction(async (tx) => {
+    const sectionIds = new Map<string, string>();
+    for (const [index, section] of input.sections.entries()) {
+      const created = await tx.chartSection.create({
+        data: {
+          songId: input.songId,
+          type: section.type,
+          label: section.label,
+          content: section.content,
+          sortOrder: index,
+          createdById: actorUserId,
+        },
+      });
+      sectionIds.set(section.label, created.id);
+    }
+
+    const arrangement = await tx.chartArrangement.create({
+      data: {
+        songId: input.songId,
+        name,
+        isActive: true,
+        createdById: actorUserId,
+      },
+    });
+    await tx.chartArrangementItem.createMany({
+      data: input.items.map((item, index) => ({
+        arrangementId: arrangement.id,
+        sectionId: sectionIds.get(item.label) as string,
+        sortOrder: index,
+        labelOverride: item.labelOverride?.trim() || null,
+      })),
+    });
+    return { arrangementId: arrangement.id };
+  }, { timeout: 30_000 });
+
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.CHART_LYRICS_IMPORTED,
+    entityType: "Song",
+    entityId: input.songId,
+    summary: `Lirik "${song.title}" diimpor menjadi ${input.sections.length} bagian + aransemen "${name}".`,
+    metadata: {
+      song: song.title,
+      sections: String(input.sections.length),
+      arrangement: name,
+    },
+  });
+  return { ok: true, id: result.arrangementId };
+}
+
 export async function importLegacyChart(
   actorUserId: string,
   songId: string,
@@ -483,7 +576,7 @@ export async function importLegacyChart(
       })),
     });
     return { arrangementId: arrangement.id, sections: sortOrder };
-  });
+  }, { timeout: 30_000 });
 
   await writeAudit({
     actorUserId,
