@@ -47,6 +47,8 @@ Materi aktif harus mudah dikenali; versi lama ditandai superseded/archive.
 
 Chord viewer: chord bertumpuk sejajar di atas suku kata lirik (font monospace), label seksi ditandai, baris panjang scroll horizontal di mobile. Mode Lirik+Chord / Lirik saja / Chord saja, dengan transpose ±½ dan reset ke basis C. Admin dapat mengedit chart aktif langsung (konten basis C) atau menambah versi baru dari nada asal lain.
 
+Aransemen lagu: halaman `/songs/[id]/chart` berisi master bagian (Verse/Chorus/Bridge/Intro/Interlude dan lainnya) serta pembangun aransemen per lagu. Editor memakai textarea ChordPro + preview akhir real-time; urutan bagian bisa diulang, dipindah, dihapus, dan diberi label tampil. Satu aransemen aktif per lagu. Chart lama tetap tersedia sebagai fallback/riwayat dan bisa diimpor otomatis untuk direview admin. Tampilan publik memakai aransemen aktif, lalu chart lama aktif, lalu empty state.
+
 ## Practice status
 Pilihan: Belum mulai; Sedang dipelajari; Sudah mencoba dengan referensi; Perlu bantuan; Siap untuk rehearsal. Catatan opsional, timestamp otomatis. User hanya mengubah status sendiri.
 

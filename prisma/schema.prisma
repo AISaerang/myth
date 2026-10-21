@@ -240,6 +240,8 @@ model Song {
   rehearsalItems RehearsalSong[]
   decisions   DecisionLog[]
   chordCharts ChordChart[]
+  chartSections ChartSection[]
+  chartArrangements ChartArrangement[]
 
   @@index([eventId, status])
   @@index([eventId, isPublished])
@@ -346,6 +348,72 @@ model ChordChart {
   createdAt    DateTime @default(now())
 
   @@index([songId, isActive])
+}
+
+enum ChartSectionType {
+  INTRO
+  VERSE
+  PRE_CHORUS
+  CHORUS
+  BRIDGE
+  INTERLUDE
+  INSTRUMENTAL
+  TAG
+  ENDING
+  CODA
+  OTHER
+}
+
+// Master bagian lagu (library). Konten ChordPro basis C dan dipakai bersama
+// oleh semua aransemen; edit bagian berlaku ke semua aransemen.
+model ChartSection {
+  id          String           @id @default(cuid())
+  songId      String
+  song        Song             @relation(fields: [songId], references: [id], onDelete: Cascade)
+  type        ChartSectionType @default(OTHER)
+  label       String
+  content     String           @db.Text
+  sortOrder   Int              @default(0)
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  items ChartArrangementItem[]
+
+  @@unique([songId, label])
+  @@index([songId, sortOrder])
+}
+
+// Susunan bagian untuk satu lagu. Hanya satu yang aktif untuk tampil.
+model ChartArrangement {
+  id          String   @id @default(cuid())
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  name        String
+  isActive    Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items ChartArrangementItem[]
+
+  @@unique([songId, name])
+  @@index([songId, isActive])
+}
+
+// Item urutan; section yang sama boleh dipakai berulang untuk repeat.
+model ChartArrangementItem {
+  id            String           @id @default(cuid())
+  arrangementId String
+  arrangement   ChartArrangement @relation(fields: [arrangementId], references: [id], onDelete: Cascade)
+  sectionId     String
+  section       ChartSection    @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  sortOrder     Int
+  labelOverride String?
+  createdAt     DateTime         @default(now())
+
+  @@unique([arrangementId, sortOrder])
+  @@index([arrangementId, sortOrder])
 }
 
 enum PracticeStatus {

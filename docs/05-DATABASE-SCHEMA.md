@@ -31,6 +31,15 @@ SongBatchItem: `songBatchId`, `songId`, `sortOrder`; unique pair. Enforce one ac
 ### ArrangementVersion
 `id`, `songId`, `versionLabel`, `changeSummary`, `key?`, `bpm?`, `grooveNotes?`, `structureNotes?`, `referenceUrl?`, `isActive`, `isFinal`, `createdById`, `createdAt`. Service transaction ensures only one active version per song.
 
+### ChartSection / ChartArrangement / ChartArrangementItem
+ChartSection: `id`, `songId`, `type` (`INTRO|VERSE|PRE_CHORUS|CHORUS|BRIDGE|INTERLUDE|INSTRUMENTAL|TAG|ENDING|CODA|OTHER`), `label`, `content` (ChordPro, basis C), `sortOrder`, `createdById`, timestamps; unique `songId+label`. Sections are the song's master library and are shared by all its arrangements.
+
+ChartArrangement: `id`, `songId`, `name`, `isActive`, `createdById`, timestamps; unique `songId+name`; at most one active arrangement per song. A named arrangement orders/repeats master sections independently of `ArrangementVersion`.
+
+ChartArrangementItem: `id`, `arrangementId`, `sectionId`, `sortOrder`, `labelOverride?`, `createdAt`; unique `arrangementId+sortOrder`. Recomposition uses section content, so editing a master section updates every arrangement that uses it.
+
+Legacy `ChordChart` remains as fallback/history. Public display precedence: active structured arrangement → active legacy `ChordChart` → empty. Legacy charts can be imported into sections/arrangement by an admin and then reviewed before saving. All chart mutations are admin-only and audited.
+
 ### SongMaterial
 `id`, `songId`, `arrangementVersionId?`, `title`, `category`, `url`, `versionLabel?`, `description?`, `isActive`, `createdById`, timestamps. Categories: `ORIGINAL|ARRANGEMENT_REFERENCE|PART_GUIDE|CHORD_CHART|LYRICS|CLICK_CUE|SEQUENCER|REHEARSAL_RECORDING|FINAL_ASSET|OTHER`.
 

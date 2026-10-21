@@ -9,6 +9,7 @@ import { getSong } from "@server/services/song-service";
 import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-service";
 import { getMyProgress, getSongProgress } from "@server/services/progress-service";
 import { listChordCharts } from "@server/services/chord-service";
+import { getActiveArrangementContent } from "@server/services/chart-arrangement-service";
 import { listSongTasks } from "@server/services/task-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
 import { prisma } from "@/lib/db";
@@ -344,8 +345,18 @@ async function SongChordChart({
   songId: string;
   admin: boolean;
 }) {
-  const charts = await listChordCharts(songId);
-  return <ChordChartSection songId={songId} admin={admin} charts={charts} />;
+  const [charts, arrangement] = await Promise.all([
+    listChordCharts(songId),
+    getActiveArrangementContent(songId),
+  ]);
+  return (
+    <ChordChartSection
+      songId={songId}
+      admin={admin}
+      charts={charts}
+      arrangement={arrangement}
+    />
+  );
 }
 
 async function SongProgress({

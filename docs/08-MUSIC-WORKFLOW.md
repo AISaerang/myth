@@ -35,6 +35,11 @@ Assignments stay per song (unique song+person pair with instrument part). The ba
 ## Timeline ke Hari H (dashboard)
 A Gantt-style card on the dashboard reads the schedule from besok to H-day: H-day anchor (`Event.eventDate`), batch bars (`releaseAt` → `targetReviewAt`), rehearsal milestones (`startsAt`), task dues (`dueAt`), and equipment dues. Labels use Jakarta calendar days (`H-14`, `Hari ini`, `Terlambat N hari`, `Selesai`); song deadlines follow their batch (no per-song due field). Admins see everything; personnel see H-day plus their published songs' batches, upcoming rehearsals, relevant tasks, and assigned equipment. Undated items appear under "Belum terjadwal". Each dated milestone expands to a breakdown: batch songs with status/publish state, rehearsal song list + attendance count, task PIC/priority/related song, equipment PIC, and H-day venue/times. The timeline is only as complete as the dates admins enter — fill event date/time, batch dates, rehearsal schedule, and task dues for it to be useful.
 
+## Lirik, chord, dan aransemen
+MD mengelola master bagian lagu (Intro, Verse, Pre-Chorus, Chorus, Bridge, Interlude, Tag, Ending, dan lainnya) dalam basis C. Setiap bagian boleh berisi chord+lirik, chord saja untuk instrumental, atau lirik saja. Nama aransemen menyusun ulang dan mengulang bagian tanpa menduplikasi konten; mengedit master bagian langsung berlaku ke semua aransemen yang memakainya.
+
+Alur admin: impor chart lama (opsional) → review pecahan bagian → rapikan label/isi → susun urutan → aktifkan satu aransemen. Hanya satu aransemen aktif per lagu. Chart lama tetap menjadi fallback/riwayat dan tidak ditampilkan selama aransemen aktif ada. Perubahan sensitif dicatat di audit log.
+
 ## Suno/reference workflow
 Original → MD arrangement concept → AI-assisted reference → MD review → optional instrument guides → publish version. AI can alter structure, harmony, timing, key, duration or instrumentation; it is not automatically authoritative or live-ready.
 

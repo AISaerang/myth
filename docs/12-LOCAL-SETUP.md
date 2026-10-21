@@ -39,6 +39,19 @@ npm.cmd run db:generate   # generate Prisma Client (tanpa koneksi DB)
 npm.cmd run db:migrate    # butuh DB hidup; membuat tabel + migration (TCP+TLS)
 ```
 
+Untuk DB bersama/produksi, jangan pakai `migrate dev`. Backup dulu, lalu
+terapkan migration yang sudah di-review dengan `npx.cmd prisma migrate deploy`.
+Migration `20261021120000_chart_sections` bersifat additive (tiga tabel baru
+untuk master bagian, aransemen, dan item aransemen lagu).
+
+Setelah migration, chart lama bisa diimpor bertahap (idempoten; lagu yang sudah
+punya bagian/aransemen dilewati). Review hasilnya di `/songs/[id]/chart`:
+
+```powershell
+npm.cmd run import:charts -- --dry-run  # daftar lagu yang akan diimpor
+npm.cmd run import:charts               # import + aransemen aktif
+```
+
 Skrip `tsx` (bootstrap/seed) butuh dua flag env karena berjalan di luar
 bundler Next — jalankan persis seperti di `package.json`:
 

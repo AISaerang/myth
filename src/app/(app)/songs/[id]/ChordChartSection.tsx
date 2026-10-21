@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -32,16 +33,44 @@ export function ChordChartSection({
   songId,
   admin,
   charts,
+  arrangement,
 }: {
   songId: string;
   admin: boolean;
   charts: ChartView[];
+  arrangement: { name: string; content: string } | null;
 }) {
   const active = charts.find((c) => c.isActive) ?? null;
   const history = charts.filter((c) => !c.isActive);
+
+  const legacyAdmin = (
+    <LegacyChartAdmin songId={songId} active={active} history={history} />
+  );
+
   return (
     <Card title="Lirik & Chord">
-      {active ? (
+      {admin ? (
+        <div className="mb-3 flex justify-end">
+          <Link
+            href={`/songs/${songId}/chart`}
+            className="text-sm font-medium underline"
+          >
+            Kelola bagian & aransemen
+          </Link>
+        </div>
+      ) : null}
+
+      {arrangement ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-zinc-500">
+            Aransemen aktif:{" "}
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">
+              {arrangement.name}
+            </span>
+          </p>
+          <ChordViewer content={arrangement.content} baseKey="C" />
+        </div>
+      ) : active ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-zinc-500">
             Basis {active.baseKey}
@@ -49,50 +78,79 @@ export function ChordChartSection({
             {active.label ? ` · ${active.label}` : ""}
           </p>
           <ChordViewer content={active.content} baseKey={active.baseKey} />
-          {admin ? <ChartEditPanel songId={songId} chart={active} /> : null}
         </div>
       ) : (
         <EmptyState
           title="Belum ada chord chart"
           description={
             admin
-              ? "Tempel ChordPro di bawah (otomatis dinormalisasi ke C)."
+              ? "Buka Kelola bagian & aransemen untuk membuat bagian pertama."
               : "MD akan mengunggah lirik & chord lagu ini."
           }
         />
       )}
+
       {admin ? (
-        <div className="mt-4 flex flex-col gap-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-          <p className="text-sm font-medium">Tambah versi baru</p>
-          <ChartInputForm songId={songId} />
-          {history.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">Riwayat (nonaktif)</p>
-              <ul className="flex flex-col gap-1">
-                {history.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
-                  >
-                    <span>
-                      {c.label ?? "Tanpa label"}{" "}
-                      <span className="text-zinc-500">
-                        · asal {c.originalKey ?? "?"} ·{" "}
-                        {formatJakarta(c.createdAt)}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <Badge tone="neutral">Arsip</Badge>
-                      <ChartRowActions songId={songId} chartId={c.id} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
+        arrangement ? (
+          <details className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+            <summary className="cursor-pointer text-sm font-medium">
+              Chart lama & riwayat
+            </summary>
+            <p className="mt-2 text-xs text-zinc-500">
+              Chart lama tidak dipakai selama aransemen aktif.
+            </p>
+            <div className="mt-3 flex flex-col gap-4">{legacyAdmin}</div>
+          </details>
+        ) : (
+          legacyAdmin
+        )
       ) : null}
     </Card>
+  );
+}
+
+function LegacyChartAdmin({
+  songId,
+  active,
+  history,
+}: {
+  songId: string;
+  active: ChartView | null;
+  history: ChartView[];
+}) {
+  return (
+    <>
+      {active ? <ChartEditPanel songId={songId} chart={active} /> : null}
+      <div className="mt-4 flex flex-col gap-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <p className="text-sm font-medium">Tambah versi baru</p>
+        <ChartInputForm songId={songId} />
+        {history.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">Riwayat (nonaktif)</p>
+            <ul className="flex flex-col gap-1">
+              {history.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                >
+                  <span>
+                    {c.label ?? "Tanpa label"}{" "}
+                    <span className="text-zinc-500">
+                      · asal {c.originalKey ?? "?"} ·{" "}
+                      {formatJakarta(c.createdAt)}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Badge tone="neutral">Arsip</Badge>
+                    <ChartRowActions songId={songId} chartId={c.id} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 }
 
