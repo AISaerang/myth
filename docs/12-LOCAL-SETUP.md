@@ -178,7 +178,7 @@ npm.cmd run seed:event       # event + 9 personel + 19 lagu + 3 batch + materi +
 - [x] Model `ChordChart` (ChordPro inline, basis C, satu aktif per lagu, transaksional + audit)
 - [x] Transpose engine: mayor/minor/slash-chord/kres-mol, normalisasi nada asal → C saat simpan
 - [x] Viewer latihan 3 mode (Lirik+Chord / Lirik saja / Chord saja) + geser nada ±½, reset ke C; chord bertumpuk sejajar di atas suku kata, baris panjang scroll horizontal
-- [x] Input admin: tempel ChordPro + nada asal → tersimpan sebagai C; riwayat + aktifkan/hapus
+- [x] Input admin: tempel ChordPro + nada asal → tersimpan sebagai C; edit chart aktif langsung (basis C, audit `CHORD_CHART_UPDATED`); riwayat + aktifkan/hapus
 - [x] Contoh live: "Bapa Sentuh Hatiku" (G→C terverifikasi di DB)
 - [x] Sort manual: tombol naik/turun urutan lagu di batch & rehearsal (sortOrder transaksional, hanya admin)
 - [x] `typecheck`, `lint` bersih, `test` 82/82, `build` lolos (22 rute)

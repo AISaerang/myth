@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   extractChordLines,
+  layoutChordLine,
   stripChords,
   transposeContent,
   transposeRoot,
@@ -18,49 +19,38 @@ const MODES: { value: ViewMode; label: string }[] = [
 ];
 
 function renderBoth(content: string, key: string): React.ReactNode {
-  // Render inline [Chord] sebagai chip di atas teks (blok per baris).
+  // Chord bertumpuk di atas lirik, sejajar kolom suku kata.
   const lines = content.split("\n");
-  return (
-    <>
-      {lines.map((line, i) => (
-        <span key={`${key}-${i}`}>
-          <ChordLine line={line} />
-          {"\n"}
-        </span>
-      ))}
-    </>
-  );
-}
+  return lines.map((line, i) => {
+    const { chordLine, lyricLine, label, isEmpty } = layoutChordLine(line);
+    const lineKey = `${key}-${i}`;
 
-function ChordLine({ line }: { line: string }) {
-  const parts = line.split(/(\[[^\]]+\])/g);
-  return (
-    <>
-      {parts.map((part, i) => {
-        const m = /^\[([^\]]+)\]$/.exec(part);
-        if (m) {
-          return (
-            <code
-              key={i}
-              className="mx-0.5 rounded bg-zinc-200 px-1 font-semibold text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100"
-            >
-              {m[1]}
-            </code>
-          );
-        }
-        // Label seksi {Reff} tampil redup.
-        const label = /^\{([^}]+)\}$/.exec(part.trim());
-        if (label && part.trim().startsWith("{")) {
-          return (
-            <span key={i} className="text-zinc-500">
-              {label[1]}
-            </span>
-          );
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </>
-  );
+    if (isEmpty) {
+      return <div key={lineKey} className="h-4" />;
+    }
+    if (label) {
+      return (
+        <div
+          key={lineKey}
+          className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-500 first:mt-0"
+        >
+          {label}
+        </div>
+      );
+    }
+    return (
+      <div key={lineKey} className="overflow-x-auto overscroll-x-contain">
+        <div className="w-max whitespace-pre font-mono text-sm leading-6">
+          {chordLine.trim() ? (
+            <div className="font-semibold text-sky-700 dark:text-sky-400">
+              {chordLine}
+            </div>
+          ) : null}
+          {lyricLine.trim() ? <div>{lyricLine}</div> : null}
+        </div>
+      </div>
+    );
+  });
 }
 
 export function ChordViewer({
@@ -145,13 +135,19 @@ export function ChordViewer({
           {useFlats ? "Mol (♭)" : "Kres (♯)"}
         </button>
       </div>
-      <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-zinc-50 p-4 font-mono text-sm leading-7 dark:bg-zinc-900">
-        {mode === "lyrics"
-          ? stripChords(transposed)
-          : mode === "chords"
-            ? extractChordLines(transposed).join("\n")
-            : renderBoth(transposed, `${offset}-${useFlats}`)}
-      </pre>
+      <div className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
+        {mode === "lyrics" ? (
+          <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-7">
+            {stripChords(transposed)}
+          </pre>
+        ) : mode === "chords" ? (
+          <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-7">
+            {extractChordLines(transposed).join("\n")}
+          </pre>
+        ) : (
+          <div>{renderBoth(transposed, `${offset}-${useFlats}`)}</div>
+        )}
+      </div>
     </div>
   );
 }

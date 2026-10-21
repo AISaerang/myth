@@ -2,7 +2,10 @@ import "server-only";
 import { AuditAction, writeAudit } from "@/lib/audit";
 import { BASE_KEY, normalizeToC } from "@/lib/chords";
 import { prisma } from "@/lib/db";
-import type { ChordChartInput } from "@/lib/validation/chord";
+import type {
+  ChordChartInput,
+  ChordChartUpdateInput,
+} from "@/lib/validation/chord";
 
 export async function listChordCharts(songId: string) {
   return prisma.chordChart.findMany({
@@ -58,6 +61,43 @@ export async function saveChordChart(
     metadata: { song: song.title, originalKey: input.originalKey.toUpperCase() },
   });
   return { ok: true, id: chart.id };
+}
+
+// Edit chart yang sudah ada. Konten tetap basis C (tanpa normalisasi ulang),
+// sehingga admin bisa memperbaiki chord/lirik langsung tanpa membuat versi baru.
+export async function updateChordChart(
+  actorUserId: string,
+  input: ChordChartUpdateInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const chart = await prisma.chordChart.findUnique({
+    where: { id: input.chartId },
+    include: { song: { select: { id: true, title: true } } },
+  });
+  if (!chart) return { ok: false, error: "Chart tidak ditemukan." };
+  if (chart.songId !== input.songId) {
+    return { ok: false, error: "Chart tidak cocok dengan lagu." };
+  }
+  await prisma.chordChart.update({
+    where: { id: input.chartId },
+    data: {
+      content: input.content,
+      baseKey: BASE_KEY,
+      label: input.label || null,
+    },
+  });
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.CHORD_CHART_UPDATED,
+    entityType: "Song",
+    entityId: chart.songId,
+    summary: `Chord chart "${chart.song.title}" diperbarui${input.label ? ` (${input.label})` : ""}.`,
+    metadata: {
+      song: chart.song.title,
+      chartId: chart.id,
+      baseKey: BASE_KEY,
+    },
+  });
+  return { ok: true };
 }
 
 export async function setChordChartActive(

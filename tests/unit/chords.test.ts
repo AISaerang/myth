@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   extractChordLines,
+  layoutChordLine,
   listChords,
   normalizeToC,
   noteIndex,
@@ -102,5 +103,39 @@ describe("view modes", () => {
 
   it("lists unique valid chords", () => {
     expect(listChords(sample)).toEqual(["G", "D"]);
+  });
+});
+
+describe("layoutChordLine", () => {
+  it("aligns chords above the lyric characters", () => {
+    const out = layoutChordLine("Bapa [G]sentuh ha[D]tiku");
+    expect(out.lyricLine).toBe("Bapa sentuh hatiku");
+    expect(out.chordLine[5]).toBe("G");
+    expect(out.chordLine[14]).toBe("D");
+    expect(out.chordLine.replace(/\s/g, "")).toBe("GD");
+  });
+
+  it("keeps chord-only lines readable without overlap", () => {
+    const out = layoutChordLine("[Bb] [C] [Am] [Dm]");
+    expect(out.chordLine).toBe("Bb C Am Dm");
+    expect(out.lyricLine.trim()).toBe("");
+    expect(out.isEmpty).toBe(false);
+  });
+
+  it("separates chords that would otherwise overlap", () => {
+    const out = layoutChordLine("[G/B][D]lirik");
+    expect(out.chordLine.trim()).toBe("G/B D");
+    expect(out.lyricLine).toBe("lirik");
+  });
+
+  it("returns section labels and blank lines separately", () => {
+    expect(layoutChordLine("{Reff}").label).toBe("Reff");
+    expect(layoutChordLine("   ").isEmpty).toBe(true);
+  });
+
+  it("leaves lyric-only lines without a chord row", () => {
+    const out = layoutChordLine("Ubah hidupku");
+    expect(out.chordLine.trim()).toBe("");
+    expect(out.lyricLine).toBe("Ubah hidupku");
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -11,6 +11,7 @@ import {
   deleteChordChartAction,
   saveChordChartAction,
   setChordChartActiveAction,
+  updateChordChartAction,
 } from "@server/actions/chords";
 import { ChordViewer } from "./ChordViewer";
 
@@ -48,6 +49,7 @@ export function ChordChartSection({
             {active.label ? ` · ${active.label}` : ""}
           </p>
           <ChordViewer content={active.content} baseKey={active.baseKey} />
+          {admin ? <ChartEditPanel songId={songId} chart={active} /> : null}
         </div>
       ) : (
         <EmptyState
@@ -61,6 +63,7 @@ export function ChordChartSection({
       )}
       {admin ? (
         <div className="mt-4 flex flex-col gap-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+          <p className="text-sm font-medium">Tambah versi baru</p>
           <ChartInputForm songId={songId} />
           {history.length > 0 ? (
             <div className="flex flex-col gap-2">
@@ -90,6 +93,94 @@ export function ChordChartSection({
         </div>
       ) : null}
     </Card>
+  );
+}
+
+function ChartEditPanel({
+  songId,
+  chart,
+}: {
+  songId: string;
+  chart: ChartView;
+}) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <div className="flex flex-col gap-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => setEditing((v) => !v)}
+        >
+          {editing ? "Tutup editor" : "Edit chart aktif"}
+        </Button>
+      </div>
+      {editing ? <ChartEditForm songId={songId} chart={chart} /> : null}
+    </div>
+  );
+}
+
+function ChartEditForm({
+  songId,
+  chart,
+}: {
+  songId: string;
+  chart: ChartView;
+}) {
+  const [state, formAction, pending] = useActionState(updateChordChartAction, {
+    ok: false,
+  });
+  return (
+    <form action={formAction} className="flex flex-col gap-3">
+      <input type="hidden" name="songId" value={songId} />
+      <input type="hidden" name="chartId" value={chart.id} />
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor={`chart-edit-label-${chart.id}`}
+          className="text-sm font-medium"
+        >
+          Label (opsional)
+        </label>
+        <input
+          id={`chart-edit-label-${chart.id}`}
+          name="label"
+          maxLength={50}
+          defaultValue={chart.label ?? ""}
+          placeholder="cth. Versi latihan v1"
+          className={inputClass}
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor={`chart-edit-content-${chart.id}`}
+          className="text-sm font-medium"
+        >
+          ChordPro — sudah basis {chart.baseKey}
+        </label>
+        <textarea
+          id={`chart-edit-content-${chart.id}`}
+          name="content"
+          required
+          rows={14}
+          defaultValue={chart.content}
+          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        />
+        <p className="text-xs text-zinc-500">
+          Ubah chord/lirik langsung di sini. Untuk menempel chart baru dari nada
+          asal lain, gunakan form &ldquo;Tambah versi baru&rdquo; di bawah.
+        </p>
+      </div>
+      {!state.ok && state.error ? (
+        <Alert tone="danger">{state.error}</Alert>
+      ) : null}
+      {state.ok ? <Alert tone="info">Chart diperbarui.</Alert> : null}
+      <div>
+        <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+          {pending ? "…" : "Simpan perubahan"}
+        </Button>
+      </div>
+    </form>
   );
 }
 

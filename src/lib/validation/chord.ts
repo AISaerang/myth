@@ -20,3 +20,13 @@ export const chordChartSchema = z.object({
 });
 
 export type ChordChartInput = z.infer<typeof chordChartSchema>;
+
+// Edit chart aktif: konten sudah basis C, jadi tidak perlu nada asal lagi.
+export const chordChartUpdateSchema = z.object({
+  songId: z.string().min(1, "Lagu tidak valid."),
+  chartId: z.string().min(1, "Chart tidak valid."),
+  content: chordChartSchema.shape.content,
+  label: chordChartSchema.shape.label,
+});
+
+export type ChordChartUpdateInput = z.infer<typeof chordChartUpdateSchema>;

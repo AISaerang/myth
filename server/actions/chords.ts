@@ -3,11 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { requireActionAdmin } from "@/lib/auth";
 import { firstIssueMessage } from "@/lib/validation/auth";
-import { chordChartSchema } from "@/lib/validation/chord";
+import {
+  chordChartSchema,
+  chordChartUpdateSchema,
+} from "@/lib/validation/chord";
 import {
   deleteChordChart,
   saveChordChart,
   setChordChartActive,
+  updateChordChart,
 } from "@server/services/chord-service";
 import type { ActionState } from "./auth";
 
@@ -31,6 +35,26 @@ export async function saveChordChartAction(
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
   const result = await saveChordChart(admin.id, parsed.data);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateSong(parsed.data.songId);
+  return { ok: true };
+}
+
+export async function updateChordChartAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireActionAdmin();
+  const parsed = chordChartUpdateSchema.safeParse({
+    songId: formData.get("songId"),
+    chartId: formData.get("chartId"),
+    content: formData.get("content"),
+    label: formData.get("label") || undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  const result = await updateChordChart(admin.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSong(parsed.data.songId);
   return { ok: true };

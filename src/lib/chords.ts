@@ -112,6 +112,87 @@ export function normalizeToC(content: string, originalKey: string): string {
   return transposeContent(content, semitonesBetween(rootMatch[1] as string, BASE_KEY));
 }
 
+export interface ChordLyricLayout {
+  chordLine: string;
+  lyricLine: string;
+  label: string | null;
+  isEmpty: boolean;
+}
+
+// Susun satu baris ChordPro menjadi dua baris teks: chord di atas lirik.
+// Kolom chord mengikuti posisi karakter lirik agar sejajar pada font monospace.
+export function layoutChordLine(line: string): ChordLyricLayout {
+  const labelMatch = /^\s*\{([^}]+)\}\s*$/.exec(line);
+  if (labelMatch) {
+    return {
+      chordLine: "",
+      lyricLine: "",
+      label: (labelMatch[1] as string).trim(),
+      isEmpty: false,
+    };
+  }
+
+  const hasLyric = stripChords(line).replace(/[{}]/g, "").trim() !== "";
+  if (!hasLyric) {
+    // Baris chord saja: pertahankan spasi asli di antara chord.
+    const chordLine = line.replace(/\[([^\]]+)\]/g, (_m, token: string) =>
+      token.trim(),
+    );
+    if (chordLine.trim() === "") {
+      return {
+        chordLine: "",
+        lyricLine: "",
+        label: null,
+        isEmpty: line.trim() === "",
+      };
+    }
+    return {
+      chordLine,
+      lyricLine: " ".repeat(chordLine.length),
+      label: null,
+      isEmpty: false,
+    };
+  }
+
+  let chordLine = "";
+  let lyricLine = "";
+  let column = 0;
+  const tokens = /\[([^\]]+)\]|\{([^}]+)\}/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokens.exec(line)) !== null) {
+    const text = line.slice(lastIndex, match.index);
+    lyricLine += text;
+    column += text.length;
+
+    if (match[1] !== undefined) {
+      const chord = match[1].trim();
+      const position =
+        column > chordLine.length
+          ? column
+          : chordLine.length + (chordLine.length > 0 ? 1 : 0);
+      chordLine = chordLine.padEnd(position, " ") + chord;
+    } else {
+      const label = (match[2] as string).trim();
+      lyricLine += label;
+      column += label.length;
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  const tail = line.slice(lastIndex);
+  lyricLine += tail;
+
+  const width = Math.max(chordLine.length, lyricLine.length);
+  return {
+    chordLine: chordLine.padEnd(width, " "),
+    lyricLine: lyricLine.padEnd(width, " "),
+    label: null,
+    isEmpty: line.trim() === "",
+  };
+}
+
 // Mode lirik saja: buang [chord], tandai {label} sebagai teks biasa.
 export function stripChords(content: string): string {
   return content
