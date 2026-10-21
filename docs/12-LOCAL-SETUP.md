@@ -177,7 +177,7 @@ npm.cmd run seed:event       # event + 9 personel + 19 lagu + 3 batch + materi +
 
 - [x] Model `ChordChart` (ChordPro inline, basis C, satu aktif per lagu, transaksional + audit)
 - [x] Transpose engine: mayor/minor/slash-chord/kres-mol, normalisasi nada asal → C saat simpan
-- [x] Viewer latihan 3 mode (Lirik+Chord / Lirik saja / Chord saja) + geser nada ±½, reset ke C
+- [x] Viewer latihan 3 mode (Lirik+Chord / Lirik saja / Chord saja) + geser nada ±½, reset ke C; chord bertumpuk sejajar di atas suku kata, baris panjang scroll horizontal
 - [x] Input admin: tempel ChordPro + nada asal → tersimpan sebagai C; riwayat + aktifkan/hapus
 - [x] Contoh live: "Bapa Sentuh Hatiku" (G→C terverifikasi di DB)
 - [x] Sort manual: tombol naik/turun urutan lagu di batch & rehearsal (sortOrder transaksional, hanya admin)
@@ -230,3 +230,15 @@ Belum dibuat (butuh info venue): item equipment. Lokasi/link rehearsal masih "me
 - [x] Broadcast: varian DM observer; `/people` bisa buat/ubah role OBSERVER
 - [x] Script `npm run onboard:observers` (Axcellent, Cantika — Imanuel Jakbar; Lorenzo — Eben Haezer Cikarang), password dibuang, akses via invite `/broadcast`
 - [x] `typecheck`, `lint` bersih, `test` 98/98
+
+## 19. Penyesuaian Setlist 16 Okt 2026 (terverifikasi 21 Okt 2026)
+
+- [x] `Sungguh Indah` → fungsi Pengakuan Dosa; `Bapa Sentuh Hatiku` → Sebelum Firman
+- [x] `Seputih Bulu Domba` keluar setlist → arsip (unpublish, assignment/batch/rehearsal dilepas, DRAFT); histori versi & materi tetap
+- [x] `archiveStaleSongs` kini ikut membersihkan `RehearsalSong` — sebelumnya lagu arsip masih tampil di daftar lagu rehearsal
+- [x] Batch 3 = 2 lagu; deskripsi diperbarui (Berita Anugerah = narasi Khadim, tanpa lagu)
+- [x] 3 entri DecisionLog (musikal) idempoten dari blok `decisions` di seed lokal
+- [x] Nama event diselaraskan dengan portal: "…Jabodetabek–Bandung-Batam" (`CONFIRMED`)
+- [x] 13 lagu aktif; lagu per rehearsal: 8 / 10 / 13 / 13 / 13
+- [ ] Praise final 2 lagu menunggu keputusan WL (3 kandidat masih di Batch 2)
+- [x] `typecheck`, `lint` bersih, `test` lolos, `build` lolos

@@ -11,8 +11,13 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { config as loadDotenv } from "dotenv";
-import type { EventStatus, SongStatus } from "@/generated/prisma/client";
+import type {
+  DecisionType,
+  EventStatus,
+  SongStatus,
+} from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
+import { createDecision } from "@server/services/decision-service";
 import { createEvent } from "@server/services/event-service";
 import {
   assignSkill,
@@ -77,6 +82,15 @@ interface SeedPerson {
   notes?: string;
 }
 
+interface SeedDecision {
+  title: string;
+  decisionType: string;
+  decisionText: string;
+  reason?: string;
+  decidedBy?: string;
+  relatedSongTitle?: string;
+}
+
 interface SeedData {
   event: { name: string; description?: string; eventDate?: string; eventStatus: string; notes?: string };
   skills: string[];
@@ -84,6 +98,7 @@ interface SeedData {
   bandUsernames: string[];
   singerUsernames: string[];
   batches: SeedBatch[];
+  decisions?: SeedDecision[];
 }
 
 const SONG_STATUSES: SongStatus[] = [
@@ -396,10 +411,54 @@ async function main(): Promise<void> {
 
   const archived = await archiveStaleSongs(actorId, event.id, activeTitles);
   await reconcileStaleBatches(actorId, event.id, data.batches.map((b) => b.name));
+  const seededDecisions = await ensureDecisions(actorId, event.id, data.decisions);
 
   console.log(
-    `Seed selesai: event "${event.name}", ${data.persons.length} personel, ${songCount} entri lagu, ${data.batches.length} batch, ${archived} lagu diarsipkan.`,
+    `Seed selesai: event "${event.name}", ${data.persons.length} personel, ${songCount} entri lagu, ${data.batches.length} batch, ${archived} lagu diarsipkan, ${seededDecisions} decision baru.`,
   );
+}
+
+// Keputusan rapat yang disimpan di data lokal: dibuat sekali per judul
+// (idempoten) agar re-run seed tidak menduplikasi decision log.
+async function ensureDecisions(
+  actorId: string,
+  eventId: string,
+  decisions: SeedDecision[] | undefined,
+): Promise<number> {
+  if (!decisions || decisions.length === 0) return 0;
+  let count = 0;
+  for (const d of decisions) {
+    const existing = await prisma.decisionLog.findFirst({
+      where: { eventId, title: d.title },
+    });
+    if (existing) continue;
+    let relatedSongId: string | undefined;
+    if (d.relatedSongTitle) {
+      const song = await prisma.song.findFirst({
+        where: { eventId, title: d.relatedSongTitle },
+      });
+      if (!song) {
+        console.log(` Lewati decision "${d.title}": lagu tidak ditemukan.`);
+        continue;
+      }
+      relatedSongId = song.id;
+    }
+    const created = await createDecision(actorId, {
+      eventId,
+      title: d.title,
+      decisionType: d.decisionType as DecisionType,
+      decisionText: d.decisionText,
+      reason: d.reason,
+      decidedBy: d.decidedBy,
+      relatedSongId,
+    });
+    if (!created.ok) {
+      console.log(` Lewati decision "${d.title}": ${created.error}`);
+      continue;
+    }
+    count += 1;
+  }
+  return count;
 }
 
 // Lagu event yang tak lagi di JSON: lepas assignment + batch, unpublish,
@@ -429,6 +488,8 @@ async function archiveStaleSongs(
     await prisma.$transaction([
       prisma.songAssignment.deleteMany({ where: { songId: song.id } }),
       prisma.songBatchItem.deleteMany({ where: { songId: song.id } }),
+      // Lagu arsip juga harus hilang dari daftar lagu tiap rehearsal.
+      prisma.rehearsalSong.deleteMany({ where: { songId: song.id } }),
       prisma.song.update({
         where: { id: song.id },
         data: { isPublished: false, status: "DRAFT" },

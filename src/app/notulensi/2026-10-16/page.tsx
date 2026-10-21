@@ -75,7 +75,8 @@ export default function Notulensi16102026Page() {
             </p>
             <p className="text-zinc-600 dark:text-zinc-400">
               WL memilih 2 dari 3 kandidat di bawah, atau mengusulkan lagu
-              baru.
+              baru. Keputusan final menyusul; sampai saat itu ketiga kandidat
+              tetap tampil di portal.
             </p>
             <ul className="mt-2 flex flex-col gap-2">
               <li className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">

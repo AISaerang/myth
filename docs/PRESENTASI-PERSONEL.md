@@ -23,12 +23,12 @@ Ambil via `Win+Shift+S`, mobile via DevTools `Ctrl+Shift+M` (390px). Highlight b
 | `02-masuk.png` | `/masuk` | desktop | Kolom username/password, tanpa tombol Daftar |
 | `03-songs-list.png` | `/songs` login USER | mobile 390px | Hanya lagu publish + ditugaskan yang tampil |
 | `04-song-detail.png` | `/songs/[id]` 1 lagu publish | desktop | 3 kotak: `Key/BPM/fungsi liturgi`, badge `Materi Aktif` hijau, `Version history v01` |
-| `05-chord-viewer.png` | `/songs/[id]` bagian chord | desktop | Mode `Lirik+Chord / Lirik saja / Chord saja`, tombol `±` transpose, `reset ke C` |
+| `05-chord-viewer.png` | `/songs/[id]` bagian chord | desktop | Chord bertumpuk sejajar di atas lirik; mode `Lirik+Chord / Lirik saja / Chord saja`, tombol `±` transpose, `reset ke C` |
 | `06-progress.png` | `/songs/[id]` bagian progres | desktop | Dropdown 5 status (lihat §2 slide 5) |
 | `07-tasks.png` | `/tasks` filter `Aktif` | desktop | Filter `Semua/Aktif/Blocked/Terlambat/Selesai`, 1 kartu usulan `[Usulan - Part]` |
 | `08-rehearsal.png` | `/rehearsals` + 1 detail `/rehearsals/[id]` | mobile 390px | Judul + jam WIB + jumlah lagu, agenda, status kehadiranmu |
 
-Prod sudah berisi data live: 14 lagu aktif dalam 4 batch manggung (urutan manggung = sortOrder), 8 chord chart basis C, 5 rehearsal, 5 task awal. Tidak perlu seed ulang.
+Prod sudah berisi data live: 13 lagu aktif dalam 4 batch manggung (urutan manggung = sortOrder), 8 chord chart basis C, 5 rehearsal, 5 task awal. Tidak perlu seed ulang.
 
 ## 2. Slide + naskah (7 slide, ±15 mnt)
 
@@ -36,7 +36,7 @@ Prod sudah berisi data live: 14 lagu aktif dalam 4 batch manggung (urutan manggu
 - Visual: `01-dashboard-user.png`.
 - 1 kalimat: "Satu link untuk tahu lagu, tugas, dan jadwalmu."
 - Ucapkan:
-  - Ibadah Pemuda Wilayah 21 Nov 2026, personel lintas jemaat, 14 lagu dalam 4 batch manggung.
+  - Ibadah Pemuda Wilayah 21 Nov 2026, personel lintas jemaat, 13 lagu dalam 4 batch manggung.
   - Masalah lama: materi nyebar di chat, versi terbaru tidak jelas, siapa sudah latihan tidak terpantau.
   - Solusi: home harianmu = `/dashboard` (Laguku, Task Aktif, Rehearsal Berikutnya, Materi Terbaru).
 - Demo: tidak perlu klik.
@@ -63,7 +63,7 @@ Prod sudah berisi data live: 14 lagu aktif dalam 4 batch manggung (urutan manggu
 - Visual: `05-chord-viewer.png`.
 - 1 kalimat: "Chord tersimpan basis C, tinggal geser sesuai suaramu."
 - Ucapkan:
-  - Viewer 3 mode: Lirik+Chord / Lirik saja / Chord saja. Tombol `±` geser nada, `reset ke C`.
+  - Viewer 3 mode: Lirik+Chord / Lirik saja / Chord saja. Chord tampil bertumpuk tepat di atas suku kata; di HP tiap baris bisa digeser horizontal. Tombol `±` geser nada, `reset ke C`.
   - Chord disimpan dinormalisasi ke C saat admin menempel ChordPro + nada asal; transposemu hanya untuk latihan — key manggung tetap ikut MD.
 - Demo live: ganti mode + geser 1 nada di depan mereka.
 
