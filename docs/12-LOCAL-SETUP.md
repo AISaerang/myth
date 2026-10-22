@@ -206,7 +206,9 @@ npm.cmd run seed:event       # event + 9 personel + 19 lagu + 3 batch + materi +
 - [x] `typecheck`, `lint` bersih, `test` 82/82, `build` lolos (22 rute)
 - [ ] Enrichment metadata menunggu persetujuan MD (2 lagu ambigu + Joyful Gathering + key TBD)
 
-## 15. Status Setlist Final 21 Nov (terverifikasi 15 Okt 2026)
+## 15. Status Setlist Final (terverifikasi 15 Okt 2026)
+
+Catatan tanggal: bagian ini diverifikasi saat tanggal kerja masih 21 Nov 2026. Acara kemudian dimajukan ke Sabtu 14 Nov 2026 (keputusan Komisi Wilayah 22 Okt 2026). Daftar lagu di bawah adalah status 15 Okt dan tidak diubah di sini.
 
 Rundown resmi: ice breaking → opening → praise → worship → persembahan → berkat → closing.
 - [x] 14 lagu aktif dalam 4 batch manggung (Ice Breaking 4, Opening&Praise 4, Worship 3, Persembahan/Berkat/Closing 3)
@@ -221,10 +223,10 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 - [x] "Satukanlah Hati Kami" diabaikan sesuai arahan MD (tidak di-seed)
 - [ ] Key Ku Tak Pandang + NNBT 20 TBD — MD isi via UI
 
-## 17. Timetable Live (terverifikasi 15 Okt 2026)
+## 17. Timetable Live (batch terverifikasi 15 Okt 2026; jadwal rehearsal diperbarui 22 Okt 2026)
 
-Tanggal batch (rilis → target review): B1 15→19 Okt, B2 17→26 Okt, B3 24 Okt→2 Nov, B4 31 Okt→9 Nov.
-Rehearsal: monitoring online 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00 (WIB) — lagu per sesi sesuai batch plan.
+Tanggal batch (rilis → target review, catatan seed 15 Okt): B1 15→19 Okt, B2 17→26 Okt, B3 24 Okt→2 Nov, B4 31 Okt→9 Nov. Batas berbagi materi yang berlaku sekarang: Sab 24 Okt (target Reference Ready); tanggal review batch di atas belum diselaraskan di data aplikasi.
+Rehearsal (WIB; jadwal 15 Okt tidak berlaku lagi): Sab 24 Okt batas semua lagu + audio aransemen + chord (target Reference Ready); Sab 31 Okt latihan onsite pertama (tempat dan jam masih dikoordinasikan); Sab 7 Nov full rehearsal (usulan, belum final); 11–12 Nov gladi bersih (usulan, belum final); Sab 14 Nov 07:00 soundcheck, lalu ibadah. Jadwal lama: monitoring online 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00.
 5 task awal (PIC: MD): konfirmasi venue, link Drive B1, review key/BPM, cek sound, click/cue.
 Belum dibuat (butuh info venue): item equipment. Lokasi/link rehearsal masih "menyusul" — MD/panitia adjust via portal.
 
@@ -264,3 +266,15 @@ Belum dibuat (butuh info venue): item equipment. Lokasi/link rehearsal masih "me
 - [x] 13 lagu aktif; lagu per rehearsal: 8 / 10 / 13 / 13 / 13
 - [ ] Praise final 2 lagu menunggu keputusan WL (3 kandidat masih di Batch 2)
 - [x] `typecheck`, `lint` bersih, `test` lolos, `build` lolos
+
+## 20. Acara dimajukan ke 14 Nov 2026 (keputusan 22 Okt 2026)
+
+- [x] Tanggal acara: Sabtu 14 Nov 2026 (Komisi Wilayah, 22 Okt 2026), menggantikan 21 Nov 2026. Alasan: dua minggu setelah tanggal lama ada katekisasi pelsus dan RMST-39.
+- [x] Soundcheck hari-H 07:00 WIB, lalu ibadah. Durasi dan jam selesai belum dikunci.
+- [x] Batas Sab 24 Okt: semua lagu + audio aransemen + chord dibagikan (target Reference Ready).
+- [ ] Latihan onsite pertama Sab 31 Okt — tempat dan jam masih dikoordinasikan.
+- [ ] Full rehearsal usulan Sab 7 Nov — belum final.
+- [ ] Gladi bersih usulan 11–12 Nov — belum final.
+- [ ] Sequencer praise masih dikoordinasikan WL dengan beberapa pihak.
+- Jadwal lama tidak berlaku: monitoring 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00 (WIB).
+- Log seed historis (§13: event 21 Nov 2026, `PENDING_CONFIRMATION`) tidak diubah. Penyesuaian tanggal di aplikasi bukan bagian dari catatan ini.

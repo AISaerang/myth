@@ -23,6 +23,18 @@
 14. Event-day soundcheck and execution.
 15. Post-event review.
 
+## Jadwal menuju 14 Nov 2026 (WIB)
+
+Keputusan Komisi Wilayah 22 Okt 2026: ibadah dimajukan ke Sabtu 14 Nov 2026 (sebelumnya 21 Nov), karena dua minggu setelah tanggal lama ada katekisasi pelsus dan RMST-39. Jadwal lama (monitoring 21 Okt, sectional 1 Nov, full 8 Nov, gladi 15 Nov, soundcheck 21 Nov) tidak berlaku.
+
+- Sab 24 Okt: batas semua lagu + audio aransemen + chord dibagikan (target status Reference Ready).
+- Sab 31 Okt: latihan onsite pertama. Tempat dan jam masih dikoordinasikan.
+- Sab 7 Nov: full rehearsal — usulan, belum final.
+- 11–12 Nov: gladi bersih — usulan, belum final.
+- Sab 14 Nov 07:00: soundcheck, lalu ibadah. Durasi dan jam selesai belum dikunci.
+
+Sequencer praise masih dikoordinasikan WL dengan beberapa pihak (masih terbuka).
+
 ## Song metadata
 Title, liturgical function, original reference, key, BPM, groove/feel, structure, intro/ending, transitions/cues, assigned instruments/people, active version, readiness, blockers. Do not finalize key/BPM until MD reviews vocal range and team capability.
 
@@ -40,7 +52,7 @@ MD mengelola master bagian lagu (Intro, Verse, Pre-Chorus, Chorus, Bridge, Inter
 
 Alur admin: impor chart lama (opsional) → review pecahan bagian → rapikan label/isi → susun urutan → aktifkan satu aransemen. Hanya satu aransemen aktif per lagu. Chart lama tetap menjadi fallback/riwayat dan tidak ditampilkan selama aransemen aktif ada. Perubahan sensitif dicatat di audit log.
 
-Setlist fixed 21 Nov 2026 dapat diisi sekaligus dengan `npm run import:lyrics` (idempoten; lagu yang sudah punya bagian/aransemen dilewati). Tujuh lagu memakai chart aktif sebagai master lirik + chord; tiga lagu tanpa chart memakai data lirik di `prisma/setlist-lyrics.ts`.
+Setlist fixed (acara Sabtu 14 Nov 2026; sebelumnya disebut setlist 21 Nov) dapat diisi sekaligus dengan `npm run import:lyrics` (idempoten; lagu yang sudah punya bagian/aransemen dilewati). Tujuh lagu memakai chart aktif sebagai master lirik + chord; tiga lagu tanpa chart memakai data lirik di `prisma/setlist-lyrics.ts`.
 
 ## Suno/reference workflow
 Original → MD arrangement concept → AI-assisted reference → MD review → optional instrument guides → publish version. AI can alter structure, harmony, timing, key, duration or instrumentation; it is not automatically authoritative or live-ready.
