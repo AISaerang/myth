@@ -56,6 +56,33 @@ export const CHART_SECTION_TYPE_LABEL: Record<ChartSectionKind, string> = {
   OTHER: "Lainnya",
 };
 
+export const CHART_SECTION_TYPE_HINT: Record<ChartSectionKind, string> = {
+  INTRO: "Pembuka instrumental — menetapkan tempo, groove, dan mood.",
+  VERSE: "Bait — bagian naratif; tiap bait berbeda lirik, melodi bisa sama.",
+  PRE_CHORUS: "Jembatan build-up dari verse menuju chorus.",
+  CHORUS: "Bagian klimaks yang berulang; identitas utama lagu.",
+  POST_CHORUS: "Hook pendek langsung setelah chorus.",
+  PRE_BRIDGE: "Pengangkat pendek sebelum masuk bridge.",
+  BRIDGE: "Bagian kontras (melodi/harmoni berbeda) di tengah lagu.",
+  INTERLUDE: "Selah instrumental pendek antara dua bagian.",
+  INSTRUMENTAL: "Bagian band penuh tanpa vokal.",
+  SOLO: "Solo satu instrumen (gitar, sax, keys) di atas progresi lagu.",
+  HOOK: "Motif/riff pendek yang mudah dikenali dan mengikat lagu.",
+  BREAKDOWN: "Bagian drop — band men-back off, dinamika turun drastis.",
+  VAMP: "Loop progesi pendek, diulang sampai mendapat cue berangkat.",
+  TAG: "Kalimat/tag pendek yang diletakkan antar bagian besar.",
+  TURNAROUND: "1-2 bar progesi balik menyambung ke bagian berikutnya.",
+  KEY_CHANGE:
+    "Perpindahan nada (modulasi), cth. sebelum chorus terakhir.",
+  ADLIB: "Ruang improv vokal; lirik boleh bebas dari teks utama.",
+  SPOKEN: "Bagian tutur/spoken word tanpa dinyanyikan.",
+  TRANSITION: "Jembatan pendek untuk pindah bagian tanpa jeda.",
+  REPRISE: "Ulang bagian sebelumnya dengan variasi pengantar.",
+  ENDING: "Penutup lagu: fade-out atau final cadence.",
+  CODA: "Ekor penutup yang berbeda dari bagian utama.",
+  OTHER: "Di luar kategori — dipakai dengan label bebas.",
+};
+
 export interface ParsedChartSection {
   label: string;
   type: ChartSectionKind;

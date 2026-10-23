@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
+  CHART_SECTION_TYPE_HINT,
   CHART_SECTION_TYPE_LABEL,
   composeArrangementContent,
   type ChartSectionKind,
@@ -29,6 +30,7 @@ import {
 } from "@server/actions/chart-arrangements";
 import { ChordViewer } from "../ChordViewer";
 import { ChartSectionEditor, type SectionData } from "./ChartSectionEditor";
+import { HintSelect } from "@/components/ui/HintSelect";
 
 const inputClass =
   "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900";
@@ -409,31 +411,33 @@ function ArrangementWorkspace({
             >
               Tambah bagian
             </label>
-            <select
+            <HintSelect
               id={`add-section-${arrangement.id}`}
-              defaultValue=""
-              onChange={(event) => {
-                if (event.target.value === "__new__") {
+              className="min-w-0 flex-1"
+              placeholder="Tambah bagian…"
+              ariaLabel="Tambah bagian ke aransemen"
+              value=""
+              onChange={(value) => {
+                if (value === "__new__") {
                   onRequestNewSection();
                 } else {
-                  addSection(event.target.value);
+                  addSection(value);
                 }
-                event.target.value = "";
               }}
-              className={`${inputClass} min-w-0 flex-1`}
-            >
-              <option value="">Tambah bagian…</option>
-              <option value="__new__">+ Bagian baru…</option>
-              {sections.length > 0 ? (
-                <optgroup label="Bagian yang sudah ada">
-                  {sections.map((section) => (
-                    <option key={section.id} value={section.id}>
-                      {section.label} · {CHART_SECTION_TYPE_LABEL[section.type]}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-            </select>
+              items={[
+                {
+                  value: "__new__",
+                  label: "+ Bagian baru…",
+                  hint: "Buat bagian baru di kartu Master bagian.",
+                },
+                ...sections.map((section) => ({
+                  value: section.id,
+                  label: `${section.label} · ${CHART_SECTION_TYPE_LABEL[section.type]}`,
+                  hint: CHART_SECTION_TYPE_HINT[section.type],
+                  group: "Bagian yang sudah ada",
+                })),
+              ]}
+            />
           </div>
 
           {draft.length === 0 ? (

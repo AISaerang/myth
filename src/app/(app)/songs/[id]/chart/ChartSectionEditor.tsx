@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import {
   CHART_SECTION_TYPES,
+  CHART_SECTION_TYPE_HINT,
   CHART_SECTION_TYPE_LABEL,
   type ChartSectionKind,
 } from "@/lib/chart-arrangement";
@@ -12,6 +13,7 @@ import {
   createChartSectionAction,
   updateChartSectionAction,
 } from "@server/actions/chart-arrangements";
+import { HintSelect } from "@/components/ui/HintSelect";
 import { ChordOverUnderEditor } from "../ChordOverUnderEditor";
 import { ChordViewer } from "../ChordViewer";
 
@@ -61,21 +63,18 @@ export function ChartSectionEditor({
           <label htmlFor="section-type" className="text-sm font-medium">
             Tipe bagian
           </label>
-          <select
+          <input type="hidden" name="type" value={type} />
+          <HintSelect
             id="section-type"
-            name="type"
+            items={CHART_SECTION_TYPES.map((value) => ({
+              value,
+              label: CHART_SECTION_TYPE_LABEL[value],
+              hint: CHART_SECTION_TYPE_HINT[value],
+            }))}
             value={type}
-            onChange={(event) =>
-              setType(event.target.value as ChartSectionKind)
-            }
-            className={inputClass}
-          >
-            {CHART_SECTION_TYPES.map((value) => (
-              <option key={value} value={value}>
-                {CHART_SECTION_TYPE_LABEL[value]}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => setType(next as ChartSectionKind)}
+            ariaLabel="Tipe bagian"
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="section-label" className="text-sm font-medium">
