@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useCallback, useActionState, useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -14,6 +14,8 @@ import {
   setChordChartActiveAction,
   updateChordChartAction,
 } from "@server/actions/chords";
+import type { ActionState } from "@server/actions/auth";
+import { ChordOverUnderEditor } from "./ChordOverUnderEditor";
 import { ChordViewer } from "./ChordViewer";
 
 const inputClass =
@@ -189,6 +191,7 @@ function ChartEditForm({
   const [state, formAction, pending] = useActionState(updateChordChartAction, {
     ok: false,
   });
+  const [content, setContent] = useState(chart.content);
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="songId" value={songId} />
@@ -209,26 +212,24 @@ function ChartEditForm({
           className={inputClass}
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <label
-          htmlFor={`chart-edit-content-${chart.id}`}
-          className="text-sm font-medium"
-        >
-          ChordPro — sudah basis {chart.baseKey}
-        </label>
-        <textarea
-          id={`chart-edit-content-${chart.id}`}
-          name="content"
-          required
-          rows={14}
-          defaultValue={chart.content}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        <p className="text-xs text-zinc-500">
-          Ubah chord/lirik langsung di sini. Untuk menempel chart baru dari nada
-          asal lain, gunakan form &ldquo;Tambah versi baru&rdquo; di bawah.
-        </p>
-      </div>
+      <ChordOverUnderEditor
+        id={`chart-edit-content-${chart.id}`}
+        name="content"
+        heading={`Kunci & lirik — sudah basis ${chart.baseKey}`}
+        defaultValue={chart.content}
+        onChange={setContent}
+        hint="Kunci di baris atas, lirik di baris bawah; atur posisi kunci pakai spasi."
+      />
+      {content.trim() ? (
+        <details className="rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+            Preview tampilan final
+          </summary>
+          <div className="px-3 pb-3">
+            <ChordViewer content={content} baseKey={chart.baseKey} />
+          </div>
+        </details>
+      ) : null}
       {!state.ok && state.error ? (
         <Alert tone="danger">{state.error}</Alert>
       ) : null}
@@ -243,13 +244,26 @@ function ChartEditForm({
 }
 
 function ChartInputForm({ songId }: { songId: string }) {
-  const [state, formAction, pending] = useActionState(saveChordChartAction, {
-    ok: false,
-  });
   const formRef = useRef<HTMLFormElement>(null);
-  useEffect(() => {
-    if (state.ok) formRef.current?.reset();
-  }, [state]);
+  const [content, setContent] = useState("");
+  const [originalKey, setOriginalKey] = useState("");
+  const [resetToken, setResetToken] = useState(0);
+  const reset = useCallback(() => {
+    formRef.current?.reset();
+    setContent("");
+    setOriginalKey("");
+    setResetToken((c) => c + 1);
+  }, []);
+  // Form direset lewat wrapper server action (bukan via effect) supaya editor
+  // dan input kembali kosong setelah chart berhasil disimpan.
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(
+    useCallback(async (prev: ActionState, formData: FormData) => {
+      const result = await saveChordChartAction(prev, formData);
+      if (result.ok) reset();
+      return result;
+    }, [reset]),
+    { ok: false },
+  );
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="songId" value={songId} />
@@ -264,6 +278,7 @@ function ChartInputForm({ songId }: { songId: string }) {
             required
             maxLength={8}
             placeholder="cth. G"
+            onChange={(event) => setOriginalKey(event.target.value)}
             className={inputClass}
           />
         </div>
@@ -280,19 +295,28 @@ function ChartInputForm({ songId }: { songId: string }) {
           />
         </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="chart-content" className="text-sm font-medium">
-          ChordPro — chord di dalam [kurung], mis. Bapa [G]sentuh ha[D]tiku
-        </label>
-        <textarea
-          id="chart-content"
-          name="content"
-          required
-          rows={10}
-          placeholder={"[G]Betapa kumencintai\n[Em]segala yang telah terjadi"}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
-      </div>
+      <ChordOverUnderEditor
+        key={resetToken}
+        id="chart-content"
+        name="content"
+        heading={`Kunci & lirik dari internet${
+          originalKey.trim() ? ` — nada ${originalKey.trim()}` : ""
+        }`}
+        onChange={setContent}
+      />
+      {content.trim() ? (
+        <details className="rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+            Preview tampilan final
+          </summary>
+          <div className="px-3 pb-3">
+            <ChordViewer
+              content={content}
+              baseKey={originalKey.trim().toUpperCase() || "C"}
+            />
+          </div>
+        </details>
+      ) : null}
       {!state.ok && state.error ? (
         <Alert tone="danger">{state.error}</Alert>
       ) : null}

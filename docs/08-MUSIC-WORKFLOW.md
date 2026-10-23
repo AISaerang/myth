@@ -38,6 +38,8 @@ A Gantt-style card on the dashboard reads the schedule from besok to H-day: H-da
 ## Lirik, chord, dan aransemen
 MD mengelola master bagian lagu (Intro, Verse, Pre-Chorus, Chorus, Bridge, Interlude, Tag, Ending, dan lainnya) dalam basis C. Setiap bagian boleh berisi chord+lirik, chord saja untuk instrumental, atau lirik saja. Nama aransemen menyusun ulang dan mengulang bagian tanpa menduplikasi konten; mengedit master bagian langsung berlaku ke semua aransemen yang memakainya.
 
+Editor chord tampil sebagai "kunci di atas lirik": chord ditulis pada baris tersendiri di atas baris liriknya dan posisinya diatur dengan spasi, sehingga menyisipkan chart dari internet (format ini umum) maupun menggeser kunci ke pemisah suku kata gampang tanpa sintaks `[bracket]`. Di penyimpanan tetap ChordPro inline basis C; konversi format edit ⇄ ChordPro terjadi di klien dan hasil render akhir selalu identik (committed dengan unit test roundtrip). Toggle "Teks ChordPro" tersedia bila perlu mengedit sintaks mentah. Label bagian tetap diisi lewat kolom "Label bagian", bukan `{brace}` di konten.
+
 Alur admin: impor chart lama (opsional) → review pecahan bagian → rapikan label/isi → susun urutan → aktifkan satu aransemen. Hanya satu aransemen aktif per lagu. Chart lama tetap menjadi fallback/riwayat dan tidak ditampilkan selama aransemen aktif ada. Perubahan sensitif dicatat di audit log.
 
 Setlist fixed 21 Nov 2026 dapat diisi sekaligus dengan `npm run import:lyrics` (idempoten; lagu yang sudah punya bagian/aransemen dilewati). Tujuh lagu memakai chart aktif sebagai master lirik + chord; tiga lagu tanpa chart memakai data lirik di `prisma/setlist-lyrics.ts`.

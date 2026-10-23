@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  chordProToOverUnder,
   extractChordLines,
+  isOverUnderFormat,
   layoutChordLine,
   listChords,
   normalizeToC,
   noteIndex,
+  overUnderToChordPro,
   parseChord,
   semitonesBetween,
   stripChords,
@@ -12,6 +15,7 @@ import {
   transposeContent,
   transposeRoot,
 } from "@/lib/chords";
+import type { ChordLyricLayout } from "@/lib/chords";
 
 describe("transposeChord", () => {
   it("transposes basic majors and minors", () => {
@@ -137,5 +141,75 @@ describe("layoutChordLine", () => {
     const out = layoutChordLine("Ubah hidupku");
     expect(out.chordLine.trim()).toBe("");
     expect(out.lyricLine).toBe("Ubah hidupku");
+  });
+});
+
+describe("over-under editor format", () => {
+  const chart = [
+    "{Verse 1}",
+    "",
+    "[G]Bapa sentuh ha[D/F#]tiku",
+    "[Em]ubah hidupku jadi baru",
+    "Reff manakah yang lain",
+    "[Bm] [A]",
+  ].join("\n");
+
+  const render = (content: string): ChordLyricLayout[] =>
+    content.split("\n").map((line) => layoutChordLine(line));
+
+  it("renders chords above the lyric line", () => {
+    const over = chordProToOverUnder(chart);
+    expect(over).toContain("G             D/F#");
+    expect(over).toContain("Bapa sentuh hatiku");
+    expect(over).toContain("Em");
+    expect(over).toContain("Bm A");
+  });
+
+  it("roundtrip ChordPro -> over-under -> ChordPro is lossless", () => {
+    expect(overUnderToChordPro(chordProToOverUnder(chart))).toBe(chart);
+    expect(overUnderToChordPro(chordProToOverUnder("[C]Bapa [Am]sentuh"))).toBe(
+      "[C]Bapa [Am]sentuh",
+    );
+    // Label, baris kosong, dan baris lirik tanpa chord juga utuh.
+    expect(overUnderToChordPro(chordProToOverUnder("{Reff}"))).toBe("{Reff}");
+    expect(overUnderToChordPro(chordProToOverUnder(""))).toBe("");
+    expect(overUnderToChordPro(chordProToOverUnder("Ubah hidupku"))).toBe(
+      "Ubah hidupku",
+    );
+  });
+
+  it("keeps the rendered layout identical after a roundtrip", () => {
+    const back = overUnderToChordPro(chordProToOverUnder(chart));
+    expect(render(back)).toEqual(render(chart));
+  });
+
+  it("keeps chords exactly on hyphen syllables", () => {
+    // Chord pas di pemisah suku kata (perpangkah) harus tetap di sana.
+    const pro = "[C]ha-ti-ku berkemah";
+    expect(overUnderToChordPro(chordProToOverUnder(pro))).toBe(pro);
+  });
+
+  it("parses pasted over-under text into ChordPro", () => {
+    // Chord dipetakan ke suku kata di kolomnya: D/F# tepat di atas "u" (kolom 9).
+    expect(overUnderToChordPro("G        D/F#\nBapa sentuh hatiku")).toBe(
+      "[G]Bapa sent[D/F#]uh hatiku",
+    );
+    expect(overUnderToChordPro("Am\nBapa sentuh")).toBe("[Am]Bapa sentuh");
+  });
+
+  it("parses chord-only and stacked chords from pasted text", () => {
+    expect(overUnderToChordPro("Bm   A")).toBe("[Bm]   [A]");
+    expect(overUnderToChordPro("Am  Dm\n")).toBe("[Am]  [Dm]\n");
+  });
+
+  it("detects over-under paste vs ChordPro paste", () => {
+    expect(isOverUnderFormat("G        D/F#\nBapa sentuh hatiku")).toBe(true);
+    expect(isOverUnderFormat("[G]Bapa sentuh ha[D/F#]tiku")).toBe(false);
+    expect(isOverUnderFormat("Bapa sentuh hatiku tanpa chord")).toBe(false);
+  });
+
+  it("leaves non-chord bracket tokens untouched", () => {
+    const pro = "[?] halo [G]tuhan";
+    expect(overUnderToChordPro(chordProToOverUnder(pro))).toBe(pro);
   });
 });

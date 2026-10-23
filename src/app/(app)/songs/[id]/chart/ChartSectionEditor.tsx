@@ -12,6 +12,7 @@ import {
   createChartSectionAction,
   updateChartSectionAction,
 } from "@server/actions/chart-arrangements";
+import { ChordOverUnderEditor } from "../ChordOverUnderEditor";
 import { ChordViewer } from "../ChordViewer";
 
 const inputClass =
@@ -95,23 +96,19 @@ export function ChartSectionEditor({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label htmlFor="section-content" className="text-sm font-medium">
-            ChordPro — basis C
-          </label>
-          <textarea
+          <ChordOverUnderEditor
             id="section-content"
             name="content"
-            required
+            heading="Kunci & lirik — basis C"
+            defaultValue={section?.content ?? ""}
             rows={16}
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-            placeholder={"[G]Bapa sentuh hatiku\n[Em]ubah hidupku"}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            onChange={setContent}
+            hint={
+              section
+                ? "Kunci di baris atas, lirik di baris bawah; atur posisi pakai spasi."
+                : undefined
+            }
           />
-          <p className="text-xs text-zinc-500">
-            Tulis chord di dalam [kurung]. Label bagian diisi kolom di atas,
-            jangan ditulis {"{Verse}"} di konten.
-          </p>
         </div>
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium">Preview tampilan akhir</p>

@@ -233,6 +233,7 @@ export function ChartArrangementEditor({
 
           {creatingSection ? (
             <ChartSectionEditor
+              key="new"
               songId={songId}
               onDone={() => setCreatingSection(false)}
             />

@@ -216,6 +216,182 @@ export function extractChordLines(content: string): string[] {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Format edit "kunci di atas lirik" (over-under):
+//
+//   G         D/F#
+//   Bapa sentuh hati-ku
+//
+// Editor menulis dalam format ini dan hasilnya dikonversi ke/dari ChordPro
+// ([bracket]) saat simpan/muat. Format tersimpan tetap ChordPro basis C.
+// ---------------------------------------------------------------------------
+
+// Regex chord yang cukup ketat agar baris lirik biasa (cth. "Bapa", "Do")
+// tidak salah dikenali sebagai baris chord.
+const CHORD_TOKEN_RE =
+  /^[A-G][#b]?(m|maj|min|sus|dim|aug|add|M)?\d*(?:[#b]\d*)?(\/[A-G][#b]?(?:m|sus\d|add\d)?\d*)?$/;
+
+const LABEL_LINE_RE = /^\s*\{([^}]+)\}\s*$/;
+
+interface OverUnderChord {
+  token: string;
+  col: number;
+}
+
+interface ChordLineParse {
+  chords: OverUnderChord[];
+  trailing: string[]; // token non-chord (mis. "|") yang dipertahankan
+}
+
+function parseOverUnderChordLine(line: string): ChordLineParse | null {
+  if (!line.trim()) return null;
+  const chords: OverUnderChord[] = [];
+  const trailing: string[] = [];
+  const tokenRe = /\S+/g;
+  let match: RegExpExecArray | null;
+  while ((match = tokenRe.exec(line)) !== null) {
+    const token = match[0] as string;
+    if (token === "|") {
+      trailing.push(token);
+      continue;
+    }
+    if (!CHORD_TOKEN_RE.test(token)) return null;
+    chords.push({ token, col: match.index });
+  }
+  return chords.length > 0 ? { chords, trailing } : null;
+}
+
+// Sisipkan [chord] ke teks lirik sesuai kolom. Chord dipetakan ke karakter
+// tidak-akses-ruang pertama pada/kanan kolomnya, jadi chord yang pas di posisi
+// pemisah suku kata ("ha-ti-ku") tetap menempel di tempat yang benar.
+function mergeOverUnderLine(chords: OverUnderChord[], lyric: string): string {
+  const byPos = new Map<number, string[]>();
+  let lastPos = -1;
+  for (const { token, col } of chords) {
+    let pos = lyric.length;
+    for (let i = col; i < lyric.length; i++) {
+      if (lyric[i] !== " ") {
+        pos = i;
+        break;
+      }
+    }
+    if (pos <= lastPos) pos = lastPos;
+    lastPos = pos;
+    const existing = byPos.get(pos) ?? [];
+    existing.push(token);
+    byPos.set(pos, existing);
+  }
+
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const pos of [...byPos.keys()].sort((a, b) => a - b)) {
+    parts.push(lyric.slice(cursor, pos));
+    parts.push(byPos.get(pos)!.map((t) => `[${t}]`).join(""));
+    cursor = pos;
+  }
+  parts.push(lyric.slice(cursor));
+  return parts.join("");
+}
+
+// Ubah baris chord-only menjadi ChordPro, spasi asli dipertahankan.
+function serializeChordOnly(line: string): string {
+  return line.replace(/\S+/g, (token) =>
+    token === "|" || CHORD_TOKEN_RE.test(token) ? `[${token}]` : token,
+  );
+}
+
+// ChordPro -> format edit over-under (kunci di atas, lirik di bawah).
+export function chordProToOverUnder(content: string): string {
+  const outLines: string[] = [];
+  for (const line of content.replace(/\r\n/g, "\n").split("\n")) {
+    if (LABEL_LINE_RE.test(line)) {
+      outLines.push(line.trim());
+      continue;
+    }
+    if (!/\[[^\]]+\]/.test(line)) {
+      // Baris lirik/label tanpa chord: tulis apa adanya.
+      outLines.push(line);
+      continue;
+    }
+    // Token [..] yang bukan chord valid tidak bisa direpresentasikan di
+    // format over-under; barisnya dibiarkan mentah agar tidak rusak.
+    let allTokensValid = true;
+    line.replace(/\[([^\]]+)\]/g, (_m, token: string) => {
+      try {
+        parseChord(token.trim());
+      } catch {
+        allTokensValid = false;
+      }
+      return "";
+    });
+    if (!allTokensValid) {
+      outLines.push(line);
+      continue;
+    }
+
+    const layout = layoutChordLine(line);
+    const chordLine = layout.chordLine.trimEnd();
+    const lyricLine = layout.lyricLine.trimEnd();
+    if (!lyricLine) {
+      outLines.push(chordLine);
+      continue;
+    }
+    outLines.push(chordLine, lyricLine);
+  }
+  return outLines.join("\n");
+}
+
+// Format edit over-under -> ChordPro. Chord di baris atas dipetakan ke kolom
+// suku kata lirik di baris bawahnya; baris tanpa lirik jadi baris chord-only.
+export function overUnderToChordPro(content: string): string {
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const outLines: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] as string;
+    if (!line.trim() || LABEL_LINE_RE.test(line)) {
+      outLines.push(line);
+      continue;
+    }
+    const chordLine = parseOverUnderChordLine(line);
+    if (!chordLine) {
+      outLines.push(line);
+      continue;
+    }
+    const next = lines[i + 1];
+    if (
+      next &&
+      next.trim() &&
+      !LABEL_LINE_RE.test(next) &&
+      !parseOverUnderChordLine(next)
+    ) {
+      outLines.push(mergeOverUnderLine(chordLine.chords, next));
+      i++;
+      continue;
+    }
+    outLines.push(serializeChordOnly(line));
+  }
+  return outLines.join("\n");
+}
+
+// Heuristik deteksi format tempel: false kalau sudah ChordPro ([bracket]);
+// true kalau ada pasangan baris chord di atas baris lirik.
+export function isOverUnderFormat(content: string): boolean {
+  if (/\[[^\]\n]+\]/.test(content)) return false;
+  const lines = content.split(/\r?\n/);
+  for (let i = 0; i + 1 < lines.length; i++) {
+    if (!parseOverUnderChordLine(lines[i] as string)) continue;
+    const next = lines[i + 1] as string;
+    if (
+      next.trim() &&
+      !LABEL_LINE_RE.test(next) &&
+      !parseOverUnderChordLine(next)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Daftar semua chord unik (untuk validasi/preview).
 export function listChords(content: string): string[] {
   const seen = new Set<string>();
