@@ -3,8 +3,12 @@
 Do not present unresolved information as confirmed.
 
 ## Event
-- [x] Confirm official date → **21 Nov 2026, pagi–sore** (confirmed 14 Okt 2026).
+- [x] Confirm official date → **Sabtu 14 November 2026** (keputusan Komisi Wilayah 22 Okt 2026). Menggantikan **21 Nov 2026, pagi–sore** (confirmed 14 Okt 2026). Dimajukan karena dua minggu setelah tanggal lama ada katekisasi pelsus dan RMST-39. Soundcheck **07:00 WIB**, lalu ibadah. Durasi dan jam selesai belum dikunci.
 - [ ] Confirm location, theme, total duration, final liturgy/rundown.
+- [x] Batas materi → **Sab 24 Okt 2026**: semua lagu + audio aransemen + chord dibagikan (target status Reference Ready).
+- [ ] Latihan onsite pertama **Sab 31 Okt 2026** — tanggal dijadwalkan; tempat dan jam masih dikoordinasikan.
+- [ ] Full rehearsal — usulan **Sab 7 Nov 2026**, belum final.
+- [ ] Gladi bersih — usulan **11–12 Nov 2026**, belum final.
 - [x] Confirm song list (19 lagu: 5 ASM + 6 Praise + 6 Worship + 2 NNBT; 2 slot worship TBD) — order final menyusul panitia.
 
 ## People
@@ -15,6 +19,7 @@ Do not present unresolved information as confirmed.
 ## Music and tech
 - [ ] Set key/BPM after MD review.
 - [ ] Identify songs requiring sequencer.
+- [ ] Sequencer praise — masih dikoordinasikan WL dengan beberapa pihak.
 - [ ] Decide click/cue/backing needs and routing.
 - [ ] Confirm venue sound system, monitor/IEM, inputs/outputs, DI, cables, power and playback backup.
 

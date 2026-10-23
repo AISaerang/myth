@@ -56,6 +56,12 @@ export default function Notulensi16102026Page() {
         </p>
       </div>
 
+      <Callout tone="info">
+        <strong>Catatan (22 Okt 2026):</strong> Komisi Wilayah memutuskan
+        acara dimajukan ke Sabtu 14 Nov 2026. Notulensi di bawah tetap arsip
+        rapat 16 Okt.
+      </Callout>
+
       <Card title="Keputusan setlist">
         <div className="flex flex-col gap-3 text-sm">
           <div>
