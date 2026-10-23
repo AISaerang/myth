@@ -332,9 +332,9 @@ yang selaras
 
 {Modulation}
 
-(tulis chord transisi modulasi di sini)
+(tulis chord transisi modulasi di sini; tipe bagian "Key Change / Modulasi")
 
-{Chorus — modulasi ke G}
+{Chorus (G)}
 
 Joyful, Joyful Gathering,
 

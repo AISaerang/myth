@@ -220,6 +220,7 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 - [x] ChordPro 4 ASM (versi MD: Mentega D, Satu Anak G, Bapa Abraham D, Kucinta D) + 4 link referensi — basis C terverifikasi; total 8 chart live
 - [x] `typecheck`, `lint` bersih, `test` 82/82, `build` lolos (22 rute)
 - [x] Joyful Gathering: IT'S GEHC / Benzics Records, key F + ChordPro lengkap (basis C) — Verse 2 mirror Verse 1, MD rapikan di portal
+- [x] Tipe bagian diperluas ke standar komprehensif (Post-Chorus, Pre-Bridge, Solo, Hook, Breakdown, Vamp, Turnaround, Key Change, Ad-lib, Spoken, Transition, Reprise); migrasi 20261023000000 meng-update section "Modulation" yang lama jatuh ke `OTHER` (cth. Joyful Gathering) menjadi `KEY_CHANGE`; dropdown aransemen punya quick-add "+ Bagian baru…"
 - [x] "Satukanlah Hati Kami" diabaikan sesuai arahan MD (tidak di-seed)
 - [ ] Key Ku Tak Pandang + NNBT 20 TBD — MD isi via UI
 

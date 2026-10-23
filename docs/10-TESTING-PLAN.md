@@ -10,7 +10,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Role/ownership permission helpers.
 - Invalid BPM/duration rejected.
 - Only one active arrangement version per song.
-- Chart legacy parser recognizes section headings (Verse/Chorus/Reff/Tagline/Prechorus/Interlude/Bridge/Modulation/Coda/Outro/Intro), keeps repeated sections, and ignores empty blocks.
+- Chart legacy parser recognizes section headings (Verse/Chorus/Reff/Tagline/Prechorus/Interlude/Bridge/Modulation→Key Change/Coda/Outro/Intro, plus Post-Chorus/Solo/Hook/Breakdown/Vamp/Turnaround/Ad-lib/Spoken/Transition/Reprise), keeps repeated sections, and ignores empty blocks.
 - Arrangement composition keeps item order/duplicates and applies label overrides.
 - Chart section/arrangement validation rejects empty labels/content, duplicate labels, invalid item payloads, and over-limit sequences.
 - Setlist lyric seed keeps unique labels, non-empty content, and arrangement items that reference existing sections.

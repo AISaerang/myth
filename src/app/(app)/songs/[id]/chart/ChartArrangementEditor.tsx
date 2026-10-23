@@ -97,6 +97,7 @@ export function ChartArrangementEditor({
     null;
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [creatingSection, setCreatingSection] = useState(false);
+  const masterSectionRef = useRef<HTMLDivElement>(null);
 
   const sectionMap = useMemo(
     () => new Map(sections.map((section) => [section.id, section])),
@@ -110,6 +111,17 @@ export function ChartArrangementEditor({
     setSelectedId(arrangement.id);
     setEditingSectionId(null);
     setCreatingSection(false);
+  }
+
+  function handleRequestNewSection() {
+    setCreatingSection(true);
+    setEditingSectionId(null);
+    requestAnimationFrame(() => {
+      masterSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   }
 
   return (
@@ -193,6 +205,7 @@ export function ChartArrangementEditor({
           arrangement={selected}
           sections={sections}
           sectionMap={sectionMap}
+          onRequestNewSection={handleRequestNewSection}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -211,7 +224,8 @@ export function ChartArrangementEditor({
         </div>
       )}
 
-      <Card title="Master bagian">
+      <div ref={masterSectionRef}>
+        <Card title="Master bagian">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-zinc-500">
@@ -296,7 +310,8 @@ export function ChartArrangementEditor({
             </ul>
           )}
         </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -306,11 +321,13 @@ function ArrangementWorkspace({
   arrangement,
   sections,
   sectionMap,
+  onRequestNewSection,
 }: {
   songId: string;
   arrangement: EditorArrangement;
   sections: EditorSection[];
   sectionMap: Map<string, EditorSection>;
+  onRequestNewSection: () => void;
 }) {
   const [draft, setDraft] = useState<DraftItem[]>(() =>
     toDraft(arrangement),
@@ -396,17 +413,26 @@ function ArrangementWorkspace({
               id={`add-section-${arrangement.id}`}
               defaultValue=""
               onChange={(event) => {
-                addSection(event.target.value);
+                if (event.target.value === "__new__") {
+                  onRequestNewSection();
+                } else {
+                  addSection(event.target.value);
+                }
                 event.target.value = "";
               }}
               className={`${inputClass} min-w-0 flex-1`}
             >
               <option value="">Tambah bagian…</option>
-              {sections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.label} · {CHART_SECTION_TYPE_LABEL[section.type]}
-                </option>
-              ))}
+              <option value="__new__">+ Bagian baru…</option>
+              {sections.length > 0 ? (
+                <optgroup label="Bagian yang sudah ada">
+                  {sections.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {section.label} · {CHART_SECTION_TYPE_LABEL[section.type]}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
             </select>
           </div>
 

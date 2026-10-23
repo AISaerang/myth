@@ -32,7 +32,7 @@ SongBatchItem: `songBatchId`, `songId`, `sortOrder`; unique pair. Enforce one ac
 `id`, `songId`, `versionLabel`, `changeSummary`, `key?`, `bpm?`, `grooveNotes?`, `structureNotes?`, `referenceUrl?`, `isActive`, `isFinal`, `createdById`, `createdAt`. Service transaction ensures only one active version per song.
 
 ### ChartSection / ChartArrangement / ChartArrangementItem
-ChartSection: `id`, `songId`, `type` (`INTRO|VERSE|PRE_CHORUS|CHORUS|BRIDGE|INTERLUDE|INSTRUMENTAL|TAG|ENDING|CODA|OTHER`), `label`, `content` (ChordPro, basis C), `sortOrder`, `createdById`, timestamps; unique `songId+label`. Sections are the song's master library and are shared by all its arrangements.
+ChartSection: `id`, `songId`, `type` (`INTRO|VERSE|PRE_CHORUS|CHORUS|POST_CHORUS|PRE_BRIDGE|BRIDGE|INTERLUDE|INSTRUMENTAL|SOLO|HOOK|BREAKDOWN|VAMP|TAG|TURNAROUND|KEY_CHANGE|ADLIB|SPOKEN|TRANSITION|REPRISE|ENDING|CODA|OTHER`), `label`, `content` (ChordPro, basis C), `sortOrder`, `createdById`, timestamps; unique `songId+label`. Sections are the song's master library and are shared by all its arrangements.
 
 ChartArrangement: `id`, `songId`, `name`, `isActive`, `createdById`, timestamps; unique `songId+name`; at most one active arrangement per song. A named arrangement orders/repeats master sections independently of `ArrangementVersion`.
 

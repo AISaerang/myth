@@ -15,6 +15,32 @@ describe("inferSectionType", () => {
     expect(inferSectionType("Coda")).toBe("CODA");
     expect(inferSectionType("Bagian 1")).toBe("OTHER");
   });
+
+  it("maps standard section headings comprehensively", () => {
+    expect(inferSectionType("Modulation")).toBe("KEY_CHANGE");
+    expect(inferSectionType("Modulasi ke G")).toBe("KEY_CHANGE");
+    expect(inferSectionType("Key Change")).toBe("KEY_CHANGE");
+    expect(inferSectionType("Transposisi modulasi")).toBe("KEY_CHANGE");
+    expect(inferSectionType("Tagline")).toBe("TAG");
+    expect(inferSectionType("Post-Chorus")).toBe("POST_CHORUS");
+    expect(inferSectionType("Pre-Bridge")).toBe("PRE_BRIDGE");
+    expect(inferSectionType("Solo Gitar")).toBe("SOLO");
+    expect(inferSectionType("Hook")).toBe("HOOK");
+    expect(inferSectionType("Riff")).toBe("HOOK");
+    expect(inferSectionType("Breakdown")).toBe("BREAKDOWN");
+    expect(inferSectionType("Vamp")).toBe("VAMP");
+    expect(inferSectionType("Turnaround")).toBe("TURNAROUND");
+    expect(inferSectionType("Ad-lib")).toBe("ADLIB");
+    expect(inferSectionType("Spoken")).toBe("SPOKEN");
+    expect(inferSectionType("Narrasi")).toBe("SPOKEN");
+    expect(inferSectionType("Transition")).toBe("TRANSITION");
+    expect(inferSectionType("Link")).toBe("TRANSITION");
+    expect(inferSectionType("Reprise")).toBe("REPRISE");
+  });
+
+  it("keeps chorus type for modulated chorus labels", () => {
+    expect(inferSectionType("Chorus — modulasi ke G")).toBe("CHORUS");
+  });
 });
 
 describe("parseLegacyChart", () => {
