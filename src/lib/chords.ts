@@ -261,20 +261,16 @@ function parseOverUnderChordLine(line: string): ChordLineParse | null {
   return chords.length > 0 ? { chords, trailing } : null;
 }
 
-// Sisipkan [chord] ke teks lirik sesuai kolom. Chord dipetakan ke karakter
-// tidak-akses-ruang pertama pada/kanan kolomnya, jadi chord yang pas di posisi
-// pemisah suku kata ("ha-ti-ku") tetap menempel di tempat yang benar.
+// Sisipkan [chord] ke teks lirik sesuai kolom. Pemetaan kolom-eksak: chord
+// tetap di kolom tempat dia berada (termasuk di atas spasi), jadi geser kunci
+// di editor langsung terlihat di kolom yang sama saat render. Chord di lirik
+// luar panjang baris ditempel ke ujung baris.
 function mergeOverUnderLine(chords: OverUnderChord[], lyric: string): string {
   const byPos = new Map<number, string[]>();
   let lastPos = -1;
   for (const { token, col } of chords) {
-    let pos = lyric.length;
-    for (let i = col; i < lyric.length; i++) {
-      if (lyric[i] !== " ") {
-        pos = i;
-        break;
-      }
-    }
+    let pos = Math.min(col, lyric.length);
+    // Jaga urutan chord tetap naik bila kolomnya menimpa/mundur.
     if (pos <= lastPos) pos = lastPos;
     lastPos = pos;
     const existing = byPos.get(pos) ?? [];

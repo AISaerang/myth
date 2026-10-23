@@ -189,6 +189,25 @@ describe("over-under editor format", () => {
     expect(overUnderToChordPro(chordProToOverUnder(pro))).toBe(pro);
   });
 
+  it("maps chords to their exact column, including above spaces", () => {
+    // Chord di atas spasi (kolom 4) tetap di kolom itu, tidak di-snap.
+    expect(overUnderToChordPro("Am  D\nBapa sentuh")).toBe(
+      "[Am]Bapa[D] sentuh",
+    );
+    const layout = layoutChordLine("[Am]Bapa[D] sentuh");
+    expect(layout.chordLine.trimEnd()).toBe("Am  D");
+    expect(layout.lyricLine).toBe("Bapa sentuh");
+    // Roundtrip tetap persis di kolom yang sama.
+    expect(overUnderToChordPro(chordProToOverUnder("[Am]Bapa[D] sentuh"))).toBe(
+      "[Am]Bapa[D] sentuh",
+    );
+  });
+
+  it("clamps chords beyond the end of the lyric line", () => {
+    // Kunci "terlempar" jauh di kanan lirik menempel ke ujung baris.
+    expect(overUnderToChordPro("Am        D\nBapa")).toBe("[Am]Bapa[D]");
+  });
+
   it("parses pasted over-under text into ChordPro", () => {
     // Chord dipetakan ke suku kata di kolomnya: D/F# tepat di atas "u" (kolom 9).
     expect(overUnderToChordPro("G        D/F#\nBapa sentuh hatiku")).toBe(

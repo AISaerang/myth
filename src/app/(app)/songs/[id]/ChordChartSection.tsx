@@ -218,7 +218,7 @@ function ChartEditForm({
         heading={`Kunci & lirik — sudah basis ${chart.baseKey}`}
         defaultValue={chart.content}
         onChange={setContent}
-        hint="Kunci di baris atas, lirik di baris bawah; atur posisi kunci pakai spasi."
+        hint="Kunci di baris atas, lirik di baris bawah; atur posisi pakai spasi atau Tab."
       />
       {content.trim() ? (
         <details className="rounded-lg border border-zinc-200 dark:border-zinc-800">

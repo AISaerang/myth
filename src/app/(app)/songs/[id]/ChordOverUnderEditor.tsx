@@ -53,6 +53,36 @@ export function ChordOverUnderEditor({
     setMode(next);
   }
 
+  // Tab = sisip 4 spasi (geser kunci jauh), Shift+Tab = hapus maksimal 4
+  // spasi di belakang kursor (mundur). Pakai spasi, bukan \t, agar pari kolom
+  // monospace dengan baris lirik tidak rusak.
+  function handleTab(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Tab") return;
+    event.preventDefault();
+    const el = event.currentTarget;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const value = el.value;
+    let next: string;
+    let cursor: number;
+    if (event.shiftKey) {
+      let removed = 0;
+      while (removed < 4 && start - removed > 0 && value[start - removed - 1] === " ") {
+        removed++;
+      }
+      if (removed === 0) return;
+      next = value.slice(0, start - removed) + value.slice(end);
+      cursor = start - removed;
+    } else {
+      next = `${value.slice(0, start)}    ${value.slice(end)}`;
+      cursor = start + 4;
+    }
+    setStacked(next);
+    requestAnimationFrame(() => {
+      el.setSelectionRange(cursor, cursor);
+    });
+  }
+
   return (
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -90,6 +120,7 @@ export function ChordOverUnderEditor({
           value={stacked}
           rows={rows}
           onChange={(event) => setStacked(event.target.value)}
+          onKeyDown={handleTab}
           placeholder={"G        D/F#\nBapa sentuh hati-ku"}
           className={`${textareaClass} overflow-x-auto`}
         />
@@ -104,7 +135,8 @@ export function ChordOverUnderEditor({
         />
       )}
       <p className="text-xs text-zinc-500">
-        {hint ?? "Kunci ditulis di baris di atas lirik; gunakan spasi untuk mengatur posisinya."}
+        {hint ??
+          "Kunci di baris atas liriknya; atur posisi pakai spasi, atau Tab (geser 4 spasi) dan Shift+Tab (mundur)."}
         {" "}
         Tempel dari internet boleh dalam format ini maupun ChordPro.
       </p>

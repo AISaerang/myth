@@ -105,7 +105,7 @@ export function ChartSectionEditor({
             onChange={setContent}
             hint={
               section
-                ? "Kunci di baris atas, lirik di baris bawah; atur posisi pakai spasi."
+                ? "Kunci di baris atas, lirik di baris bawah; atur posisi pakai spasi atau Tab."
                 : undefined
             }
           />
