@@ -262,16 +262,15 @@ function parseOverUnderChordLine(line: string): ChordLineParse | null {
 }
 
 // Sisipkan [chord] ke teks lirik sesuai kolom. Pemetaan kolom-eksak: chord
-// tetap di kolom tempat dia berada (termasuk di atas spasi), jadi geser kunci
-// di editor langsung terlihat di kolom yang sama saat render. Chord di lirik
-// luar panjang baris ditempel ke ujung baris.
+// tetap di kolom tempat dia berada (termasuk di atas spasi). Kolom di luar
+// panjang baris lirik diwakili spasi di akhir baris, jadi kunci yang
+// diletakkan setelah lirik habis tetap melayang di tempat itu saat render.
 function mergeOverUnderLine(chords: OverUnderChord[], lyric: string): string {
   const byPos = new Map<number, string[]>();
   let lastPos = -1;
   for (const { token, col } of chords) {
-    let pos = Math.min(col, lyric.length);
     // Jaga urutan chord tetap naik bila kolomnya menimpa/mundur.
-    if (pos <= lastPos) pos = lastPos;
+    const pos = Math.max(col, lastPos);
     lastPos = pos;
     const existing = byPos.get(pos) ?? [];
     existing.push(token);
@@ -281,8 +280,10 @@ function mergeOverUnderLine(chords: OverUnderChord[], lyric: string): string {
   const parts: string[] = [];
   let cursor = 0;
   for (const pos of [...byPos.keys()].sort((a, b) => a - b)) {
-    parts.push(lyric.slice(cursor, pos));
-    parts.push(byPos.get(pos)!.map((t) => `[${t}]`).join(""));
+    const text = lyric.slice(cursor, pos);
+    // Kunci di luar akhir lirik: buat gap pakai spasi agar kolomnya terjaga.
+    const pad = Math.max(0, pos - (cursor + text.length));
+    parts.push(text, " ".repeat(pad), byPos.get(pos)!.map((t) => `[${t}]`).join(""));
     cursor = pos;
   }
   parts.push(lyric.slice(cursor));
@@ -296,10 +297,33 @@ function serializeChordOnly(line: string): string {
   );
 }
 
+// Ubah karakter tab (mis. dari keyboard HP) menjadi spasi hingga tab-stop,
+// sama seperti cara browser merender \t di textarea — supaya kolom yang
+// terlihat di editor selalu sama dengan kolom yang dihitung konversi.
+export function expandTabs(text: string, tabSize = 8): string {
+  const out: string[] = [];
+  for (const line of text.replace(/\r\n/g, "\n").split("\n")) {
+    let col = 0;
+    const builder: string[] = [];
+    for (const ch of line) {
+      if (ch === "\t") {
+        const pad = tabSize - (col % tabSize);
+        builder.push(" ".repeat(pad));
+        col += pad;
+      } else {
+        builder.push(ch);
+        col++;
+      }
+    }
+    out.push(builder.join(""));
+  }
+  return out.join("\n");
+}
+
 // ChordPro -> format edit over-under (kunci di atas, lirik di bawah).
 export function chordProToOverUnder(content: string): string {
   const outLines: string[] = [];
-  for (const line of content.replace(/\r\n/g, "\n").split("\n")) {
+  for (const line of expandTabs(content).split("\n")) {
     if (LABEL_LINE_RE.test(line)) {
       outLines.push(line.trim());
       continue;
@@ -327,12 +351,17 @@ export function chordProToOverUnder(content: string): string {
 
     const layout = layoutChordLine(line);
     const chordLine = layout.chordLine.trimEnd();
-    const lyricLine = layout.lyricLine.trimEnd();
-    if (!lyricLine) {
+    if (!layout.lyricLine.trim()) {
       outLines.push(chordLine);
       continue;
     }
-    outLines.push(chordLine, lyricLine);
+    // Spasi di akhir baris lirik dipertahankan sampai kolom awal kunci
+    // terakhir: itulah cara gap "kunci setelah lirik habis" direpresentasikan.
+    const lyricEnd = layout.lyricLine.trimEnd().length;
+    const chordTail = /\S+$/.exec(chordLine)?.[0] ?? "";
+    const lastChordStart = Math.max(0, chordLine.length - chordTail.length);
+    const cap = Math.max(lyricEnd, lastChordStart);
+    outLines.push(chordLine, layout.lyricLine.slice(0, cap));
   }
   return outLines.join("\n");
 }
@@ -340,7 +369,7 @@ export function chordProToOverUnder(content: string): string {
 // Format edit over-under -> ChordPro. Chord di baris atas dipetakan ke kolom
 // suku kata lirik di baris bawahnya; baris tanpa lirik jadi baris chord-only.
 export function overUnderToChordPro(content: string): string {
-  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const lines = expandTabs(content).split("\n");
   const outLines: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] as string;

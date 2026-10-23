@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   chordProToOverUnder,
+  expandTabs,
   extractChordLines,
   isOverUnderFormat,
   layoutChordLine,
@@ -203,9 +204,38 @@ describe("over-under editor format", () => {
     );
   });
 
-  it("clamps chords beyond the end of the lyric line", () => {
-    // Kunci "terlempar" jauh di kanan lirik menempel ke ujung baris.
-    expect(overUnderToChordPro("Am        D\nBapa")).toBe("[Am]Bapa[D]");
+  it("renders chords placed after the lyric ends", () => {
+    // Kunci setelah lirik habis tetap melayang di kolomnya (gap = spasi).
+    expect(overUnderToChordPro("Am        D\nBapa")).toBe("[Am]Bapa      [D]");
+    const layout = layoutChordLine("[Am]Bapa      [D]");
+    expect(layout.lyricLine.trimEnd()).toBe("Bapa");
+    expect(layout.chordLine.indexOf("D")).toBe(10);
+    // Roundtrip dengan gap tetap lossless.
+    expect(overUnderToChordPro(chordProToOverUnder("[Am]Bapa      [D]"))).toBe(
+      "[Am]Bapa      [D]",
+    );
+  });
+
+  it("expands real tab characters like the browser renders them", () => {
+    expect(expandTabs("C\tG")).toBe("C       G");
+    expect(expandTabs("\tF")).toBe("        F");
+    expect(expandTabs("ab\tc")).toBe("ab      c");
+  });
+
+  it("keeps tab-pasted over-under aligned with its display", () => {
+    // Keyboard HP menyisipkan \t: tab-stop 8, jadi G/B terlihat di kolom 16.
+    const editor = expandTabs("C\t\tG/B\nKemanakah aku dapat pergi");
+    expect(editor.indexOf("G/B")).toBe(16);
+    const pro = overUnderToChordPro(editor);
+    const layout = layoutChordLine(pro.split("\n")[0] as string);
+    expect(layout.chordLine.indexOf("G/B")).toBe(16);
+  });
+
+  it("expands tabs inside hyphen and slash-bass pastes", () => {
+    // Tab dari kolom 2 → tab-stop 8 = 6 spasi.
+    expect(overUnderToChordPro(expandTabs("Am\tD/F#\nBapa sentuh"))).toBe(
+      overUnderToChordPro("Am      D/F#\nBapa sentuh"),
+    );
   });
 
   it("parses pasted over-under text into ChordPro", () => {

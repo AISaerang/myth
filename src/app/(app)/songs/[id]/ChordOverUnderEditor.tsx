@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   chordProToOverUnder,
+  expandTabs,
   overUnderToChordPro,
 } from "@/lib/chords";
 
@@ -119,7 +120,7 @@ export function ChordOverUnderEditor({
           id={id}
           value={stacked}
           rows={rows}
-          onChange={(event) => setStacked(event.target.value)}
+          onChange={(event) => setStacked(expandTabs(event.target.value))}
           onKeyDown={handleTab}
           placeholder={"G        D/F#\nBapa sentuh hati-ku"}
           className={`${textareaClass} overflow-x-auto`}
@@ -129,7 +130,7 @@ export function ChordOverUnderEditor({
           id={id}
           value={source}
           rows={rows}
-          onChange={(event) => setSource(event.target.value)}
+          onChange={(event) => setSource(expandTabs(event.target.value))}
           placeholder={"[G]Bapa sentuh ha[D/F#]tiku"}
           className={`${textareaClass} overflow-x-auto`}
         />
