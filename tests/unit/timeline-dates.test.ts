@@ -41,8 +41,8 @@ describe("timelineLabel", () => {
 describe("hDayLabel", () => {
   it("reads H-0 as Hari H", () => {
     expect(
-      hDayLabel(new Date("2026-11-21T00:00:00+07:00"), NOW),
-    ).toBe("H-37");
+      hDayLabel(new Date("2026-11-14T00:00:00+07:00"), NOW),
+    ).toBe("H-30");
     expect(hDayLabel(new Date("2026-10-15T10:00:00+07:00"), NOW)).toBe(
       "Hari H",
     );
@@ -52,7 +52,7 @@ describe("hDayLabel", () => {
 
 describe("barPosition", () => {
   const t0 = new Date("2026-10-15T00:00:00+07:00");
-  const t1 = new Date("2026-11-21T00:00:00+07:00");
+  const t1 = new Date("2026-11-14T00:00:00+07:00");
   it("maps spans to percentages and milestones to markers", () => {
     const full = barPosition(t0, t1, t0, t1);
     expect(full.left).toBe(0);

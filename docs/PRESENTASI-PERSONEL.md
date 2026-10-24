@@ -8,7 +8,7 @@
 
 - [ ] Siapkan 2 akun USER live: 1 band (mis. gitar/keyboard) + 1 singer, keduanya sudah ada assignment di lagu publish.
 - [ ] Pastikan 1 lagu publish punya materi aktif + ChordPro (saran: "Bapa Sentuh Hatiku" G→C, atau NDC, atau Sungguh Indah).
-- [ ] Pastikan ada 1 rehearsal upcoming yang sudah mengikuti jadwal baru (WIB): batas materi Sab 24 Okt (target Reference Ready); latihan onsite pertama Sab 31 Okt (tempat/jam masih dikoordinasikan); full rehearsal usulan Sab 7 Nov (belum final); gladi bersih usulan 11–12 Nov (belum final); soundcheck Sab 14 Nov 07:00 lalu ibadah. Jangan tampilkan jadwal lama (monitoring 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00) sebagai rencana yang berlaku.
+- [ ] Pastikan ada 1 rehearsal upcoming yang sudah mengikuti jadwal baru (WIB): batas materi Sab 24 Okt (target Reference Ready); latihan onsite pertama Sab 31 Okt (tempat/jam masih dikoordinasikan); full rehearsal Sab 7 Nov 10:00; gladi bersih Jum 13 Nov 15:00; soundcheck Sab 14 Nov 07:00 lalu ibadah. Jangan tampilkan jadwal lama (monitoring 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00) sebagai rencana yang berlaku.
 - [ ] Buka prod di laptop + HP (tampilkan 1x versi mobile biar percaya mobile-first).
 - [ ] Siapkan PDF backup / hotspot bila internet mati.
 - [ ] Latihan klik urutan §3 sekali tanpa bicara (±2 mnt).

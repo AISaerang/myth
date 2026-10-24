@@ -29,8 +29,8 @@ Keputusan Komisi Wilayah 22 Okt 2026: ibadah dimajukan ke Sabtu 14 Nov 2026 (seb
 
 - Sab 24 Okt: batas semua lagu + audio aransemen + chord dibagikan (target status Reference Ready).
 - Sab 31 Okt: latihan onsite pertama. Tempat dan jam masih dikoordinasikan.
-- Sab 7 Nov: full rehearsal — usulan, belum final.
-- 11–12 Nov: gladi bersih — usulan, belum final.
+- Sab 7 Nov 10:00: full rehearsal.
+- Jum 13 Nov 15:00: gladi bersih.
 - Sab 14 Nov 07:00: soundcheck, lalu ibadah. Durasi dan jam selesai belum dikunci.
 
 Sequencer praise masih dikoordinasikan WL dengan beberapa pihak (masih terbuka).

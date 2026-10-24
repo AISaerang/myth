@@ -7,8 +7,8 @@ Do not present unresolved information as confirmed.
 - [ ] Confirm location, theme, total duration, final liturgy/rundown.
 - [x] Batas materi → **Sab 24 Okt 2026**: semua lagu + audio aransemen + chord dibagikan (target status Reference Ready).
 - [ ] Latihan onsite pertama **Sab 31 Okt 2026** — tanggal dijadwalkan; tempat dan jam masih dikoordinasikan.
-- [ ] Full rehearsal — usulan **Sab 7 Nov 2026**, belum final.
-- [ ] Gladi bersih — usulan **11–12 Nov 2026**, belum final.
+- [ ] Full rehearsal — **Sab 7 Nov 2026 10:00 WIB**.
+- [ ] Gladi bersih — **Jum 13 Nov 2026 15:00 WIB**.
 - [x] Confirm song list (19 lagu: 5 ASM + 6 Praise + 6 Worship + 2 NNBT; 2 slot worship TBD) — order final menyusul panitia.
 
 ## People
