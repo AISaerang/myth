@@ -73,3 +73,18 @@ export function barPosition(
   const width = Math.max(2, ((end.getTime() - start.getTime()) / (t1 - t0)) * 100);
   return { left, width: Math.min(100 - left, width) };
 }
+
+// Tooltip range for Gantt bars: "DD MMM – DD MMM YYYY" (Asia/Jakarta).
+// Milestones (no end / same day) render as a single "DD MMM YYYY".
+export function formatDateRange(start: Date, end: Date | null): string {
+  const fmt = (d: Date, withYear: boolean) =>
+    new Intl.DateTimeFormat("id-ID", {
+      timeZone: "Asia/Jakarta",
+      day: "2-digit",
+      month: "short",
+      ...(withYear ? { year: "numeric" } : {}),
+    }).format(d);
+  if (!end || jakartaDayKey(end) === jakartaDayKey(start)) return fmt(start, true);
+  const sameYear = jakartaDayKey(start).slice(0, 4) === jakartaDayKey(end).slice(0, 4);
+  return `${fmt(start, !sameYear)} – ${fmt(end, true)}`;
+}

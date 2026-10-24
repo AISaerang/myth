@@ -226,7 +226,7 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 
 ## 17. Timetable Live (batch terverifikasi 15 Okt 2026; jadwal rehearsal diperbarui 22 Okt 2026)
 
-Tanggal batch (rilis → target review, catatan seed 15 Okt): B1 15→19 Okt, B2 17→26 Okt, B3 24 Okt→2 Nov, B4 31 Okt→9 Nov. Batas berbagi materi yang berlaku sekarang: Sab 24 Okt (target Reference Ready); tanggal review batch di atas belum diselaraskan di data aplikasi.
+Tanggal batch (rilis → target review, diselaraskan 24 Okt 2026 ke jadwal 14 Nov): B1 15→19 Okt, B2 17→24 Okt, B3 22→24 Okt, B4 22→24 Okt. Sab 24 Okt = batas akhir semua batch; materi (lagu, audio aransemen, chord, nada final) sudah dibagikan → semua batch COMPLETED. Catatan seed 15 Okt (lama): B1 15→19 Okt, B2 17→26 Okt, B3 24 Okt→2 Nov, B4 31 Okt→9 Nov.
 Rehearsal (WIB; jadwal 15 Okt tidak berlaku lagi): Sab 24 Okt batas semua lagu + audio aransemen + chord (target Reference Ready); Sab 31 Okt latihan onsite pertama (tempat dan jam masih dikoordinasikan); Sab 7 Nov full rehearsal (usulan, belum final); 11–12 Nov gladi bersih (usulan, belum final); Sab 14 Nov 07:00 soundcheck, lalu ibadah. Jadwal lama: monitoring online 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00.
 5 task awal (PIC: MD): konfirmasi venue, link Drive B1, review key/BPM, cek sound, click/cue.
 Belum dibuat (butuh info venue): item equipment. Lokasi/link rehearsal masih "menyusul" — MD/panitia adjust via portal.
@@ -272,7 +272,7 @@ Belum dibuat (butuh info venue): item equipment. Lokasi/link rehearsal masih "me
 
 - [x] Tanggal acara: Sabtu 14 Nov 2026 (Komisi Wilayah, 22 Okt 2026), menggantikan 21 Nov 2026. Alasan: dua minggu setelah tanggal lama ada katekisasi pelsus dan RMST-39.
 - [x] Soundcheck hari-H 07:00 WIB, lalu ibadah. Durasi dan jam selesai belum dikunci.
-- [x] Batas Sab 24 Okt: semua lagu + audio aransemen + chord dibagikan (target Reference Ready).
+- [x] Batas Sab 24 Okt: semua lagu + audio aransemen + chord dibagikan (target Reference Ready). Nada final ditetapkan 24 Okt; semua batch → COMPLETED.
 - [ ] Latihan onsite pertama Sab 31 Okt — tempat dan jam masih dikoordinasikan.
 - [ ] Full rehearsal usulan Sab 7 Nov — belum final.
 - [ ] Gladi bersih usulan 11–12 Nov — belum final.

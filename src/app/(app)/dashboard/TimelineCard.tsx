@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatJakarta } from "@/lib/format";
-import { barPosition, hDayLabel } from "@/lib/timeline-dates";
+import { barPosition, hDayLabel, formatDateRange } from "@/lib/timeline-dates";
 import {
   getEventTimeline,
   getUserTimeline,
@@ -126,13 +126,23 @@ function GanttChart({ data, now }: { data: TimelineData; now: Date }) {
                 rangeEnd,
               );
               const overdue = isItemOverdue(item, now);
+              const range = formatDateRange(item.start as Date, item.end);
               return (
                 <div key={item.id} className="relative h-9">
                   <div
-                    className={`absolute top-1/2 h-3 -translate-y-1/2 rounded-full ${KIND_BAR[item.kind]} ${item.done ? "opacity-40" : ""} ${overdue ? "ring-2 ring-red-500 ring-offset-1 dark:ring-offset-zinc-950" : ""}`}
+                    tabIndex={0}
+                    aria-label={`${item.title}: ${range}`}
+                    className={`group absolute top-1/2 h-3 -translate-y-1/2 rounded-full ${KIND_BAR[item.kind]} ${item.done ? "opacity-40 hover:opacity-100" : ""} ${overdue ? "ring-2 ring-red-500 ring-offset-1 dark:ring-offset-zinc-950" : ""}`}
                     style={{ left: `${pos.left}%`, width: `${pos.width}%` }}
-                    title={`${item.title} — ${itemLabel(item, now)?.text ?? ""}`}
-                  />
+                    title={`${item.title} · ${range} — ${itemLabel(item, now)?.text ?? ""}`}
+                  >
+                    <span
+                      role="tooltip"
+                      className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-zinc-900 px-2 py-1 text-xs text-white shadow group-hover:block group-focus:block dark:bg-zinc-100 dark:text-zinc-900"
+                    >
+                      {range}
+                    </span>
+                  </div>
                 </div>
               );
             })}
