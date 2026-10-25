@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseJakartaLocalInput } from "@/lib/datetime-local";
 
 export const rehearsalTypeSchema = z.enum(
   [
@@ -36,7 +37,7 @@ const requiredDateTime = z.preprocess(
   (v) => {
     if (v instanceof Date) return v;
     if (typeof v === "string" && v !== "") {
-      const d = new Date(v);
+      const d = parseJakartaLocalInput(v);
       return Number.isNaN(d.getTime()) ? v : d;
     }
     return v;
@@ -48,7 +49,7 @@ const optionalDateTime = z.preprocess(
   (v) => {
     if (v === "" || v === undefined || v === null) return undefined;
     if (v instanceof Date) return v;
-    const d = new Date(String(v));
+    const d = parseJakartaLocalInput(String(v));
     return Number.isNaN(d.getTime()) ? v : d;
   },
   z.date({ message: "Waktu tidak valid." }).optional(),

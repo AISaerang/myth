@@ -17,13 +17,6 @@ const inputClass =
 const TYPES = Object.keys(REHEARSAL_TYPE_LABEL) as RehearsalType[];
 const STATUSES = Object.keys(REHEARSAL_STATUS_LABEL) as RehearsalStatus[];
 
-function toLocalInput(value?: Date | null): string {
-  if (!value) return "";
-  const d = new Date(value);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 export interface RehearsalFormDefaults {
   title?: string;
   type?: RehearsalType;
@@ -183,4 +176,3 @@ export function RehearsalForm({
   );
 }
 
-export { toLocalInput };

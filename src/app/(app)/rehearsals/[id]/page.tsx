@@ -15,7 +15,8 @@ import { isTaskOverdue } from "@/lib/task-status";
 import { SongStatusBadge } from "../../songs/SongStatusBadge";
 import { AttendanceBadge, RehearsalStatusBadge, RehearsalTypeBadge } from "../OpsBadges";
 import { RehearsalSongMover } from "@/components/ui/MoveButtons";
-import { RehearsalForm, toLocalInput } from "../RehearsalForm";
+import { RehearsalForm } from "../RehearsalForm";
+import { toJakartaLocalInput } from "@/lib/datetime-local";
 import {
   AttendanceCard,
   AttendanceRowForm,
@@ -209,8 +210,8 @@ export default async function RehearsalDetailPage({
           defaults={{
             title: rehearsal.title,
             type: rehearsal.type,
-            startsAt: toLocalInput(rehearsal.startsAt),
-            endsAt: toLocalInput(rehearsal.endsAt),
+            startsAt: toJakartaLocalInput(rehearsal.startsAt),
+            endsAt: toJakartaLocalInput(rehearsal.endsAt),
             venueOrMeetingUrl: rehearsal.venueOrMeetingUrl,
             agenda: rehearsal.agenda,
             status: rehearsal.status,
