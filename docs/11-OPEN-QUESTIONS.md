@@ -5,11 +5,13 @@ Do not present unresolved information as confirmed.
 ## Event
 - [x] Confirm official date → **Sabtu 14 November 2026** (keputusan Komisi Wilayah 22 Okt 2026). Menggantikan **21 Nov 2026, pagi–sore** (confirmed 14 Okt 2026). Dimajukan karena dua minggu setelah tanggal lama ada katekisasi pelsus dan RMST-39. Soundcheck **07:00 WIB**, lalu ibadah. Durasi dan jam selesai belum dikunci.
 - [ ] Confirm location, theme, total duration, final liturgy/rundown.
-- [x] Batas materi → **Sab 24 Okt 2026**: semua lagu + audio aransemen + chord dibagikan (target status Reference Ready).
-- [ ] Latihan onsite pertama **Sab 31 Okt 2026** — tanggal dijadwalkan; tempat dan jam masih dikoordinasikan.
+- [x] Materi → **Sab 24 Okt 2026**: lagu, audio aransemen Suno, chord dibagikan.
+- [x] Batch review + latihan mandiri: B1 25–29 Okt, B2 26–31 Okt, B3 27 Okt–3 Nov, B4 28 Okt–5 Nov.
+- [ ] Monitoring online — **Rab 28 Okt 2026 19:00 WIB**.
+- [ ] Latihan onsite pertama (sectional) **Sab 31 Okt 2026 10:00 WIB** — tempat masih dikoordinasikan.
 - [ ] Full rehearsal — **Sab 7 Nov 2026 10:00 WIB**.
 - [ ] Gladi bersih — **Jum 13 Nov 2026 15:00 WIB**.
-- [x] Confirm song list (19 lagu: 5 ASM + 6 Praise + 6 Worship + 2 NNBT; 2 slot worship TBD) — order final menyusul panitia.
+- [x] Setlist aktif: 13 lagu dalam 4 batch manggung (lihat 12 §19/§21); order final menyusul panitia. (Sebelumnya: 19 lagu: 5 ASM + 6 Praise + 6 Worship + 2 NNBT.)
 
 ## People
 - [ ] Finalize cross-congregation roster and instrument PICs.

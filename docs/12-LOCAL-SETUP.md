@@ -210,6 +210,8 @@ npm.cmd run seed:event       # event + 9 personel + 19 lagu + 3 batch + materi +
 
 Catatan tanggal: bagian ini diverifikasi saat tanggal kerja masih 21 Nov 2026. Acara kemudian dimajukan ke Sabtu 14 Nov 2026 (keputusan Komisi Wilayah 22 Okt 2026). Daftar lagu di bawah adalah status 15 Okt dan tidak diubah di sini.
 
+Status terkini (25 Okt 2026): Ice breaking — Mentega & Roti D, Satu Anak Tuhan E, Bapa Abraham E, Kucinta Keluarga Tuhan C; Praise — Sungguh Indah, Bapa Sentuh Hatiku; Batch akhir — Kami Bersyukur (NNBT 20) A, Joyful Gathering F→G, Mars Obor Pembangunan C. Enam perubahan key menunggu persetujuan owner di portal. Aransemen: AISaerang Art (Suno v1).
+
 Rundown resmi: ice breaking → opening → praise → worship → persembahan → berkat → closing.
 - [x] 14 lagu aktif dalam 4 batch manggung (Ice Breaking 4, Opening&Praise 4, Worship 3, Persembahan/Berkat/Closing 3)
 - [x] 4 lagu diarsipkan (Yesus Baik, Ku Hidup, Oceans, NNBT 15): unpublish + unassign + DRAFT, histori utuh
@@ -224,10 +226,11 @@ Rundown resmi: ice breaking → opening → praise → worship → persembahan �
 - [x] "Satukanlah Hati Kami" diabaikan sesuai arahan MD (tidak di-seed)
 - [ ] Key Ku Tak Pandang + NNBT 20 TBD — MD isi via UI
 
-## 17. Timetable Live (batch terverifikasi 15 Okt 2026; jadwal rehearsal diperbarui 22 Okt 2026)
+## 15a. Timetable Live (batch terverifikasi 15 Okt 2026; jadwal rehearsal diperbarui 22 Okt 2026)
 
-Tanggal batch (rilis → target review, diselaraskan 24 Okt 2026 ke jadwal 14 Nov): B1 15→19 Okt, B2 17→24 Okt, B3 22→24 Okt, B4 22→24 Okt. Sab 24 Okt = batas akhir semua batch; materi (lagu, audio aransemen, chord, nada final) sudah dibagikan → semua batch COMPLETED. Catatan seed 15 Okt (lama): B1 15→19 Okt, B2 17→26 Okt, B3 24 Okt→2 Nov, B4 31 Okt→9 Nov.
-Rehearsal (WIB; jadwal 15 Okt tidak berlaku lagi): Sab 24 Okt batas semua lagu + audio aransemen + chord (target Reference Ready); Sab 31 Okt latihan onsite pertama (tempat dan jam masih dikoordinasikan); Sab 7 Nov 10:00 full rehearsal; Jum 13 Nov 15:00 gladi bersih; Sab 14 Nov 07:00 soundcheck, lalu ibadah. Jadwal lama: monitoring online 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00.
+Catatan penomoran: bagian ini sebelumnya bernomor §17 (duplikat dengan §17 Fix Form Edit), dinomori ulang menjadi §15a.
+Tanggal batch (rilis → target review, remap 25 Okt 2026): B1 25→29 Okt, B2 26→31 Okt, B3 27 Okt→3 Nov, B4 28 Okt→5 Nov. Status di portal: Dipublikasi (bukan COMPLETED). Versi 24 Okt (lama): B1 15→19 Okt, B2 17→24 Okt, B3 22→24 Okt, B4 22→24 Okt. Catatan seed 15 Okt (lama): B1 15→19 Okt, B2 17→26 Okt, B3 24 Okt→2 Nov, B4 31 Okt→9 Nov.
+Rehearsal (WIB; jadwal 15 Okt tidak berlaku lagi): Sab 24 Okt materi (lagu, audio aransemen Suno, chord) dibagikan; Rab 28 Okt 19:00 monitoring online; Sab 31 Okt 10:00 latihan onsite pertama/sectional (tempat masih dikoordinasikan); Sab 7 Nov 10:00 full rehearsal; Jum 13 Nov 15:00 gladi bersih; Sab 14 Nov 07:00 soundcheck, lalu ibadah. Jadwal lama: monitoring online 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00.
 5 task awal (PIC: MD): konfirmasi venue, link Drive B1, review key/BPM, cek sound, click/cue.
 Belum dibuat (butuh info venue): item equipment. Lokasi/link rehearsal masih "menyusul" — MD/panitia adjust via portal.
 
@@ -270,10 +273,12 @@ Belum dibuat (butuh info venue): item equipment. Lokasi/link rehearsal masih "me
 
 ## 20. Acara dimajukan ke 14 Nov 2026 (keputusan 22 Okt 2026)
 
-- [x] Tanggal acara: Sabtu 14 Nov 2026 (Komisi Wilayah, 22 Okt 2026), menggantikan 21 Nov 2026. Alasan: dua minggu setelah tanggal lama ada katekisasi pelsus dan RMST-39.
+- [x] Tanggal acara: Sabtu 14 Nov 2026 (Komisi Wilayah, 22 Okt 2026), menggantikan 21 Nov 2026 (di portal tercatat 20 Nov sebelum remap). Alasan: dua minggu setelah tanggal lama ada katekisasi pelsus dan RMST-39.
 - [x] Soundcheck hari-H 07:00 WIB, lalu ibadah. Durasi dan jam selesai belum dikunci.
-- [x] Batas Sab 24 Okt: semua lagu + audio aransemen + chord dibagikan (target Reference Ready). Nada final ditetapkan 24 Okt; semua batch → COMPLETED.
-- [ ] Latihan onsite pertama Sab 31 Okt — tempat dan jam masih dikoordinasikan.
+- [x] Sab 24 Okt: materi (lagu, audio aransemen Suno, chord) dibagikan. Perubahan key menunggu persetujuan owner.
+- [x] Batch review + latihan mandiri: B1 25–29 Okt, B2 26–31 Okt, B3 27 Okt–3 Nov, B4 28 Okt–5 Nov (Dipublikasi).
+- [ ] Monitoring online Rab 28 Okt 19:00.
+- [ ] Latihan onsite pertama (sectional) Sab 31 Okt 10:00 — tempat masih dikoordinasikan.
 - [ ] Full rehearsal Sab 7 Nov 10:00.
 - [ ] Gladi bersih Jum 13 Nov 15:00.
 - [ ] Sequencer praise masih dikoordinasikan WL dengan beberapa pihak.

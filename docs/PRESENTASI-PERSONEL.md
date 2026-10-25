@@ -8,7 +8,7 @@
 
 - [ ] Siapkan 2 akun USER live: 1 band (mis. gitar/keyboard) + 1 singer, keduanya sudah ada assignment di lagu publish.
 - [ ] Pastikan 1 lagu publish punya materi aktif + ChordPro (saran: "Bapa Sentuh Hatiku" G→C, atau NDC, atau Sungguh Indah).
-- [ ] Pastikan ada 1 rehearsal upcoming yang sudah mengikuti jadwal baru (WIB): batas materi Sab 24 Okt (target Reference Ready); latihan onsite pertama Sab 31 Okt (tempat/jam masih dikoordinasikan); full rehearsal Sab 7 Nov 10:00; gladi bersih Jum 13 Nov 15:00; soundcheck Sab 14 Nov 07:00 lalu ibadah. Jangan tampilkan jadwal lama (monitoring 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00) sebagai rencana yang berlaku.
+- [ ] Pastikan ada 1 rehearsal upcoming yang sudah mengikuti jadwal baru (WIB): materi dibagikan Sab 24 Okt; batch B1 25–29 Okt, B2 26–31 Okt, B3 27 Okt–3 Nov, B4 28 Okt–5 Nov; monitoring online Rab 28 Okt 19:00; latihan onsite pertama (sectional) Sab 31 Okt 10:00 (tempat masih dikoordinasikan); full rehearsal Sab 7 Nov 10:00; gladi bersih Jum 13 Nov 15:00; soundcheck Sab 14 Nov 07:00 lalu ibadah. Jangan tampilkan jadwal lama (monitoring 21 Okt 19:00, sectional 1 Nov 10:00, full 8 Nov 10:00, gladi 15 Nov 10:00, soundcheck 21 Nov 07:00) sebagai rencana yang berlaku.
 - [ ] Buka prod di laptop + HP (tampilkan 1x versi mobile biar percaya mobile-first).
 - [ ] Siapkan PDF backup / hotspot bila internet mati.
 - [ ] Latihan klik urutan §3 sekali tanpa bicara (±2 mnt).
@@ -28,7 +28,7 @@ Ambil via `Win+Shift+S`, mobile via DevTools `Ctrl+Shift+M` (390px). Highlight b
 | `07-tasks.png` | `/tasks` filter `Aktif` | desktop | Filter `Semua/Aktif/Blocked/Terlambat/Selesai`, 1 kartu usulan `[Usulan - Part]` |
 | `08-rehearsal.png` | `/rehearsals` + 1 detail `/rehearsals/[id]` | mobile 390px | Judul + jam WIB + jumlah lagu, agenda, status kehadiranmu |
 
-Prod sudah berisi data live: 13 lagu aktif dalam 4 batch manggung (urutan manggung = sortOrder), 8 chord chart basis C, 5 rehearsal, 5 task awal. Tidak perlu seed ulang. Lima baris rehearsal itu masih jadwal lama dan tidak berlaku; yang diucapkan adalah jadwal Sabtu 14 Nov di atas, setelah MD menyesuaikan entri di portal.
+Prod sudah berisi data live: 13 lagu aktif dalam 4 batch manggung (urutan manggung = sortOrder), 8 chord chart basis C, 5 rehearsal, 5 task awal. Tidak perlu seed ulang. Lima baris rehearsal itu masih jadwal lama dan tidak berlaku sampai MD memindahkannya di portal (halaman detail rehearsal sudah diperbaiki); sampai saat itu sampaikan jadwal 14 Nov di atas secara lisan.
 
 ## 2. Slide + naskah (7 slide, ±15 mnt)
 

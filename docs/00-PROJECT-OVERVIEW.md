@@ -7,9 +7,11 @@
 - Acara: Ibadah Pemuda Wilayah GMIM Jabodetabek–Bandung.
 - Tanggal kerja: **Sabtu 14 November 2026** (resmi, keputusan Komisi Wilayah 22 Oktober 2026). Sebelumnya 21 November 2026. Dimajukan karena dua minggu setelah tanggal lama ada katekisasi pelsus dan RMST-39.
 - Hari-H: soundcheck 07:00 WIB, lalu ibadah. Durasi dan jam selesai belum dikunci.
-- Jadwal latihan (WIB), per 22 Oktober 2026:
-  - Sab 24 Okt — batas semua lagu + audio aransemen + chord dibagikan (target status Reference Ready).
-  - Sab 31 Okt — latihan onsite pertama; tempat dan jam masih dikoordinasikan.
+- Jadwal latihan (WIB), per 22 Oktober 2026 (remap portal 25 Okt 2026):
+  - Sab 24 Okt — materi (lagu, audio aransemen Suno, chord) dibagikan.
+  - 25 Okt–5 Nov — review + latihan mandiri per batch: B1 25–29 Okt, B2 26–31 Okt, B3 27 Okt–3 Nov, B4 28 Okt–5 Nov.
+  - Rab 28 Okt 19:00 — monitoring online (cek progres latihan mandiri per batch).
+  - Sab 31 Okt 10:00 — latihan onsite pertama (sectional); tempat masih dikoordinasikan.
   - Sab 7 Nov 10:00 — full rehearsal.
   - Jum 13 Nov 15:00 — gladi bersih.
   - Sab 14 Nov 07:00 — soundcheck, lalu ibadah.
