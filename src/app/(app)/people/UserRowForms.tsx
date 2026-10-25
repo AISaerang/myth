@@ -157,10 +157,9 @@ export function EditUserForm({
           disabled={disabled}
           className="h-11 rounded-lg border border-zinc-300 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <option value="USER">USER</option>
-          <option value="OBSERVER">OBSERVER</option>
-          <option value="ADMIN">ADMIN</option>
-          <option value="OBSERVER">OBSERVER</option>
+          <option value="USER">USER — personel</option>
+          <option value="OBSERVER">OBSERVER — Pantau (baca saja)</option>
+          <option value="ADMIN">ADMIN — pengelola/MD</option>
         </select>
         <Button type="submit" variant="secondary" size="sm" disabled={disabled || pending}>
           {pending ? "…" : "Simpan"}

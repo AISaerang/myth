@@ -62,9 +62,8 @@ export function CreateUserForm() {
             className="h-11 rounded-lg border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900"
           >
             <option value="USER">USER — personel</option>
-            <option value="OBSERVER">OBSERVER — pemantau (Pantau)</option>
+            <option value="OBSERVER">OBSERVER — Pantau (baca saja)</option>
             <option value="ADMIN">ADMIN — pengelola/MD</option>
-            <option value="OBSERVER">OBSERVER — pengamat (baca saja)</option>
           </select>
         </div>
         {!state.ok && state.error ? (
