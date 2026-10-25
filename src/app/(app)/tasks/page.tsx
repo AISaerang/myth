@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { toJakartaLocalInput } from "@/lib/datetime-local";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
@@ -220,7 +221,7 @@ export default async function TasksPage({
                           status: t.status,
                           priority: t.priority,
                           dueAt: t.dueAt
-                            ? new Date(t.dueAt).toISOString().slice(0, 16)
+                            ? toJakartaLocalInput(t.dueAt)
                             : "",
                           assigneePersonId: t.assigneePersonId,
                           relatedSongId: t.relatedSongId,

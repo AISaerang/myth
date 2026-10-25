@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { toJakartaLocalInput } from "@/lib/datetime-local";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
@@ -135,7 +136,7 @@ export default async function EquipmentPage({
                           assigneePersonId: item.assignee?.id ?? null,
                           notes: item.notes,
                           dueAtIso: item.dueAt
-                            ? new Date(item.dueAt).toISOString().slice(0, 16)
+                            ? toJakartaLocalInput(item.dueAt)
                             : "",
                         }}
                       />

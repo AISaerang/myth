@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseJakartaLocalInput } from "@/lib/datetime-local";
 
 export const practiceStatusSchema = z.enum(
   [
@@ -29,7 +30,7 @@ export const progressSchema = z.object({
 const optionalDateTime = z.preprocess(
   (v) => {
     if (v === "" || v === undefined || v === null) return undefined;
-    const d = v instanceof Date ? v : new Date(String(v));
+    const d = v instanceof Date ? v : parseJakartaLocalInput(String(v));
     return Number.isNaN(d.getTime()) ? v : d;
   },
   z.date({ message: "Tanggal tidak valid." }).optional(),
