@@ -65,7 +65,12 @@ const rehearsalCore = {
   startsAt: requiredDateTime,
   endsAt: optionalDateTime,
   venueOrMeetingUrl: z.string().trim().max(500).optional(),
-  agenda: z.string().trim().max(5000).optional(),
+  // Kolom DB agenda masih VARCHAR(191) (lihat migrasi init).
+  agenda: z
+    .string()
+    .trim()
+    .max(191, "Agenda maksimal 191 karakter (termasuk baris baru).")
+    .optional(),
   status: rehearsalStatusSchema,
   notes: z.string().trim().max(5000).optional(),
 };

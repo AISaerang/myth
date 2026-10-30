@@ -141,7 +141,7 @@ export function RehearsalForm({
             id="rh-agenda"
             name="agenda"
             rows={3}
-            maxLength={5000}
+            maxLength={191}
             defaultValue={d.agenda ?? ""}
             placeholder="cth. Cek form, key, tempo, part guide Batch 1"
             className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
