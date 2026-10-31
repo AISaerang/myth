@@ -63,23 +63,18 @@ export default async function SongDetailPage({
   const admin = isAdmin(user);
   const observer = isObserver(user);
 
-  if (observer) {
-    // Pemantau: boleh membuka semua lagu Publish, tanpa assignment.
-    if (!song.isPublished) notFound();
-  } else if (!admin) {
-    // Personel hanya boleh membuka lagu yang dipublikasi dan ditugaskan.
+  // Semua user login (USER/OBSERVER/ADMIN) boleh membuka lagu Publish.
+  // Draft hanya untuk ADMIN. Hak edit tetap diatur terpisah.
+  if (!admin && !song.isPublished) notFound();
+  let myAssignment: (typeof song.assignments)[number] | undefined;
+  if (!admin && !observer) {
     const person = await prisma.person.findUnique({
       where: { userId: user.id },
     });
-    const assigned = person
-      ? song.assignments.some((a) => a.personId === person.id)
-      : false;
-    if (!song.isPublished || !assigned) notFound();
+    myAssignment = person
+      ? song.assignments.find((a) => a.personId === person.id)
+      : undefined;
   }
-
-  const myAssignment = !admin && !observer
-    ? song.assignments[0]
-    : undefined;
 
   return (
     <div className="flex flex-col gap-4">

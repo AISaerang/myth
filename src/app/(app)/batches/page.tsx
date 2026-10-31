@@ -24,11 +24,6 @@ export default async function BatchesPage({
   searchParams: Promise<{ eventId?: string; filter?: string }>;
 }) {
   const user = await requireFreshUser();
-  if (!isAdmin(user) && !isObserver(user)) {
-    // MVP: batch management is an MD/admin tool. Users follow their
-    // assigned songs and the team roster instead.
-    await requireAdminUser();
-  }
   const params = await searchParams;
   const events = await listEvents();
   if (events.length === 0) {
@@ -56,7 +51,8 @@ export default async function BatchesPage({
         ? b.status === "ARCHIVED"
         : b.status !== "ARCHIVED",
   );
-  const observer = isObserver(user);
+  // Non-admin (USER/OBSERVER): tampilan read-only, lagu Publish saja.
+  const observer = !isAdmin(user);
 
   return (
     <div className="flex flex-col gap-4">

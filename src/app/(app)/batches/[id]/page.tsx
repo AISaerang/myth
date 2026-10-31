@@ -28,10 +28,8 @@ export default async function BatchDetailPage({
 }) {
   const user = await requireFreshUser();
   const admin = isAdmin(user);
-  const observer = isObserver(user);
-  if (!admin && !observer) {
-    await requireAdminUser();
-  }
+  // Non-admin (USER/OBSERVER): tampilan read-only, lagu Publish saja.
+  const observer = !isAdmin(user);
   const { id } = await params;
   const batch = await getBatch(id);
   if (!batch) notFound();

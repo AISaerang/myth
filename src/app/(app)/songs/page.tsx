@@ -18,7 +18,7 @@ export default async function SongsPage({
   const user = await requireFreshUser();
   const params = await searchParams;
 
-  if (isObserver(user)) {
+  if (!isAdmin(user)) {
     const current = await getCurrentEvent();
     if (!current) {
       return (
@@ -35,8 +35,9 @@ export default async function SongsPage({
           Lagu
         </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Mode pantau: hanya lagu yang sudah publish. Klik lagu untuk melihat
-          progres semua personel dan memberi usulan.
+          {isObserver(user)
+            ? "Mode pantau: hanya lagu yang sudah publish. Klik lagu untuk melihat progres semua personel dan memberi usulan."
+            : "Semua lagu yang sudah publish. Klik lagu untuk lirik, chord, referensi, dan update status latihanmu."}
         </p>
         {songs.length === 0 ? (
           <EmptyState
