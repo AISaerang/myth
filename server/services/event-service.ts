@@ -118,6 +118,43 @@ export async function createEvent(
   return event;
 }
 
+// Tutup/buka akses event (P7). Hanya dipanggil setelah otorisasi
+// requireEventAccessManager: EVENT_ADMIN event tsb atau global ADMIN.
+// Tidak otomatis dari eventStatus; MEMBERSHIP tidak berubah, tapi
+// getEventRole() menolak MEMBER/OBSERVER selama tertutup (read-only
+// untuk EVENT_ADMIN sampai dibuka kembali).
+export async function setEventAccessClosed(
+  actorUserId: string,
+  eventId: string,
+  closed: boolean,
+): Promise<{ ok: true; changed: boolean } | { ok: false; error: string }> {
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) return { ok: false, error: "Event tidak ditemukan." };
+  const currentlyClosed = Boolean(event.accessClosedAt);
+  if (closed === currentlyClosed) return { ok: true, changed: false };
+
+  const updated = await prisma.event.update({
+    where: { id: eventId },
+    data: closed
+      ? { accessClosedAt: new Date(), accessClosedById: actorUserId }
+      : { accessClosedAt: null, accessClosedById: null },
+  });
+
+  await writeAudit({
+    actorUserId,
+    action: closed
+      ? AuditAction.EVENT_ACCESS_CLOSED
+      : AuditAction.EVENT_ACCESS_REOPENED,
+    entityType: "Event",
+    entityId: eventId,
+    summary: closed
+      ? `Akses "${updated.name}" ditutup.`
+      : `Akses "${updated.name}" dibuka kembali.`,
+    metadata: { name: updated.name, closed: closed ? "true" : "false" },
+  });
+  return { ok: true, changed: true };
+}
+
 const WATCHED_FIELDS = [
   "eventDate",
   "startTime",

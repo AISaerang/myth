@@ -8,8 +8,15 @@ import { ACTIVE_EVENT_COOKIE } from "@/lib/event-context";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import { eventSchema } from "@/lib/validation/event";
 import { getAccessibleEvent } from "@server/services/event-access";
-import { createEvent, updateEvent } from "@server/services/event-service";
-import { requireEventManager } from "./event-authorization";
+import {
+  createEvent,
+  setEventAccessClosed,
+  updateEvent,
+} from "@server/services/event-service";
+import {
+  requireEventAccessManager,
+  requireEventManager,
+} from "./event-authorization";
 import type { ActionState } from "./auth";
 
 function parseEventForm(formData: FormData) {
@@ -80,4 +87,27 @@ export async function setActiveEventAction(formData: FormData): Promise<void> {
     maxAge: 60 * 60 * 24 * 30,
   });
   redirect("/dashboard");
+}
+
+export async function setEventAccessClosedAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireActionUser();
+  const eventId = String(formData.get("eventId") ?? "");
+  const intent = String(formData.get("intent") ?? "");
+  if (!eventId || (intent !== "close" && intent !== "reopen")) {
+    return { ok: false, error: "Data tidak valid." };
+  }
+  await requireEventAccessManager(user, eventId);
+  const result = await setEventAccessClosed(
+    user.id,
+    eventId,
+    intent === "close",
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidatePath("/event");
+  revalidatePath(`/event/${eventId}`);
+  revalidatePath(`/event/${eventId}/members`);
+  return { ok: true };
 }

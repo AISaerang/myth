@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import type { SessionUser } from "@/lib/permissions";
-import { canWriteEventData, isAdmin } from "@/lib/permissions";
+import { canManageEvent, canWriteEventData, isAdmin } from "@/lib/permissions";
 import { getEventRole } from "@server/services/event-access";
 
 type EventScopedEntity =
@@ -31,6 +31,18 @@ export async function requireEventManager(
   if (!canWriteEventData(role, Boolean(event.accessClosedAt), isAdmin(user))) {
     throw new Error("Forbidden");
   }
+}
+
+// P7: hanya EVENT_ADMIN event ini atau global ADMIN boleh menutup/membuka
+// akses. Berbeda dari requireEventManager: tetap diizinkan saat event
+// sudah tertutup (agar bisa dibuka kembali), dan MEMBER/OBSERVER
+// selalu ditolak (getEventRole memberi null saat tertutup).
+export async function requireEventAccessManager(
+  user: SessionUser,
+  eventId: string,
+): Promise<void> {
+  const role = await getEventRole(user, eventId);
+  if (!canManageEvent(role)) throw new Error("Forbidden");
 }
 
 export async function requireEventManagerForEntity(

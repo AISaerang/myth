@@ -136,6 +136,26 @@ describe("permissions", () => {
     expect(canAccessEvent(admin, "event-a", null, closedAt)).toBe(true);
   });
 
+  it("gates closing and reopening event access to the event admin", () => {
+    expect(canManageEvent("EVENT_ADMIN")).toBe(true);
+    expect(canManageEvent("MEMBER")).toBe(false);
+    expect(canManageEvent("OBSERVER")).toBe(false);
+    expect(canManageEvent(null)).toBe(false);
+  });
+
+  it("never closes access automatically when an event completes", () => {
+    // COMPLETED saja tidak mengubah akses; hanya "Tutup akses" manual.
+    expect(
+      canAccessEvent(user, "event-a", { eventId: "event-a", role: "MEMBER" }),
+    ).toBe(true);
+    expect(canWriteEventData("EVENT_ADMIN", false, false)).toBe(true);
+    // Setelah ditutup manual, member kehilangan akses dan EVENT_ADMIN hanya-baca.
+    expect(
+      canAccessEvent(user, "event-a", { eventId: "event-a", role: "MEMBER" }, new Date()),
+    ).toBe(false);
+    expect(canWriteEventData("EVENT_ADMIN", true, false)).toBe(false);
+  });
+
   it("lets users update only their own progress", () => {
     expect(canUpdateProgress(user, "user-1")).toBe(true);
     expect(canUpdateProgress(user, "user-2")).toBe(false);
