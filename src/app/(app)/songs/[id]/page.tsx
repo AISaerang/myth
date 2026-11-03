@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { isAdmin, isObserver } from "@/lib/permissions";
 import { getSong } from "@server/services/song-service";
+import { getCurrentEvent } from "@server/services/event-service";
 import { getEventRole } from "@server/services/event-access";
 import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-service";
 import { getMyProgress, getSongProgress } from "@server/services/progress-service";
@@ -54,20 +55,31 @@ function Meta({ label, value }: { label: string; value?: string | null }) {
 
 export default async function SongDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ eventId?: string }>;
 }) {
   const user = await requireFreshUser();
   const { id } = await params;
-  const song = await getSong(id);
+  const { eventId: requestedEventId } = await searchParams;
+  const legacySong = requestedEventId
+    ? null
+    : await prisma.song.findUnique({
+        where: { id },
+        select: { eventId: true },
+      });
+  const eventId =
+    requestedEventId ??
+    legacySong?.eventId ??
+    (await getCurrentEvent(user))?.id;
+  if (!eventId) notFound();
+  const song = await getSong(id, eventId);
   if (!song) notFound();
-  if (!song.eventId || !song.event) notFound();
   if (!(await getEventRole(user, song.eventId))) notFound();
   const admin = isAdmin(user);
   const observer = isObserver(user);
 
-  // Semua user login (USER/OBSERVER/ADMIN) boleh membuka lagu Publish.
-  // Draft hanya untuk ADMIN. Hak edit tetap diatur terpisah.
   if (!admin && !song.isPublished) notFound();
   let myAssignment: (typeof song.assignments)[number] | undefined;
   if (!admin && !observer) {
@@ -77,6 +89,7 @@ export default async function SongDetailPage({
     myAssignment = person
       ? song.assignments.find((a) => a.personId === person.id)
       : undefined;
+    if (!myAssignment) notFound();
   }
 
   return (
@@ -146,9 +159,19 @@ export default async function SongDetailPage({
         </Card>
       ) : null}
 
-      <SongProgress songId={song.id} admin={admin} observer={observer} userId={user.id} />
+      <SongProgress
+        songId={song.id}
+        eventSongId={song.eventSongId}
+        admin={admin}
+        observer={observer}
+        userId={user.id}
+      />
 
-      <SongChordChart songId={song.id} admin={admin} />
+      <SongChordChart
+        songId={song.id}
+        eventId={song.eventId}
+        admin={admin}
+      />
 
       <Card title="Materi aktif">
         {song.materials.filter((m) => m.isActive).length === 0 ? (
@@ -222,7 +245,7 @@ export default async function SongDetailPage({
               {song.isFinalLocked ? <UnlockButton songId={song.id} /> : null}
             </div>
           </Card>
-          <AdminPersonnel songId={song.id} />
+          <AdminPersonnel songId={song.id} assignments={song.assignments} />
           <Card title="Tambah materi">
             <MaterialForm
               songId={song.id}
@@ -323,7 +346,7 @@ export default async function SongDetailPage({
         )}
       </Card>
 
-      <SongTasks songId={song.id} />
+      <SongTasks songId={song.id} eventId={song.eventId} />
 
       {!admin ? (
         <SongSuggestion
@@ -338,9 +361,11 @@ export default async function SongDetailPage({
 
 async function SongChordChart({
   songId,
+  eventId,
   admin,
 }: {
   songId: string;
+  eventId: string;
   admin: boolean;
 }) {
   const [charts, arrangement] = await Promise.all([
@@ -350,6 +375,7 @@ async function SongChordChart({
   return (
     <ChordChartSection
       songId={songId}
+      eventId={eventId}
       admin={admin}
       charts={charts}
       arrangement={arrangement}
@@ -359,17 +385,19 @@ async function SongChordChart({
 
 async function SongProgress({
   songId,
+  eventSongId,
   admin,
   observer,
   userId,
 }: {
   songId: string;
+  eventSongId: string;
   admin: boolean;
   observer: boolean;
   userId: string;
 }) {
   if (observer) {
-    const progress = await getSongProgress(songId);
+    const progress = await getSongProgress(eventSongId);
     const total = progress.length;
     const ready = progress.filter((p) => p.status === "READY_FOR_REHEARSAL").length;
     const needHelp = progress.filter((p) => p.status === "NEEDS_HELP");
@@ -405,14 +433,14 @@ async function SongProgress({
     );
   }
   if (!admin) {
-    const current = await getMyProgress(userId, songId);
+    const current = await getMyProgress(userId, eventSongId);
     return (
       <Card title="Progres latihanku">
         <MyProgressForm songId={songId} current={current} />
       </Card>
     );
   }
-  const progress = await getSongProgress(songId);
+  const progress = await getSongProgress(eventSongId);
   const total = progress.length;
   const ready = progress.filter((p) => p.status === "READY_FOR_REHEARSAL").length;
   const needHelp = progress.filter((p) => p.status === "NEEDS_HELP");
@@ -478,7 +506,8 @@ async function SongSuggestion({
   );
 }
 
-async function SongTasks({ songId }: { songId: string }) {  const tasks = await listSongTasks(songId);
+async function SongTasks({ songId, eventId }: { songId: string; eventId: string }) {
+  const tasks = await listSongTasks(songId, eventId);
   if (tasks.length === 0) return null;
   return (
     <Card title={`Task terkait (${tasks.length})`}>
@@ -510,23 +539,27 @@ async function SongTasks({ songId }: { songId: string }) {  const tasks = await 
   );
 }
 
-async function AdminPersonnel({ songId }: { songId: string }) {
-  const song = await getSong(songId);
-  if (!song) return null;
+async function AdminPersonnel({
+  songId,
+  assignments,
+}: {
+  songId: string;
+  assignments: NonNullable<Awaited<ReturnType<typeof getSong>>>["assignments"];
+}) {
   const [people, skills] = await Promise.all([
     listPersonnelForAdmin(),
     listSkills(),
   ]);
   const activePeople = people.filter((p) => p.isActive);
-  const assignedIds = new Set(song.assignments.map((a) => a.personId));
+  const assignedIds = new Set(assignments.map((a) => a.personId));
   return (
-    <Card title={`Personel (${song.assignments.length})`}>
+    <Card title={`Personel (${assignments.length})`}>
       <div className="flex flex-col gap-3">
-        {song.assignments.length === 0 ? (
+        {assignments.length === 0 ? (
           <EmptyState title="Belum ada personel ditugaskan" />
         ) : (
           <ul className="flex flex-col gap-1">
-            {song.assignments.map((a) => (
+            {assignments.map((a) => (
               <li
                 key={a.personId}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"

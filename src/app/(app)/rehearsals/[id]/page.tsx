@@ -110,7 +110,7 @@ export default async function RehearsalDetailPage({
                   <span className="w-6 text-center text-xs text-zinc-500">
                     {index + 1}
                   </span>
-                  <Link href={`/songs/${s.songId}`} className="font-medium underline">
+                  <Link href={`/songs/${s.songId}?eventId=${rehearsal.eventId}`} className="font-medium underline">
                     {s.song.title}
                   </Link>
                 </span>

@@ -78,7 +78,7 @@ export default async function BatchDetailPage({
                     <span className="w-6 text-center text-xs text-zinc-500">
                       {index + 1}
                     </span>
-                    <Link href={`/songs/${item.songId}`} className="font-medium underline">
+                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
                       {item.song.title}
                     </Link>
                   </span>
@@ -153,7 +153,7 @@ export default async function BatchDetailPage({
                     <span className="w-6 text-center text-xs text-zinc-500">
                       {index + 1}
                     </span>
-                    <Link href={`/songs/${item.songId}`} className="font-medium underline">
+                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
                       {item.song.title}
                     </Link>
                   </span>

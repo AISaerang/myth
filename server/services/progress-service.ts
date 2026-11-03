@@ -6,18 +6,18 @@ import type { ProgressInput } from "@/lib/validation/work";
 
 export async function getMyProgress(
   userId: string,
-  songId: string,
+  eventSongId: string,
 ) {
   const person = await prisma.person.findUnique({ where: { userId } });
   if (!person) return null;
-  return prisma.practiceProgress.findUnique({
-    where: { songId_personId: { songId, personId: person.id } },
+  return prisma.practiceProgress.findFirst({
+    where: { eventSongId, personId: person.id },
   });
 }
 
-export async function getSongProgress(songId: string) {
+export async function getSongProgress(eventSongId: string) {
   return prisma.practiceProgress.findMany({
-    where: { songId },
+    where: { eventSongId },
     include: { person: { select: { id: true, displayName: true, isActive: true } } },
     orderBy: { person: { displayName: "asc" } },
   });
@@ -42,6 +42,7 @@ export async function upsertMyProgress(
   }
   const assignment = await prisma.songAssignment.findUnique({
     where: { songId_personId: { songId: input.songId, personId: person.id } },
+    select: { eventSongId: true },
   });
   if (!assignment) {
     return { ok: false, error: "Lagu ini tidak ditugaskan kepadamu." };
@@ -51,6 +52,7 @@ export async function upsertMyProgress(
     create: {
       songId: input.songId,
       personId: person.id,
+      eventSongId: assignment.eventSongId,
       status: input.status as PracticeStatus,
       note: input.note || null,
       updatedById: userId,

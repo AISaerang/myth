@@ -149,7 +149,7 @@ export default async function DashboardPage() {
               {data.helpNeeded.map((h, i) => (
                 <li key={`ph-${i}`}>
                   <Badge tone="danger">Perlu bantuan</Badge>{" "}
-                  <Link href={`/songs/${h.song.id}`} className="font-medium underline">
+                  <Link href={`/songs/${h.song.id}?eventId=${event.id}`} className="font-medium underline">
                     {h.song.title}
                   </Link>{" "}
                   — {h.person.displayName}
@@ -176,7 +176,7 @@ export default async function DashboardPage() {
                   key={s.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
-                  <Link href={`/songs/${s.id}`} className="font-medium underline">
+                  <Link href={`/songs/${s.id}?eventId=${event.id}`} className="font-medium underline">
                     {s.title}
                   </Link>
                   <span className="flex items-center gap-1">
@@ -337,7 +337,7 @@ export default async function DashboardPage() {
               {data.helpNeeded.map((h, i) => (
                 <li key={`ph-${i}`}>
                   <Badge tone="danger">Perlu bantuan</Badge>{" "}
-                  <Link href={`/songs/${h.song.id}`} className="font-medium underline">
+                  <Link href={`/songs/${h.song.id}?eventId=${event.id}`} className="font-medium underline">
                     {h.song.title}
                   </Link>{" "}
                   — {h.person.displayName}
@@ -364,7 +364,7 @@ export default async function DashboardPage() {
                   key={s.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
-                  <Link href={`/songs/${s.id}`} className="font-medium underline">
+                  <Link href={`/songs/${s.id}?eventId=${event.id}`} className="font-medium underline">
                     {s.title}
                   </Link>
                   <span className="flex items-center gap-1">
@@ -472,7 +472,7 @@ export default async function DashboardPage() {
             {data.mySongs.map((a) => (
               <li key={a.song.id}>
                 <Link
-                  href={`/songs/${a.song.id}`}
+                  href={`/songs/${a.song.id}?eventId=${event.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
                   <span>
@@ -541,7 +541,7 @@ export default async function DashboardPage() {
                 </a>{" "}
                 <span className="text-zinc-500">
                   · {MATERIAL_CATEGORY_LABEL[m.category]} ·{" "}
-                  <Link href={`/songs/${m.song.id}`} className="underline">
+                  <Link href={`/songs/${m.song.id}?eventId=${event.id}`} className="underline">
                     {m.song.title}
                   </Link>
                 </span>

@@ -39,11 +39,25 @@ export async function proxy(request: NextRequest) {
     segments.length === 2 &&
     segments[0] === "songs"
   ) {
-    const song = await prisma.song.findUnique({
-      where: { id: segments[1] },
-      select: { eventId: true },
-    });
-    eventId = song?.eventId ?? null;
+    const requestedEventId = request.nextUrl.searchParams.get("eventId");
+    if (requestedEventId) {
+      const eventSong = await prisma.eventSong.findUnique({
+        where: {
+          eventId_songId: {
+            eventId: requestedEventId,
+            songId: segments[1],
+          },
+        },
+        select: { eventId: true },
+      });
+      eventId = eventSong?.eventId ?? null;
+    } else {
+      const song = await prisma.song.findUnique({
+        where: { id: segments[1] },
+        select: { eventId: true },
+      });
+      eventId = song?.eventId ?? null;
+    }
   } else if (
     segments.length === 3 &&
     segments[0] === "songs" &&

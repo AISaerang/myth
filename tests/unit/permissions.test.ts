@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eventSongDisplayKey } from "@/lib/event-song";
 import {
   canManageAccounts,
   canAccessEvent,
@@ -42,6 +43,17 @@ describe("permissions", () => {
     expect(isAdmin(user)).toBe(false);
     expect(canManageAccounts(admin)).toBe(true);
     expect(canManageAccounts(user)).toBe(false);
+  });
+
+  describe("event song display key", () => {
+    it("uses the event-specific key when set", () => {
+      expect(eventSongDisplayKey("D", "C")).toBe("D");
+    });
+
+    it("falls back to the library key when no event key is set", () => {
+      expect(eventSongDisplayKey(null, "C")).toBe("C");
+      expect(eventSongDisplayKey(null, null)).toBeNull();
+    });
   });
 
   it("scopes event access to membership, except for global ADMIN", () => {

@@ -20,13 +20,16 @@ export default async function ChartEditorPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ arrangement?: string }>;
+  searchParams: Promise<{ arrangement?: string; eventId?: string }>;
 }) {
   const user = await requireFreshUser();
   if (!isAdmin(user)) notFound();
 
   const { id } = await params;
-  const { arrangement: requestedArrangementId } = await searchParams;
+  const {
+    arrangement: requestedArrangementId,
+    eventId,
+  } = await searchParams;
   const song = await prisma.song.findUnique({
     where: { id },
     select: { id: true, title: true },
@@ -73,7 +76,11 @@ export default async function ChartEditorPage({
     <div className="flex flex-col gap-4">
       <div>
         <Link
-          href={`/songs/${song.id}`}
+          href={
+            eventId
+              ? `/songs/${song.id}?eventId=${eventId}`
+              : "/songs/library"
+          }
           className="text-sm font-medium text-zinc-500 underline"
         >
           ← Kembali ke {song.title}

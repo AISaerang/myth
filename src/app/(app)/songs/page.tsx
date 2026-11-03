@@ -19,7 +19,7 @@ export default async function SongsPage({
   const user = await requireFreshUser();
   const params = await searchParams;
 
-  if (!isAdmin(user)) {
+  if (isObserver(user)) {
     const current = await getCurrentEvent(user);
     if (!current) {
       return (
@@ -50,7 +50,7 @@ export default async function SongsPage({
             {songs.map((s) => (
               <li key={s.id}>
                 <Link
-                  href={`/songs/${s.id}`}
+                  href={`/songs/${s.id}?eventId=${current.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                 >
                   <span>
@@ -96,7 +96,7 @@ export default async function SongsPage({
             {mine.map((s) => (
               <li key={s.id}>
                 <Link
-                  href={`/songs/${s.id}`}
+                  href={`/songs/${s.id}?eventId=${current.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                 >
                   <span>
@@ -141,7 +141,12 @@ export default async function SongsPage({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Lagu</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Lagu</h1>
+          <Link href="/songs/library" className="text-sm font-medium underline">
+            Pustaka Lagu
+          </Link>
+        </div>
         <EventPicker
           events={events.map((e) => ({ id: e.id, name: e.name }))}
           value={eventId}
@@ -156,7 +161,7 @@ export default async function SongsPage({
             {songs.map((s) => (
               <li key={s.id}>
                 <Link
-                  href={`/songs/${s.id}`}
+                  href={`/songs/${s.id}?eventId=${eventId}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                 >
                   <span>

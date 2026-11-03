@@ -1,7 +1,12 @@
 import "server-only";
-import type { MaterialCategory, SongStatus } from "@/generated/prisma/client";
+import type {
+  MaterialCategory,
+  Prisma,
+  SongStatus,
+} from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { eventSongDisplayKey } from "@/lib/event-song";
 import type {
   ArrangementVersionInput,
   AssignmentInput,
@@ -9,88 +14,111 @@ import type {
   SongInput,
 } from "@/lib/validation/song";
 
-export async function listSongs(eventId: string) {
-  return prisma.song.findMany({
-    where: { eventId },
-    include: {
-      activeVersion: { select: { id: true, versionLabel: true } },
-      assignments: {
-        include: {
-          person: { select: { id: true, displayName: true } },
-          instrumentSkill: { select: { id: true, name: true } },
+function eventSongReadInclude(eventId: string) {
+  return {
+    event: { select: { id: true, name: true } },
+    song: {
+      include: {
+        activeVersion: true,
+        versions: { orderBy: { createdAt: "desc" } },
+        materials: {
+          where: {
+            OR: [{ eventId: null }, { eventId }],
+          },
+          orderBy: [{ category: "asc" }, { createdAt: "desc" }],
         },
-        orderBy: { person: { displayName: "asc" } },
-      },
-      batchItems: {
-        include: { batch: { select: { id: true, name: true, status: true } } },
       },
     },
-    orderBy: [{ status: "asc" }, { title: "asc" }],
+    assignments: {
+      include: {
+        person: { select: { id: true, displayName: true, isActive: true } },
+        instrumentSkill: { select: { id: true, name: true } },
+      },
+      orderBy: { person: { displayName: "asc" } },
+    },
+    batchItems: {
+      include: { batch: true },
+      orderBy: { sortOrder: "asc" },
+    },
+  } satisfies Prisma.EventSongInclude;
+}
+
+type EventSongRead = Prisma.EventSongGetPayload<{
+  include: ReturnType<typeof eventSongReadInclude>;
+}>;
+
+function toEventSongView(eventSong: EventSongRead) {
+  return {
+    ...eventSong.song,
+    eventId: eventSong.eventId,
+    event: eventSong.event,
+    eventSongId: eventSong.id,
+    eventKey: eventSong.eventKey,
+    sortOrder: eventSong.sortOrder,
+    key: eventSongDisplayKey(eventSong.eventKey, eventSong.song.key),
+    liturgicalFunction: eventSong.liturgicalFunction,
+    arrangementNotes: eventSong.notes,
+    status: eventSong.status,
+    isPublished: eventSong.isPublished,
+    isFinalLocked: eventSong.isFinalLocked,
+    assignments: eventSong.assignments,
+    batchItems: eventSong.batchItems,
+  };
+}
+
+export async function listSongs(eventId: string) {
+  const eventSongs = await prisma.eventSong.findMany({
+    where: { eventId },
+    include: eventSongReadInclude(eventId),
+    orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
   });
+  return eventSongs.map(toEventSongView);
 }
 
 // Lagu untuk personel: yang dipublikasi DAN ditugaskan ke profilnya.
 export async function listMySongs(userId: string, eventId: string) {
   const person = await prisma.person.findUnique({ where: { userId } });
   if (!person) return [];
-  return prisma.song.findMany({
+  const eventSongs = await prisma.eventSong.findMany({
     where: {
       eventId,
       isPublished: true,
       assignments: { some: { personId: person.id } },
     },
-    include: {
-      activeVersion: true,
-      assignments: {
-        where: { personId: person.id },
-        include: { instrumentSkill: true },
-      },
-      materials: { where: { isActive: true }, orderBy: { category: "asc" } },
-      batchItems: { include: { batch: { select: { name: true } } } },
-    },
-    orderBy: { title: "asc" },
+    include: eventSongReadInclude(eventId),
+    orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
   });
+  return eventSongs.map((eventSong) => ({
+    ...toEventSongView(eventSong),
+    assignments: eventSong.assignments.filter(
+      (assignment) => assignment.personId === person.id,
+    ),
+  }));
 }
 
 // Lagu untuk pemantau: semua yang sudah Publish (tanpa perlu
 // assignment). DRAFT internal tidak pernah bocor ke observer.
 export async function listPublishedSongsForObserver(eventId: string) {
-  return prisma.song.findMany({
+  const eventSongs = await prisma.eventSong.findMany({
     where: { eventId, isPublished: true },
-    include: {
-      activeVersion: { select: { id: true, versionLabel: true } },
-      assignments: {
-        include: {
-          person: { select: { id: true, displayName: true } },
-          instrumentSkill: { select: { id: true, name: true } },
-        },
-        orderBy: { person: { displayName: "asc" } },
-      },
-      batchItems: {
-        include: { batch: { select: { id: true, name: true, status: true } } },
-      },
-    },
-    orderBy: [{ status: "asc" }, { title: "asc" }],
+    include: eventSongReadInclude(eventId),
+    orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
   });
+  return eventSongs.map(toEventSongView);
 }
 
-export async function getSong(id: string) {
-  return prisma.song.findUnique({
-    where: { id },
-    include: {
-      activeVersion: true,
-      versions: { orderBy: { createdAt: "desc" } },
-      materials: { orderBy: [{ category: "asc" }, { createdAt: "desc" }] },
-      assignments: {
-        include: {
-          person: { select: { id: true, displayName: true, isActive: true } },
-          instrumentSkill: { select: { id: true, name: true } },
-        },
-        orderBy: { person: { displayName: "asc" } },
-      },
-      batchItems: { include: { batch: true } },
-      event: { select: { id: true, name: true } },
-    },
+export async function getSong(id: string, eventId: string) {
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { eventId_songId: { eventId, songId: id } },
+    include: eventSongReadInclude(eventId),
+  });
+  return eventSong ? toEventSongView(eventSong) : null;
+}
+
+export async function listSongLibrary() {
+  return prisma.song.findMany({
+    include: { _count: { select: { eventSongs: true } } },
+    orderBy: [{ title: "asc" }, { artistOrAuthor: "asc" }],
   });
 }
 

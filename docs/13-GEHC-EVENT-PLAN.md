@@ -1,6 +1,6 @@
 # 13 — Plan: Event Ibadah Internal GEHC
 
-Status: **Draft / planning only.** Belum ada kode, migrasi, atau PR. Semua keputusan terbuka ada di §10. Update 2 Nov 2026: Q6–Q8 resolved. Update 3 Nov 2026: Q1–Q5 resolved. **Semua open question resolved.**
+Status: **Implementasi bertahap pada branch `feature/gehc-events`; belum dirilis.** P1/P2 sudah di-commit lokal dan P3 diimplementasikan pada branch. Semua keputusan terbuka ada di §10. Update 2 Nov 2026: Q6–Q8 resolved. Update 3 Nov 2026: Q1–Q5 resolved. **Semua open question resolved.**
 
 ## 1. Goal
 MYTH mendukung lebih dari satu event secara bersamaan:
@@ -310,6 +310,8 @@ async function getActiveEventFor(user, requestedId?) {
 | P7 Close access | "Tutup akses"/"Buka kembali" + audit. | Tests in §8 pass. |
 | P8 Release (owner) | Separate Preview `DATABASE_URL`; TiDB snapshot; merge to main by owner. | Regional members still see 14 Nov unchanged; GEHC test user sees only GEHC. |
 | P9 Contract (later) | Drop `Song.eventId`, legacy Song status fields, old uniques. | Only after owner approval and 1 stable release. |
+
+P3 implementation: setlist and song-detail reads now resolve through `EventSong`, display `EventSong.eventKey ?? Song.key`, scope song materials/tasks/progress to the selected event, and expose the shared library page to global ADMIN only. Song detail links retain `eventId`. No database command, migration, seed, or production/DEV data mutation was run for P3.
 
 ## 8. Testing
 - Unit: `getEventRole` / `requireEventAccess` for each role + no membership + global ADMIN.

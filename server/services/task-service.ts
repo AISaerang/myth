@@ -9,7 +9,8 @@ const taskInclude = {
   relatedRehearsal: { select: { id: true, title: true, eventId: true } },
 } as const;
 
-export async function listTasks(eventId: string, status?: TaskStatus) {  return prisma.task.findMany({
+export async function listTasks(eventId: string, status?: TaskStatus) {
+  return prisma.task.findMany({
     where: { eventId, ...(status ? { status } : {}) },
     include: taskInclude,
     orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }, { priority: "desc" }, { createdAt: "desc" }],
@@ -40,9 +41,9 @@ export async function listRelevantTasks(userId: string, eventId: string) {
   });
 }
 
-export async function listSongTasks(songId: string) {
+export async function listSongTasks(songId: string, eventId: string) {
   return prisma.task.findMany({
-    where: { relatedSongId: songId },
+    where: { relatedSongId: songId, eventId },
     include: taskInclude,
     orderBy: [{ status: "asc" }, { priority: "desc" }],
   });

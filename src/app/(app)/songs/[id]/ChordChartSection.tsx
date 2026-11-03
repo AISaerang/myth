@@ -33,11 +33,13 @@ export interface ChartView {
 
 export function ChordChartSection({
   songId,
+  eventId,
   admin,
   charts,
   arrangement,
 }: {
   songId: string;
+  eventId: string;
   admin: boolean;
   charts: ChartView[];
   arrangement: { name: string; content: string } | null;
@@ -54,7 +56,7 @@ export function ChordChartSection({
       {admin ? (
         <div className="mb-3 flex justify-end">
           <Link
-            href={`/songs/${songId}/chart`}
+            href={`/songs/${songId}/chart?eventId=${eventId}`}
             className="text-sm font-medium underline"
           >
             Kelola bagian & aransemen
