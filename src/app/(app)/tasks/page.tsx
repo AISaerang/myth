@@ -10,7 +10,11 @@ import { prisma } from "@/lib/db";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
 import { listPersonnelForAdmin } from "@server/services/personnel-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
-import { listMySongs, listPublishedSongsForObserver, listSongs } from "@server/services/song-service";
+import {
+  listPublishedSongsForMember,
+  listPublishedSongsForObserver,
+  listSongs,
+} from "@server/services/song-service";
 import { listObserverTasks, listRelevantTasks, listTasks } from "@server/services/task-service";
 import { notFound } from "next/navigation";
 import { EventPicker } from "../songs/EventPicker";
@@ -116,7 +120,7 @@ export default async function TasksPage({
         ])
       : await Promise.all([
           [] as { id: string; displayName: string }[],
-          listMySongs(user.id, eventId).then((s) =>
+          listPublishedSongsForMember(eventId).then((s) =>
             s.map((x) => ({ id: x.id, title: x.title })),
           ),
           listRehearsals(eventId).then((r) => r.map((x) => ({ id: x.id, title: x.title }))),

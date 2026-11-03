@@ -266,7 +266,7 @@ async function getActiveEventFor(user, requestedId?) {
 | Setlist: add/remove/order EventSong, event key/notes/status/publish | ✓ | ✓ | ✗ | ✗ | ✗ |
 | Batches/assignments in event | ✓ | ✓ | ✗ | ✗ | ✗ |
 | Pustaka Lagu read (to pick songs) | ✓ | ✓ | ✗ | ✗ | ✗ |
-| Songs read | all incl. DRAFT | all incl. DRAFT | published | published | ✗ |
+| Songs read | all incl. DRAFT | all incl. DRAFT | all published songs in member events | published | ✗ |
 | Own progress update | ✓ | ✓ | ✓ | ✗ | ✗ |
 | All progress read | ✓ | ✓ | ✗ | published | ✗ |
 | Suggestions (task TODO) | — | — | ✓ | ✓ | ✗ |
@@ -311,7 +311,7 @@ async function getActiveEventFor(user, requestedId?) {
 | P8 Release (owner) | Separate Preview `DATABASE_URL`; TiDB snapshot; merge to main by owner. | Regional members still see 14 Nov unchanged; GEHC test user sees only GEHC. |
 | P9 Contract (later) | Drop `Song.eventId`, legacy Song status fields, old uniques. | Only after owner approval and 1 stable release. |
 
-P3 implementation: setlist and song-detail reads now resolve through `EventSong`, display `EventSong.eventKey ?? Song.key`, scope song materials/tasks/progress to the selected event, and expose the shared library page to global ADMIN only. Song detail links retain `eventId`. No database command, migration, seed, or production/DEV data mutation was run for P3.
+P3 implementation: setlist and song-detail reads now resolve through `EventSong`, display `EventSong.eventKey ?? Song.key`, scope song materials/tasks/progress to the selected event, and expose the shared library page to global ADMIN only. MEMBER reads include every published song in an accessible event (assignment is required only for progress updates); other events remain inaccessible. Song detail links retain `eventId`. No database command, migration, seed, or production/DEV data mutation was run for P3.
 
 ## 8. Testing
 - Unit: `getEventRole` / `requireEventAccess` for each role + no membership + global ADMIN.

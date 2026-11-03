@@ -25,6 +25,17 @@ export function canAccessEvent(
   return !accessClosedAt || membership.role === "EVENT_ADMIN";
 }
 
+export function canReadEventSong(
+  user: SessionUser,
+  songEventId: string,
+  requestedEventId: string,
+  isPublished: boolean,
+  hasEventAccess: boolean,
+): boolean {
+  if (!hasEventAccess || songEventId !== requestedEventId) return false;
+  return isAdmin(user) || isPublished;
+}
+
 export function resolveAccessibleEventId(
   accessibleEventIds: readonly string[],
   requestedEventId: string | undefined,

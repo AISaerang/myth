@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver } from "@/lib/permissions";
+import { canReadEventSong, isAdmin, isObserver } from "@/lib/permissions";
 import { getSong } from "@server/services/song-service";
 import { getCurrentEvent } from "@server/services/event-service";
 import { getEventRole } from "@server/services/event-access";
@@ -76,11 +76,20 @@ export default async function SongDetailPage({
   if (!eventId) notFound();
   const song = await getSong(id, eventId);
   if (!song) notFound();
-  if (!(await getEventRole(user, song.eventId))) notFound();
+  const eventRole = await getEventRole(user, song.eventId);
   const admin = isAdmin(user);
   const observer = isObserver(user);
-
-  if (!admin && !song.isPublished) notFound();
+  if (
+    !canReadEventSong(
+      user,
+      song.eventId,
+      eventId,
+      song.isPublished,
+      eventRole !== null,
+    )
+  ) {
+    notFound();
+  }
   let myAssignment: (typeof song.assignments)[number] | undefined;
   if (!admin && !observer) {
     const person = await prisma.person.findUnique({
@@ -89,7 +98,6 @@ export default async function SongDetailPage({
     myAssignment = person
       ? song.assignments.find((a) => a.personId === person.id)
       : undefined;
-    if (!myAssignment) notFound();
   }
 
   return (
@@ -159,13 +167,22 @@ export default async function SongDetailPage({
         </Card>
       ) : null}
 
-      <SongProgress
-        songId={song.id}
-        eventSongId={song.eventSongId}
-        admin={admin}
-        observer={observer}
-        userId={user.id}
-      />
+      {admin || observer || myAssignment ? (
+        <SongProgress
+          songId={song.id}
+          eventSongId={song.eventSongId}
+          admin={admin}
+          observer={observer}
+          userId={user.id}
+        />
+      ) : (
+        <Card title="Progres latihan">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Kamu dapat melihat lagu ini. Update progres tersedia setelah lagu
+            ditugaskan kepadamu.
+          </p>
+        </Card>
+      )}
 
       <SongChordChart
         songId={song.id}

@@ -75,25 +75,17 @@ export async function listSongs(eventId: string) {
   return eventSongs.map(toEventSongView);
 }
 
-// Lagu untuk personel: yang dipublikasi DAN ditugaskan ke profilnya.
-export async function listMySongs(userId: string, eventId: string) {
-  const person = await prisma.person.findUnique({ where: { userId } });
-  if (!person) return [];
+// Member event melihat semua lagu yang sudah dipublikasi di setlist itu.
+export async function listPublishedSongsForMember(eventId: string) {
   const eventSongs = await prisma.eventSong.findMany({
     where: {
       eventId,
       isPublished: true,
-      assignments: { some: { personId: person.id } },
     },
     include: eventSongReadInclude(eventId),
     orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
   });
-  return eventSongs.map((eventSong) => ({
-    ...toEventSongView(eventSong),
-    assignments: eventSong.assignments.filter(
-      (assignment) => assignment.personId === person.id,
-    ),
-  }));
+  return eventSongs.map(toEventSongView);
 }
 
 // Lagu untuk pemantau: semua yang sudah Publish (tanpa perlu

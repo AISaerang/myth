@@ -3,6 +3,7 @@ import { eventSongDisplayKey } from "@/lib/event-song";
 import {
   canManageAccounts,
   canAccessEvent,
+  canReadEventSong,
   canSuggest,
   canUpdateProgress,
   canViewAllProgress,
@@ -68,6 +69,28 @@ describe("permissions", () => {
     expect(
       resolveAccessibleEventId(["event-a"], "event-a", "event-a"),
     ).toBe("event-a");
+  });
+
+  it("lets a member read every published song in their event, but not another event", () => {
+    const hasEventAccess = canAccessEvent(user, "event-a", {
+      eventId: "event-a",
+      role: "MEMBER",
+    });
+    expect(
+      canReadEventSong(user, "event-a", "event-a", true, hasEventAccess),
+    ).toBe(true);
+    expect(
+      canReadEventSong(user, "event-b", "event-a", true, hasEventAccess),
+    ).toBe(false);
+    expect(
+      canReadEventSong(user, "event-a", "event-a", false, hasEventAccess),
+    ).toBe(false);
+    expect(canReadEventSong(user, "event-a", "event-a", true, false)).toBe(
+      false,
+    );
+    expect(canReadEventSong(admin, "event-b", "event-b", false, true)).toBe(
+      true,
+    );
   });
 
   it("keeps closed events visible only to event admins and global ADMIN", () => {

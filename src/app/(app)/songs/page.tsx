@@ -5,7 +5,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { isAdmin, isObserver, resolveAccessibleEventId } from "@/lib/permissions";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
-import { listMySongs, listPublishedSongsForObserver, listSongs } from "@server/services/song-service";
+import {
+  listPublishedSongsForMember,
+  listPublishedSongsForObserver,
+  listSongs,
+} from "@server/services/song-service";
 import { notFound } from "next/navigation";
 import { EventPicker } from "./EventPicker";
 import { SongForm } from "./SongForm";
@@ -80,20 +84,20 @@ export default async function SongsPage({
         />
       );
     }
-    const mine = await listMySongs(user.id, current.id);
+    const songs = await listPublishedSongsForMember(current.id);
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           Lagu Saya
         </h1>
-        {mine.length === 0 ? (
+        {songs.length === 0 ? (
           <EmptyState
-            title="Belum ada lagu untukmu"
-            description="Admin/MD akan menugaskan lagu yang perlu dipelajari."
+            title="Belum ada lagu publish"
+            description="Lagu yang sudah dipublish di event ini akan tampil di sini."
           />
         ) : (
           <ul className="flex flex-col gap-2">
-            {mine.map((s) => (
+            {songs.map((s) => (
               <li key={s.id}>
                 <Link
                   href={`/songs/${s.id}?eventId=${current.id}`}
