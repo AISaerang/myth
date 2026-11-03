@@ -16,6 +16,25 @@ describe("event validation", () => {
     expect(eventSchema.safeParse(validEvent).success).toBe(true);
   });
 
+  it("accepts event type and region labels while rejecting unknown types", () => {
+    const parsed = eventSchema.safeParse({
+      ...validEvent,
+      eventType: "INTERNAL_GEHC",
+      region: "Cikarang",
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.eventType).toBe("INTERNAL_GEHC");
+      expect(parsed.data.region).toBe("Cikarang");
+    }
+    expect(
+      eventSchema.safeParse({ ...validEvent, eventType: "UNKNOWN" }).success,
+    ).toBe(false);
+    expect(
+      eventSchema.safeParse({ ...validEvent, region: "x".repeat(65) }).success,
+    ).toBe(false);
+  });
+
   it("rejects short names and bad statuses", () => {
     expect(
       eventSchema.safeParse({ ...validEvent, name: "AB" }).success,

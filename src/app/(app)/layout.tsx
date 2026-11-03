@@ -1,27 +1,38 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { cacheLife } from "next/cache";
+import { connection } from "next/server";
+import { cookies } from "next/headers";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { isAdmin, isObserver, roleLabel } from "@/lib/permissions";
+import { EventSwitcher } from "@/components/ui/EventSwitcher";
+import { EventTypeBadge } from "@/components/ui/EventTypeBadge";
+import { ACTIVE_EVENT_COOKIE } from "@/lib/event-context";
+import { isAdmin, isObserver, roleLabel, type SessionUser } from "@/lib/permissions";
 import { requireFreshUser } from "@/lib/auth";
-import type { SessionUser } from "@/lib/permissions";
+import type { Event } from "@/generated/prisma/client";
 import { logoutAction } from "@server/actions/auth";
 import { listAccessibleEvents } from "@server/services/event-access";
 
-async function userHasAccessibleEvents(user: SessionUser): Promise<boolean> {
+async function getUserAccessibleEvents(user: SessionUser): Promise<Event[]> {
   "use cache: private";
   cacheLife({ stale: 30 });
-  return (await listAccessibleEvents(user)).length > 0;
+  return listAccessibleEvents(user);
 }
 
 export default async function AppLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
+  await connection();
   const user = await requireFreshUser();
   const admin = isAdmin(user);
   const observer = isObserver(user);
-  const hasEventAccess = admin || (await userHasAccessibleEvents(user));
+  const events = await getUserAccessibleEvents(user);
+  const hasEventAccess = admin || events.length > 0;
+  const selectedEventId = (await cookies()).get(ACTIVE_EVENT_COOKIE)?.value;
+  const currentEvent =
+    events.find((event) => event.id === selectedEventId) ??
+    events.find((event) => event.eventStatus !== "CANCELLED");
 
   return (
     <div className="flex flex-col gap-4">
@@ -115,6 +126,15 @@ export default async function AppLayout({
           ) : null}
         </nav>
         <div className="flex items-center gap-2">
+          {currentEvent ? (
+            <>
+              <EventTypeBadge type={currentEvent.eventType} />
+              <EventSwitcher
+                events={events.map(({ id, name, eventType }) => ({ id, name, eventType }))}
+                selectedEventId={currentEvent.id}
+              />
+            </>
+          ) : null}
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
             {user.displayName}
           </span>

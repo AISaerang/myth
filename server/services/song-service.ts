@@ -114,6 +114,69 @@ export async function listSongLibrary() {
   });
 }
 
+export async function listAvailableSongsForEvent(eventId: string) {
+  return prisma.song.findMany({
+    where: { eventSongs: { none: { eventId } } },
+    select: { id: true, title: true, artistOrAuthor: true, key: true },
+    orderBy: [{ title: "asc" }, { artistOrAuthor: "asc" }],
+  });
+}
+
+export async function addSongFromLibraryToEvent(
+  actorUserId: string,
+  eventId: string,
+  songId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const result = await prisma.$transaction(async (tx) => {
+    const event = await tx.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, name: true },
+    });
+    if (!event) return { ok: false as const, error: "Event tidak ditemukan." };
+    const song = await tx.song.findUnique({
+      where: { id: songId },
+      select: { id: true, title: true },
+    });
+    if (!song) return { ok: false as const, error: "Lagu pustaka tidak ditemukan." };
+
+    await tx.$queryRaw`SELECT id FROM Event WHERE id = ${eventId} FOR UPDATE`;
+    const existing = await tx.eventSong.findUnique({
+      where: { eventId_songId: { eventId, songId } },
+      select: { id: true },
+    });
+    if (existing) {
+      return { ok: false as const, error: "Lagu sudah ada di setlist event ini." };
+    }
+    const maxOrder = await tx.eventSong.aggregate({
+      where: { eventId },
+      _max: { sortOrder: true },
+    });
+    await tx.eventSong.create({
+      data: {
+        eventId,
+        songId,
+        sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+      },
+    });
+    return {
+      ok: true as const,
+      eventName: event.name,
+      songTitle: song.title,
+    };
+  });
+  if (!result.ok) return result;
+
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.EVENT_SONG_ADDED,
+    entityType: "EventSong",
+    entityId: `${eventId}:${songId}`,
+    summary: `"${result.songTitle}" ditambahkan ke setlist "${result.eventName}".`,
+    metadata: { eventId, songId },
+  });
+  return { ok: true };
+}
+
 export async function createSong(
   actorUserId: string,
   input: SongInput,

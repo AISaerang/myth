@@ -70,6 +70,25 @@ export function EventForm({
         {mode === "edit" ? (
           <input type="hidden" name="eventId" value={eventId} />
         ) : null}
+        {mode === "create" ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="eventType" className="text-sm font-medium">
+                Jenis event
+              </label>
+              <select id="eventType" name="eventType" defaultValue="REGIONAL" className={inputClass}>
+                <option value="REGIONAL">Regional</option>
+                <option value="INTERNAL_GEHC">Internal GEHC</option>
+              </select>
+            </div>
+            <TextField
+              id="region"
+              label="Wilayah (label)"
+              defaultValue=""
+              maxLength={64}
+            />
+          </div>
+        ) : null}
         <TextField
           id="name"
           label="Nama acara"

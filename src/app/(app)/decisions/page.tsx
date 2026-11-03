@@ -51,7 +51,7 @@ export default async function DecisionsPage({
           Keputusan & Catatan
         </h1>
         <EventPicker
-          events={events.map((e) => ({ id: e.id, name: e.name }))}
+          events={events.map((e) => ({ id: e.id, name: e.name, eventType: e.eventType }))}
           value={eventId}
         />
       </div>

@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { requireActionAdmin, requireActionUser } from "@/lib/auth";
 import {
   requireEventManagerForEventSong,
   requireEventManagerForSong,
+  requireEventManager,
   requireMaterialManager,
   requireGlobalAdmin,
 } from "./event-authorization";
@@ -19,6 +21,7 @@ import {
 } from "@/lib/validation/song";
 import {
   activateVersion,
+  addSongFromLibraryToEvent,
   addMaterial,
   assignPerson,
   createSong,
@@ -83,6 +86,35 @@ export async function createSongAction(
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs();
   redirect(`/songs/${result.id}`);
+}
+
+export async function addSongFromLibraryAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireActionUser();
+  const parsed = z
+    .object({
+      eventId: z.string().min(1),
+      songId: z.string().min(1),
+    })
+    .safeParse({
+      eventId: formData.get("eventId"),
+      songId: formData.get("songId"),
+    });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  await requireEventManager(user, parsed.data.eventId);
+  const result = await addSongFromLibraryToEvent(
+    user.id,
+    parsed.data.eventId,
+    parsed.data.songId,
+  );
+  if (!result.ok) return result;
+  revalidateSongs();
+  revalidatePath(`/event/${parsed.data.eventId}`);
+  return { ok: true };
 }
 
 export async function updateSongAction(

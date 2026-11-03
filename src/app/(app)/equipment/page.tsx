@@ -66,7 +66,7 @@ export default async function EquipmentPage({
         </h1>
         {admin ? (
           <EventPicker
-            events={events.map((e) => ({ id: e.id, name: e.name }))}
+            events={events.map((e) => ({ id: e.id, name: e.name, eventType: e.eventType }))}
             value={eventId}
           />
         ) : null}

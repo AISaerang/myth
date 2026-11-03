@@ -319,6 +319,8 @@ P5 implementation: event-scoped server actions resolve the event from the persis
 
 Known schema constraint: the legacy unique key `SongAssignment(songId, personId)` remains until a separately approved schema migration, so assigning the same person to the same shared library song in two events is rejected explicitly instead of overwriting the first event's assignment.
 
+P6 implementation: the app header now switches among accessible events and displays the event type; event creation captures type/region and atomically adds the creator as `EVENT_ADMIN`. Event managers can manage membership of existing active accounts, with audit entries and protection against removing/demoting the last event admin. The song page offers a library picker for writable event managers; it adds an event-local draft without editing shared library metadata, and is hidden when an event is closed. Dynamic event pages use request-time rendering behind Suspense boundaries. Typecheck, lint, 155 tests, build, and authenticated DEV route smoke passed. The smoke used a temporary ADMIN session and verified `/event`, `/songs`, event detail, and members pages; the session was removed and no user/event/song data was seeded or changed. No migration or seed command was run.
+
 ## 8. Testing
 - Unit: `getEventRole` / `requireEventAccess` for each role + no membership + global ADMIN.
 - Integration: user in regional only → GEHC song URL returns 404; dashboard lists only regional.

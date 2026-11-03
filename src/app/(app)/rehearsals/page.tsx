@@ -77,7 +77,7 @@ export default async function RehearsalsPage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Rehearsal</h1>
         <EventPicker
-          events={events.map((e) => ({ id: e.id, name: e.name }))}
+          events={events.map((e) => ({ id: e.id, name: e.name, eventType: e.eventType }))}
           value={eventId}
         />
       </div>

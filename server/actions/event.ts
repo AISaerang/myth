@@ -1,10 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireActionAdmin, requireActionUser } from "@/lib/auth";
+import { ACTIVE_EVENT_COOKIE } from "@/lib/event-context";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import { eventSchema } from "@/lib/validation/event";
+import { getAccessibleEvent } from "@server/services/event-access";
 import { createEvent, updateEvent } from "@server/services/event-service";
 import { requireEventManager } from "./event-authorization";
 import type { ActionState } from "./auth";
@@ -20,6 +23,8 @@ function parseEventForm(formData: FormData) {
     theme: formData.get("theme") || undefined,
     targetDurationMinutes: formData.get("targetDurationMinutes") || undefined,
     eventStatus: formData.get("eventStatus"),
+    eventType: formData.get("eventType") || undefined,
+    region: formData.get("region") || undefined,
     liturgicalFlowUrl: formData.get("liturgicalFlowUrl") || undefined,
     committeePicName: formData.get("committeePicName") || undefined,
     committeePicContact: formData.get("committeePicContact") || undefined,
@@ -58,4 +63,21 @@ export async function updateEventAction(
   revalidatePath("/event");
   revalidatePath(`/event/${id}`);
   return { ok: true };
+}
+
+export async function setActiveEventAction(formData: FormData): Promise<void> {
+  const user = await requireActionUser();
+  const eventId = String(formData.get("eventId") ?? "");
+  if (!eventId || !(await getAccessibleEvent(user, eventId))) {
+    throw new Error("Event tidak tersedia.");
+  }
+  const cookieStore = await cookies();
+  cookieStore.set(ACTIVE_EVENT_COOKIE, eventId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+  redirect("/dashboard");
 }

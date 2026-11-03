@@ -1,6 +1,8 @@
 import "server-only";
+import { cookies } from "next/headers";
 import type { Event, EventStatus } from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
+import { ACTIVE_EVENT_COOKIE } from "@/lib/event-context";
 import { prisma } from "@/lib/db";
 import type { SessionUser } from "@/lib/permissions";
 import type { EventInput } from "@/lib/validation/event";
@@ -56,7 +58,12 @@ export async function getActiveEventFor(
   if (requestedEventId) {
     return events.find((event) => event.id === requestedEventId) ?? null;
   }
-  return events.find((event) => event.eventStatus !== "CANCELLED") ?? null;
+  const selectedEventId = (await cookies()).get(ACTIVE_EVENT_COOKIE)?.value;
+  return (
+    events.find((event) => event.id === selectedEventId) ??
+    events.find((event) => event.eventStatus !== "CANCELLED") ??
+    null
+  );
 }
 
 export async function getCurrentEvent(user: SessionUser): Promise<Event | null> {
@@ -67,22 +74,34 @@ export async function createEvent(
   actorUserId: string,
   input: EventInput,
 ): Promise<Event> {
-  const event = await prisma.event.create({
-    data: {
-      name: input.name,
-      description: input.description || null,
-      eventDate: input.eventDate ?? null,
-      startTime: input.startTime,
-      endTime: input.endTime,
-      venue: input.venue || null,
-      theme: input.theme || null,
-      targetDurationMinutes: input.targetDurationMinutes,
-      eventStatus: input.eventStatus as EventStatus,
-      liturgicalFlowUrl: input.liturgicalFlowUrl,
-      committeePicName: input.committeePicName || null,
-      committeePicContact: input.committeePicContact || null,
-      notes: input.notes || null,
-    },
+  const event = await prisma.$transaction(async (tx) => {
+    const created = await tx.event.create({
+      data: {
+        name: input.name,
+        description: input.description || null,
+        eventDate: input.eventDate ?? null,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        venue: input.venue || null,
+        theme: input.theme || null,
+        targetDurationMinutes: input.targetDurationMinutes,
+        eventStatus: input.eventStatus as EventStatus,
+        liturgicalFlowUrl: input.liturgicalFlowUrl,
+        committeePicName: input.committeePicName || null,
+        committeePicContact: input.committeePicContact || null,
+        notes: input.notes || null,
+        eventType: input.eventType ?? "REGIONAL",
+        region: input.region || null,
+      },
+    });
+    await tx.eventMembership.create({
+      data: {
+        eventId: created.id,
+        userId: actorUserId,
+        role: "EVENT_ADMIN",
+      },
+    });
+    return created;
   });
   await writeAudit({
     actorUserId,
@@ -90,7 +109,11 @@ export async function createEvent(
     entityType: "Event",
     entityId: event.id,
     summary: `Event "${event.name}" dibuat (${event.eventStatus}).`,
-    metadata: { name: event.name, status: event.eventStatus },
+    metadata: {
+      name: event.name,
+      status: event.eventStatus,
+      eventType: event.eventType,
+    },
   });
   return event;
 }

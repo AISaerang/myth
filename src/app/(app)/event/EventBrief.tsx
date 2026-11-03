@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/Card";
+import { EventTypeBadge } from "@/components/ui/EventTypeBadge";
 import { formatJakarta } from "@/lib/format";
 import type { PublicEvent } from "@server/services/event-service";
 import { EventStatusBadge } from "./EventStatusBadge";
@@ -24,6 +25,8 @@ export function EventBrief({
   return (
     <Card title={event.name}>
       <div className="mb-3 flex flex-wrap gap-2">
+        <EventTypeBadge type={event.eventType} />
+        {event.region ? <span className="text-sm text-zinc-500">{event.region}</span> : null}
         <EventStatusBadge status={event.eventStatus} />
         {event.eventStatus !== "CONFIRMED" &&
         event.eventStatus !== "COMPLETED" ? (
