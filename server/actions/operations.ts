@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireActionAdmin } from "@/lib/auth";
+import { requireActionUser } from "@/lib/auth";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
   attendanceSchema,
@@ -25,6 +25,10 @@ import {
   upsertAttendance,
 } from "@server/services/rehearsal-service";
 import type { ActionState } from "./auth";
+import {
+  requireEventManager,
+  requireEventManagerForEntity,
+} from "./event-authorization";
 
 function revalidateOps(rehearsalId?: string): void {
   revalidatePath("/rehearsals");
@@ -66,11 +70,12 @@ export async function createRehearsalAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const parsed = parseRehearsalForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  await requireEventManager(admin, parsed.data.eventId);
   const result = await createRehearsal(admin.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateOps();
@@ -81,9 +86,10 @@ export async function updateRehearsalAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const id = String(formData.get("rehearsalId") ?? "");
   if (!id) return { ok: false, error: "Rehearsal tidak valid." };
+  await requireEventManagerForEntity(admin, "rehearsal", id);
   const parsed = parseRehearsalUpdateForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
@@ -98,9 +104,10 @@ export async function setRehearsalSongsAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireActionAdmin();
+  const user = await requireActionUser();
   const rehearsalId = String(formData.get("rehearsalId") ?? "");
   if (!rehearsalId) return { ok: false, error: "Rehearsal tidak valid." };
+  await requireEventManagerForEntity(user, "rehearsal", rehearsalId);
   const songIds = formData.getAll("songIds").map(String);
   const result = await setRehearsalSongs(rehearsalId, songIds);
   if (!result.ok) return { ok: false, error: result.error };
@@ -112,7 +119,7 @@ export async function reorderRehearsalSongsAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireActionAdmin();
+  const user = await requireActionUser();
   const rehearsalId = String(formData.get("rehearsalId") ?? "");
   let ordered: unknown = [];
   try {
@@ -124,6 +131,7 @@ export async function reorderRehearsalSongsAction(
   if (!rehearsalId || !parsed.success) {
     return { ok: false, error: "Data tidak valid." };
   }
+  await requireEventManagerForEntity(user, "rehearsal", rehearsalId);
   const { reorderRehearsalSongs } = await import(
     "@server/services/rehearsal-service"
   );
@@ -137,7 +145,7 @@ export async function upsertAttendanceAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireActionAdmin();
+  const user = await requireActionUser();
   const parsed = attendanceSchema.safeParse({
     rehearsalId: formData.get("rehearsalId"),
     personId: formData.get("personId"),
@@ -147,6 +155,7 @@ export async function upsertAttendanceAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  await requireEventManagerForEntity(user, "rehearsal", parsed.data.rehearsalId);
   const result = await upsertAttendance(parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateOps(parsed.data.rehearsalId);
@@ -185,11 +194,12 @@ export async function createEquipmentAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const parsed = parseEquipmentForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  await requireEventManager(admin, parsed.data.eventId);
   const result = await createEquipment(admin.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateOps();
@@ -200,9 +210,10 @@ export async function updateEquipmentAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const id = String(formData.get("itemId") ?? "");
   if (!id) return { ok: false, error: "Item tidak valid." };
+  await requireEventManagerForEntity(admin, "equipment", id);
   const parsed = parseEquipmentUpdateForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
@@ -217,7 +228,7 @@ export async function createDecisionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const parsed = decisionSchema.safeParse({
     eventId: formData.get("eventId"),
     title: formData.get("title"),
@@ -231,6 +242,7 @@ export async function createDecisionAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  await requireEventManager(admin, parsed.data.eventId);
   const result = await createDecision(admin.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateOps(parsed.data.relatedRehearsalId);

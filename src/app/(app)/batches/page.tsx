@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { requireAdminUser, requireFreshUser } from "@/lib/auth";
+import { requireFreshUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import { listBatches } from "@server/services/batch-service";

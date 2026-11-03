@@ -85,7 +85,7 @@ export default async function SongDetailPage({
       song.eventId,
       eventId,
       song.isPublished,
-      eventRole !== null,
+      eventRole,
     )
   ) {
     notFound();
@@ -238,6 +238,7 @@ export default async function SongDetailPage({
         <>
           <SongForm
             mode="edit"
+            eventId={song.eventId}
             songId={song.id}
             defaults={{
               title: song.title,
@@ -256,13 +257,18 @@ export default async function SongDetailPage({
             <div className="flex flex-col gap-3">
               <PublishToggle
                 songId={song.id}
+                eventId={song.eventId}
                 isPublished={song.isPublished}
                 isLocked={song.isFinalLocked}
               />
-              {song.isFinalLocked ? <UnlockButton songId={song.id} /> : null}
+              {song.isFinalLocked ? <UnlockButton eventSongId={song.eventSongId} /> : null}
             </div>
           </Card>
-          <AdminPersonnel songId={song.id} assignments={song.assignments} />
+          <AdminPersonnel
+            songId={song.id}
+            eventId={song.eventId}
+            assignments={song.assignments}
+          />
           <Card title="Tambah materi">
             <MaterialForm
               songId={song.id}
@@ -351,6 +357,7 @@ export default async function SongDetailPage({
                   <div className="mt-2">
                     <VersionActions
                       songId={song.id}
+                      eventSongId={song.eventSongId}
                       versionId={v.id}
                       isActive={v.isActive}
                       isLocked={song.isFinalLocked}
@@ -453,7 +460,11 @@ async function SongProgress({
     const current = await getMyProgress(userId, eventSongId);
     return (
       <Card title="Progres latihanku">
-        <MyProgressForm songId={songId} current={current} />
+        <MyProgressForm
+          songId={songId}
+          eventSongId={eventSongId}
+          current={current}
+        />
       </Card>
     );
   }
@@ -488,6 +499,7 @@ async function SongProgress({
               <div className="mt-2">
                 <CorrectProgressForm
                   songId={songId}
+                  eventSongId={eventSongId}
                   personId={p.personId}
                   personName={p.person.displayName}
                   current={p.status}
@@ -558,9 +570,11 @@ async function SongTasks({ songId, eventId }: { songId: string; eventId: string 
 
 async function AdminPersonnel({
   songId,
+  eventId,
   assignments,
 }: {
   songId: string;
+  eventId: string;
   assignments: NonNullable<Awaited<ReturnType<typeof getSong>>>["assignments"];
 }) {
   const [people, skills] = await Promise.all([
@@ -588,6 +602,7 @@ async function AdminPersonnel({
                 </span>
                 <UnassignButton
                   songId={songId}
+                  eventId={eventId}
                   personId={a.personId}
                   name={a.person.displayName}
                 />
@@ -597,6 +612,7 @@ async function AdminPersonnel({
         )}
         <AssignForm
           songId={songId}
+          eventId={eventId}
           people={activePeople
             .filter((p) => !assignedIds.has(p.id))
             .map((p) => ({ id: p.id, displayName: p.displayName }))}

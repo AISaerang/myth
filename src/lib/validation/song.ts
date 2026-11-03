@@ -201,6 +201,7 @@ export const arrangementVersionSchema = z.object({
 
 export const materialSchema = z.object({
   songId: z.string().min(1, "Lagu tidak valid."),
+  eventId: z.string().min(1, "Event tidak valid.").optional(),
   arrangementVersionId: z.string().min(1).optional(),
   title: z
     .string()

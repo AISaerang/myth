@@ -1,6 +1,6 @@
 # 13 — Plan: Event Ibadah Internal GEHC
 
-Status: **Implementasi bertahap pada branch `feature/gehc-events`; belum dirilis.** P1/P2 sudah di-commit lokal dan P3 diimplementasikan pada branch. Semua keputusan terbuka ada di §10. Update 2 Nov 2026: Q6–Q8 resolved. Update 3 Nov 2026: Q1–Q5 resolved. **Semua open question resolved.**
+Status: **Implementasi bertahap pada branch `feature/gehc-events`; belum dirilis.** P1/P2 sudah di-commit lokal; P3–P5 diimplementasikan bertahap. Semua keputusan terbuka ada di §10. Update 2 Nov 2026: Q6–Q8 resolved. Update 3 Nov 2026: Q1–Q5 resolved. **Semua open question resolved.**
 
 ## 1. Goal
 MYTH mendukung lebih dari satu event secara bersamaan:
@@ -314,6 +314,10 @@ async function getActiveEventFor(user, requestedId?) {
 P3 implementation: setlist and song-detail reads now resolve through `EventSong`, display `EventSong.eventKey ?? Song.key`, scope song materials/tasks/progress to the selected event, and expose the shared library page to global ADMIN only. MEMBER reads include every published song in an accessible event (assignment is required only for progress updates); other events remain inaccessible. Song detail links retain `eventId`. No database command, migration, seed, or production/DEV data mutation was run for P3.
 
 P4 implementation: dashboard, batch, rehearsal, task, equipment, and decision list reads resolve an explicitly requested event only from the user's accessible events. Dashboard and timeline data use event-scoped setlist state; user timeline attendance is restricted to rehearsals in the selected event. Dashboard links retain `eventId`, inaccessible requested events return 404, and users without memberships see an empty dashboard ("Belum terdaftar di acara mana pun"). With Cache Components enabled, dashboard and song-list data rendering wait for a request via `connection()` inside Suspense boundaries before database reads; the app navigation computes membership visibility through a request-time private cache function, avoiding an extra prerender-time query. This keeps the MariaDB pool's internal `Date.now()` health checks out of prerendering. No database command, migration, seed, or production/DEV data mutation was run for P4.
+
+P5 implementation: event-scoped server actions resolve the event from the persisted Event, EventSong, batch, task, rehearsal, equipment, or material record before allowing writes. EVENT_ADMIN can mutate only open events where they hold that role; a closed event is read-only for EVENT_ADMIN. MEMBER/OBSERVER cannot use event-management actions. Global ADMIN retains cross-event access, while account/personnel management and shared chart/library editing remain global-ADMIN-only. Song creation adds a library Song plus its EventSong; publish, status/key/notes, final lock, assignment, progress, batch membership, rehearsal song links, and event-only materials write through EventSong/new event FKs. Task/decision song references are checked against the selected event's EventSong. Tests cover EVENT_ADMIN-only writes, MEMBER/OBSERVER denial, closed-event writes, and global ADMIN override. No schema or database command was needed for P5.
+
+Known schema constraint: the legacy unique key `SongAssignment(songId, personId)` remains until a separately approved schema migration, so assigning the same person to the same shared library song in two events is rejected explicitly instead of overwriting the first event's assignment.
 
 ## 8. Testing
 - Unit: `getEventRole` / `requireEventAccess` for each role + no membership + global ADMIN.

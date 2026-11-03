@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/Card";
-import { requireAdminUser, requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver } from "@/lib/permissions";
+import { requireFreshUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { getBatch } from "@server/services/batch-service";
 import { listSongs } from "@server/services/song-service";
@@ -28,7 +28,6 @@ export default async function BatchDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireFreshUser();
-  const admin = isAdmin(user);
   // Non-admin (USER/OBSERVER): tampilan read-only, lagu Publish saja.
   const observer = !isAdmin(user);
   const { id } = await params;

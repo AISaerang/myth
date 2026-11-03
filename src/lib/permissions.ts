@@ -8,6 +8,26 @@ export interface SessionUser {
   mustChangePassword: boolean;
 }
 
+export function canManageEvent(role: EventRole | null): boolean {
+  return role === "EVENT_ADMIN";
+}
+
+export function canWriteEventData(
+  role: EventRole | null,
+  accessClosed: boolean,
+  globalAdmin: boolean,
+): boolean {
+  return globalAdmin || (canManageEvent(role) && !accessClosed);
+}
+
+export function canReadDrafts(role: EventRole | null): boolean {
+  return role === "EVENT_ADMIN";
+}
+
+export function canManageMembers(role: EventRole | null): boolean {
+  return role === "EVENT_ADMIN";
+}
+
 // Authorization checklist (docs/06): role checks live here and are
 // enforced server-side on every mutation. Hiding UI is not authorization.
 export function isAdmin(user: SessionUser): boolean {
@@ -30,10 +50,10 @@ export function canReadEventSong(
   songEventId: string,
   requestedEventId: string,
   isPublished: boolean,
-  hasEventAccess: boolean,
+  eventRole: EventRole | null,
 ): boolean {
-  if (!hasEventAccess || songEventId !== requestedEventId) return false;
-  return isAdmin(user) || isPublished;
+  if (!eventRole || songEventId !== requestedEventId) return false;
+  return isAdmin(user) || canReadDrafts(eventRole) || isPublished;
 }
 
 export function resolveAccessibleEventId(

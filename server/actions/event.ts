@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireActionAdmin } from "@/lib/auth";
+import { requireActionAdmin, requireActionUser } from "@/lib/auth";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import { eventSchema } from "@/lib/validation/event";
 import { createEvent, updateEvent } from "@server/services/event-service";
+import { requireEventManager } from "./event-authorization";
 import type { ActionState } from "./auth";
 
 function parseEventForm(formData: FormData) {
@@ -44,9 +45,10 @@ export async function updateEventAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const id = String(formData.get("eventId") ?? "");
   if (!id) return { ok: false, error: "Event tidak valid." };
+  await requireEventManager(admin, id);
   const parsed = parseEventForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };

@@ -38,9 +38,11 @@ function StatusSelect({
 
 export function MyProgressForm({
   songId,
+  eventSongId,
   current,
 }: {
   songId: string;
+  eventSongId: string;
   current: { status: PracticeStatus; note: string | null } | null;
 }) {
   const [state, formAction, pending] = useActionState(updateMyProgressAction, {
@@ -49,6 +51,7 @@ export function MyProgressForm({
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="songId" value={songId} />
+      <input type="hidden" name="eventSongId" value={eventSongId} />
       <div className="flex flex-col gap-1">
         <label htmlFor="my-progress-status" className="text-sm font-medium">
           Status latihanmu
@@ -84,11 +87,13 @@ export function MyProgressForm({
 
 export function CorrectProgressForm({
   songId,
+  eventSongId,
   personId,
   personName,
   current,
 }: {
   songId: string;
+  eventSongId: string;
   personId: string;
   personName: string;
   current?: PracticeStatus;
@@ -99,6 +104,7 @@ export function CorrectProgressForm({
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="songId" value={songId} />
+      <input type="hidden" name="eventSongId" value={eventSongId} />
       <input type="hidden" name="personId" value={personId} />
       <div className="flex flex-col gap-1">
         <label htmlFor={`correct-${personId}`} className="sr-only text-sm font-medium">

@@ -213,19 +213,30 @@ export async function setRehearsalSongs(
   });
   if (!rehearsal) return { ok: false, error: "Rehearsal tidak ditemukan." };
   if (songIds.length > 0) {
-    const count = await prisma.song.count({
-      where: { id: { in: songIds }, eventId: rehearsal.eventId },
+    const eventSongs = await prisma.eventSong.findMany({
+      where: { eventId: rehearsal.eventId, songId: { in: songIds } },
+      select: { id: true, songId: true },
     });
-    if (count !== songIds.length) {
-      return { ok: false, error: "Semua lagu harus satu event dengan rehearsal." };
+    if (eventSongs.length !== songIds.length) {
+      return { ok: false, error: "Semua lagu harus ada di setlist event rehearsal." };
     }
+    const eventSongIdBySongId = new Map(eventSongs.map((item) => [item.songId, item.id]));
+    await prisma.$transaction([
+      prisma.rehearsalSong.deleteMany({ where: { rehearsalId } }),
+      prisma.rehearsalSong.createMany({
+        data: songIds.map((songId, i) => ({
+          rehearsalId,
+          songId,
+          eventSongId: eventSongIdBySongId.get(songId)!,
+          sortOrder: i,
+        })),
+        skipDuplicates: true,
+      }),
+    ]);
+    return { ok: true };
   }
   await prisma.$transaction([
     prisma.rehearsalSong.deleteMany({ where: { rehearsalId } }),
-    prisma.rehearsalSong.createMany({
-      data: songIds.map((songId, i) => ({ rehearsalId, songId, sortOrder: i })),
-      skipDuplicates: true,
-    }),
   ]);
   return { ok: true };
 }

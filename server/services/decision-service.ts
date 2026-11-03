@@ -23,11 +23,17 @@ export async function createDecision(
   const event = await prisma.event.findUnique({ where: { id: input.eventId } });
   if (!event) return { ok: false, error: "Event tidak ditemukan." };
   if (input.relatedSongId) {
-    const song = await prisma.song.findUnique({
-      where: { id: input.relatedSongId },
+    const eventSong = await prisma.eventSong.findUnique({
+      where: {
+        eventId_songId: {
+          eventId: input.eventId,
+          songId: input.relatedSongId,
+        },
+      },
+      select: { id: true },
     });
-    if (!song || song.eventId !== input.eventId) {
-      return { ok: false, error: "Lagu terkait harus satu event." };
+    if (!eventSong) {
+      return { ok: false, error: "Lagu terkait harus ada di setlist event." };
     }
   }
   if (input.relatedRehearsalId) {

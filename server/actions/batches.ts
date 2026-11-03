@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { z } from "zod";
-import { requireActionAdmin } from "@/lib/auth";
+import { requireActionUser } from "@/lib/auth";
 import { canTransitionBatch } from "@/lib/batch-status";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
@@ -26,6 +26,10 @@ import {
   type BatchAssignResult,
 } from "@server/services/song-service";
 import type { ActionState } from "./auth";
+import {
+  requireEventManager,
+  requireEventManagerForEntity,
+} from "./event-authorization";
 
 function revalidateBatches(batchId?: string): void {
   revalidatePath("/batches");
@@ -59,11 +63,12 @@ export async function createBatchAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const parsed = parseBatchForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  await requireEventManager(admin, parsed.data.eventId);
   const result = await createBatch(admin.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateBatches();
@@ -74,9 +79,10 @@ export async function updateBatchAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const id = String(formData.get("batchId") ?? "");
   if (!id) return { ok: false, error: "Batch tidak valid." };
+  await requireEventManagerForEntity(admin, "batch", id);
   const parsed = parseBatchUpdateForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
@@ -93,12 +99,13 @@ export async function setBatchStatusAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const id = String(formData.get("batchId") ?? "");
   const parsedStatus = batchStatusSchema.safeParse(formData.get("status"));
   if (!id || !parsedStatus.success) {
     return { ok: false, error: "Data tidak valid." };
   }
+  await requireEventManagerForEntity(admin, "batch", id);
   const batch = await getBatch(id);
   if (!batch) return { ok: false, error: "Batch tidak ditemukan." };
   if (!canTransitionBatch(batch.status, parsedStatus.data)) {
@@ -117,10 +124,11 @@ export async function addSongToBatchAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireActionAdmin();
+  const user = await requireActionUser();
   const batchId = String(formData.get("batchId") ?? "");
   const songId = String(formData.get("songId") ?? "");
   if (!batchId || !songId) return { ok: false, error: "Data tidak valid." };
+  await requireEventManagerForEntity(user, "batch", batchId);
   const result = await addSongToBatch(batchId, songId);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateBatches(batchId);
@@ -131,11 +139,13 @@ export async function removeSongFromBatchAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireActionAdmin();
+  const user = await requireActionUser();
   const batchId = String(formData.get("batchId") ?? "");
   const songId = String(formData.get("songId") ?? "");
   if (!batchId || !songId) return { ok: false, error: "Data tidak valid." };
-  await removeSongFromBatch(batchId, songId);
+  await requireEventManagerForEntity(user, "batch", batchId);
+  const result = await removeSongFromBatch(batchId, songId);
+  if (!result.ok) return { ok: false, error: result.error };
   revalidateBatches(batchId);
   return { ok: true };
 }
@@ -144,9 +154,10 @@ export async function deleteBatchAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const batchId = String(formData.get("batchId") ?? "");
   if (!batchId) return { ok: false, error: "Batch tidak valid." };
+  await requireEventManagerForEntity(admin, "batch", batchId);
   const { deleteBatch } = await import("@server/services/batch-service");
   const result = await deleteBatch(admin.id, batchId);
   if (!result.ok) return { ok: false, error: result.error };
@@ -162,7 +173,7 @@ export async function reorderBatchItemsAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireActionAdmin();
+  const user = await requireActionUser();
   const batchId = String(formData.get("batchId") ?? "");
   let ordered: unknown = [];
   try {
@@ -174,6 +185,7 @@ export async function reorderBatchItemsAction(
   if (!batchId || !parsed.success) {
     return { ok: false, error: "Data tidak valid." };
   }
+  await requireEventManagerForEntity(user, "batch", batchId);
   const { reorderBatchItems } = await import(
     "@server/services/batch-service"
   );
@@ -193,7 +205,7 @@ export async function assignBatchAction(
   _prev: BatchAssignState,
   formData: FormData,
 ): Promise<BatchAssignState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const batchId = String(formData.get("batchId") ?? "");
   let payload: unknown = null;
   try {
@@ -208,6 +220,7 @@ export async function assignBatchAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  await requireEventManagerForEntity(admin, "batch", parsed.data.batchId);
   const result = await assignBatchMembers(
     admin.id,
     parsed.data.batchId,

@@ -28,10 +28,12 @@ function Result({ state }: { state: { ok: boolean; error?: string } }) {
 
 export function PublishToggle({
   songId,
+  eventId,
   isPublished,
   isLocked,
 }: {
   songId: string;
+  eventId: string;
   isPublished: boolean;
   isLocked: boolean;
 }) {
@@ -42,6 +44,7 @@ export function PublishToggle({
     <div className="flex flex-col gap-2">
       <form action={formAction} className="flex items-center gap-2">
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <input type="hidden" name="isPublished" value={String(!isPublished)} />
         <Button type="submit" variant="secondary" size="sm" disabled={pending || isLocked}>
           {isPublished ? "Tarik publikasi" : "Publikasikan"}
@@ -54,10 +57,12 @@ export function PublishToggle({
 
 export function AssignForm({
   songId,
+  eventId,
   people,
   skills,
 }: {
   songId: string;
+  eventId: string;
   people: { id: string; displayName: string }[];
   skills: { id: string; name: string }[];
 }) {
@@ -72,6 +77,7 @@ export function AssignForm({
     <div className="flex flex-col gap-2">
       <form ref={formRef} action={formAction} className="flex flex-wrap gap-2">
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <select name="personId" aria-label="Personel" required defaultValue="" className={inputClass}>
           <option value="" disabled>
             Pilih personel…
@@ -108,10 +114,12 @@ export function AssignForm({
 
 export function UnassignButton({
   songId,
+  eventId,
   personId,
   name,
 }: {
   songId: string;
+  eventId: string;
   personId: string;
   name: string;
 }) {
@@ -121,6 +129,7 @@ export function UnassignButton({
   return (
     <form action={formAction} className="inline">
       <input type="hidden" name="songId" value={songId} />
+      <input type="hidden" name="eventId" value={eventId} />
       <input type="hidden" name="personId" value={personId} />
       <button
         type="submit"
@@ -206,11 +215,13 @@ export function VersionForm({ songId }: { songId: string }) {
 
 export function VersionActions({
   songId,
+  eventSongId,
   versionId,
   isActive,
   isLocked,
 }: {
   songId: string;
+  eventSongId: string;
   versionId: string;
   isActive: boolean;
   isLocked: boolean;
@@ -236,6 +247,7 @@ export function VersionActions({
         <form action={lockAction}>
           <input type="hidden" name="versionId" value={versionId} />
           <input type="hidden" name="songId" value={songId} />
+          <input type="hidden" name="eventSongId" value={eventSongId} />
           <Button type="submit" variant="secondary" size="sm" disabled={lockPending}>
             Kunci final
           </Button>
@@ -247,14 +259,14 @@ export function VersionActions({
   );
 }
 
-export function UnlockButton({ songId }: { songId: string }) {
+export function UnlockButton({ eventSongId }: { eventSongId: string }) {
   const [state, formAction, pending] = useActionState(unlockFinalAction, {
     ok: false,
   });
   return (
     <div className="flex flex-col gap-2">
       <form action={formAction}>
-        <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventSongId" value={eventSongId} />
         <Button type="submit" variant="danger" size="sm" disabled={pending}>
           Buka kunci final
         </Button>
