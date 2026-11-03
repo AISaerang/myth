@@ -3,11 +3,11 @@ import { toJakartaLocalInput } from "@/lib/datetime-local";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver, resolveAccessibleEventId } from "@/lib/permissions";
+import { isAdmin, isObserver } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { isTaskOverdue } from "@/lib/task-status";
 import { prisma } from "@/lib/db";
-import { getCurrentEvent, listEvents } from "@server/services/event-service";
+import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import { listPersonnelForAdmin } from "@server/services/personnel-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
 import {
@@ -47,9 +47,10 @@ export default async function TasksPage({
 
   const [events, current] = await Promise.all([
     listEvents(user),
-    getCurrentEvent(user),
+    getActiveEventFor(user, params.eventId),
   ]);
   if (events.length === 0) {
+    if (params.eventId) notFound();
     return (
       <EmptyState
         title="Belum ada event"
@@ -57,11 +58,7 @@ export default async function TasksPage({
       />
     );
   }
-  const eventId = resolveAccessibleEventId(
-    events.map((event) => event.id),
-    params.eventId,
-    current?.id,
-  );
+  const eventId = current?.id;
   if (!eventId) notFound();
   const filter: Filter = FILTERS.some((f) => f.value === params.filter)
     ? (params.filter as Filter)

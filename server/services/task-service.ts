@@ -24,7 +24,7 @@ export async function listRelevantTasks(userId: string, eventId: string) {
   if (!person) return [];
   const mySongIds = (
     await prisma.songAssignment.findMany({
-      where: { personId: person.id, song: { eventId } },
+      where: { personId: person.id, eventSong: { is: { eventId } } },
       select: { songId: true },
     })
   ).map((a) => a.songId);
@@ -154,7 +154,11 @@ export async function listObserverTasks(eventId: string) {
       eventId,
       OR: [
         { relatedSongId: null },
-        { relatedSong: { isPublished: true } },
+        {
+          relatedSong: {
+            eventSongs: { some: { eventId, isPublished: true } },
+          },
+        },
       ],
     },
     include: taskInclude,

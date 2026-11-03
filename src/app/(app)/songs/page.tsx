@@ -3,8 +3,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver, resolveAccessibleEventId } from "@/lib/permissions";
-import { getCurrentEvent, listEvents } from "@server/services/event-service";
+import { isAdmin, isObserver } from "@/lib/permissions";
+import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import {
   listPublishedSongsForMember,
   listPublishedSongsForObserver,
@@ -24,8 +24,9 @@ export default async function SongsPage({
   const params = await searchParams;
 
   if (isObserver(user)) {
-    const current = await getCurrentEvent(user);
+    const current = await getActiveEventFor(user, params.eventId);
     if (!current) {
+      if (params.eventId) notFound();
       return (
         <EmptyState
           title="Belum ada lagu"
@@ -75,8 +76,9 @@ export default async function SongsPage({
   }
 
   if (!isAdmin(user)) {
-    const current = await getCurrentEvent(user);
+    const current = await getActiveEventFor(user, params.eventId);
     if (!current) {
+      if (params.eventId) notFound();
       return (
         <EmptyState
           title="Belum ada lagu"
@@ -123,9 +125,10 @@ export default async function SongsPage({
 
   const [events, current] = await Promise.all([
     listEvents(user),
-    getCurrentEvent(user),
+    getActiveEventFor(user, params.eventId),
   ]);
   if (events.length === 0) {
+    if (params.eventId) notFound();
     return (
       <EmptyState
         title="Belum ada event"
@@ -133,11 +136,7 @@ export default async function SongsPage({
       />
     );
   }
-  const eventId = resolveAccessibleEventId(
-    events.map((event) => event.id),
-    params.eventId,
-    current?.id,
-  );
+  const eventId = current?.id;
   if (!eventId) notFound();
   const songs = await listSongs(eventId);
   const activeEvent = events.find((e) => e.id === eventId);

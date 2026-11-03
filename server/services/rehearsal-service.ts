@@ -22,26 +22,81 @@ export async function listRehearsals(eventId: string) {
 }
 
 export async function listUpcomingRehearsals(eventId: string, now: Date = new Date()) {
-  return prisma.rehearsal.findMany({
+  const rehearsals = await prisma.rehearsal.findMany({
     where: {
       eventId,
       status: { in: ["SCHEDULED", "RESCHEDULED"] },
       startsAt: { gte: now },
     },
     include: {
-      songs: { include: { song: { select: { id: true, title: true } } }, orderBy: { sortOrder: "asc" } },
+      songs: {
+        where: {
+          OR: [
+            { eventSong: { is: { eventId, isPublished: true } } },
+            {
+              eventSongId: null,
+              song: { is: { eventId, isPublished: true } },
+            },
+          ],
+        },
+        include: {
+          song: { select: { id: true, title: true, eventId: true } },
+          eventSong: {
+            select: {
+              eventId: true,
+              isPublished: true,
+              song: { select: { id: true, title: true } },
+            },
+          },
+        },
+        orderBy: { sortOrder: "asc" },
+      },
     },
     orderBy: { startsAt: "asc" },
     take: 5,
   });
+  return rehearsals.map((rehearsal) => ({
+    ...rehearsal,
+    songs: rehearsal.songs.map((item) => {
+      if (
+        (item.eventSong &&
+          (item.eventSong.eventId !== rehearsal.eventId ||
+            !item.eventSong.isPublished)) ||
+        (!item.eventSong && item.song.eventId !== rehearsal.eventId)
+      ) {
+        throw new Error(
+          `Rehearsal song ${item.songId} is missing its EventSong.`,
+        );
+      }
+      return { ...item, song: item.eventSong?.song ?? item.song };
+    }),
+  }));
 }
 
 export async function getRehearsal(id: string) {
-  return prisma.rehearsal.findUnique({
+  const rehearsal = await prisma.rehearsal.findUnique({
     where: { id },
     include: {
       songs: {
-        include: { song: { select: { id: true, title: true, status: true } } },
+        include: {
+          song: {
+            select: {
+              id: true,
+              title: true,
+              eventId: true,
+              status: true,
+              isPublished: true,
+            },
+          },
+          eventSong: {
+            select: {
+              eventId: true,
+              status: true,
+              isPublished: true,
+              song: { select: { id: true, title: true } },
+            },
+          },
+        },
         orderBy: { sortOrder: "asc" },
       },
       attendance: {
@@ -55,6 +110,29 @@ export async function getRehearsal(id: string) {
       event: { select: { id: true, name: true } },
     },
   });
+  if (!rehearsal) return null;
+  return {
+    ...rehearsal,
+    songs: rehearsal.songs.map((item) => {
+      if (
+        (item.eventSong && item.eventSong.eventId !== rehearsal.eventId) ||
+        (!item.eventSong && item.song.eventId !== rehearsal.eventId)
+      ) {
+        throw new Error(
+          `Rehearsal song ${item.songId} is missing its EventSong.`,
+        );
+      }
+      return {
+        ...item,
+        song: {
+          ...(item.eventSong?.song ?? item.song),
+          status: item.eventSong?.status ?? item.song.status,
+          isPublished:
+            item.eventSong?.isPublished ?? item.song.isPublished,
+        },
+      };
+    }),
+  };
 }
 
 export async function createRehearsal(

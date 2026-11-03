@@ -1,9 +1,9 @@
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAdminUser, requireFreshUser } from "@/lib/auth";
-import { isAdmin, resolveAccessibleEventId } from "@/lib/permissions";
+import { isAdmin } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
-import { getCurrentEvent, listEvents } from "@server/services/event-service";
+import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import { listDecisions } from "@server/services/decision-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
 import { listSongs } from "@server/services/song-service";
@@ -26,6 +26,7 @@ export default async function DecisionsPage({
   const params = await searchParams;
   const events = await listEvents(user);
   if (events.length === 0) {
+    if (params.eventId) notFound();
     return (
       <EmptyState
         title="Belum ada event"
@@ -33,12 +34,8 @@ export default async function DecisionsPage({
       />
     );
   }
-  const current = await getCurrentEvent(user);
-  const eventId = resolveAccessibleEventId(
-    events.map((event) => event.id),
-    params.eventId,
-    current?.id,
-  );
+  const current = await getActiveEventFor(user, params.eventId);
+  const eventId = current?.id;
   if (!eventId) notFound();
 
   const [decisions, songs, rehearsals] = await Promise.all([

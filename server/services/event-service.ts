@@ -46,10 +46,21 @@ export async function getEvent(
   return getAccessibleEvent(user, id);
 }
 
-// Event berjalan terbaru yang dapat diakses oleh pengguna.
-export async function getCurrentEvent(user: SessionUser): Promise<Event | null> {
+// Pilih event yang diminta hanya jika dapat diakses; tanpa pilihan,
+// gunakan event non-cancelled terbaru yang dapat diakses pengguna.
+export async function getActiveEventFor(
+  user: SessionUser,
+  requestedEventId?: string,
+): Promise<Event | null> {
   const events = await listAccessibleEvents(user);
+  if (requestedEventId) {
+    return events.find((event) => event.id === requestedEventId) ?? null;
+  }
   return events.find((event) => event.eventStatus !== "CANCELLED") ?? null;
+}
+
+export async function getCurrentEvent(user: SessionUser): Promise<Event | null> {
+  return getActiveEventFor(user);
 }
 
 export async function createEvent(

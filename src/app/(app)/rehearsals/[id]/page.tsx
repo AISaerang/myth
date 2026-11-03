@@ -35,6 +35,9 @@ export default async function RehearsalDetailPage({
   if (!(await getEventRole(user, rehearsal.eventId))) notFound();
   const admin = isAdmin(user);
   const observer = isObserver(user);
+  const visibleSongs = admin
+    ? rehearsal.songs
+    : rehearsal.songs.filter((item) => item.song.isPublished);
 
   const myPerson = admin
     ? null
@@ -96,12 +99,12 @@ export default async function RehearsalDetailPage({
         ) : null}
       </Card>
 
-      <Card title={`Lagu (${rehearsal.songs.length})`}>
-        {rehearsal.songs.length === 0 && !admin ? (
+      <Card title={`Lagu (${visibleSongs.length})`}>
+        {visibleSongs.length === 0 && !admin ? (
           <EmptyState title="Belum ada lagu ditentukan" />
         ) : (
           <ul className="flex flex-col gap-1">
-            {rehearsal.songs.map((s, index) => (
+            {visibleSongs.map((s, index) => (
               <li
                 key={s.songId}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"

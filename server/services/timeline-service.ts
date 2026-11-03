@@ -171,8 +171,19 @@ export async function getEventTimeline(
                 select: {
                   id: true,
                   title: true,
+                  eventId: true,
                   status: true,
                   isPublished: true,
+                },
+              },
+              eventSong: {
+                select: {
+                  eventId: true,
+                  status: true,
+                  isPublished: true,
+                  song: {
+                    select: { id: true, title: true },
+                  },
                 },
               },
             },
@@ -190,7 +201,17 @@ export async function getEventTimeline(
           status: true,
           startsAt: true,
           songs: {
-            select: { song: { select: { id: true, title: true } } },
+            select: {
+              song: {
+                select: { id: true, title: true, eventId: true },
+              },
+              eventSong: {
+                select: {
+                  eventId: true,
+                  song: { select: { id: true, title: true } },
+                },
+              },
+            },
             orderBy: { sortOrder: "asc" },
           },
         },
@@ -253,7 +274,31 @@ export async function getEventTimeline(
       done: b.status === "COMPLETED" || b.status === "ARCHIVED",
       detail: {
         kind: "batch" as const,
-        songs: b.items.map((i) => i.song),
+        songs: b.items.map((item) => {
+          if (item.eventSong) {
+            if (item.eventSong.eventId !== eventId) {
+              throw new Error(
+                `Batch item ${item.song.id} references an EventSong from another event.`,
+              );
+            }
+            return {
+              ...item.eventSong.song,
+              status: item.eventSong.status,
+              isPublished: item.eventSong.isPublished,
+            };
+          }
+          if (item.song.eventId !== eventId) {
+            throw new Error(
+              `Batch item ${item.song.id} is missing its EventSong.`,
+            );
+          }
+          return {
+            id: item.song.id,
+            title: item.song.title,
+            status: item.song.status,
+            isPublished: item.song.isPublished,
+          };
+        }),
       },
     })),
     ...rehearsals.map((r) => {
@@ -270,7 +315,22 @@ export async function getEventTimeline(
         detail: {
           kind: "rehearsal" as const,
           type: r.type,
-          songs: r.songs.map((s) => s.song),
+          songs: r.songs.map((item) => {
+            if (item.eventSong) {
+              if (item.eventSong.eventId !== eventId) {
+                throw new Error(
+                  `Rehearsal song ${item.song.id} references an EventSong from another event.`,
+                );
+              }
+              return item.eventSong.song;
+            }
+            if (item.song.eventId !== eventId) {
+              throw new Error(
+                `Rehearsal song ${item.song.id} is missing its EventSong.`,
+              );
+            }
+            return { id: item.song.id, title: item.song.title };
+          }),
           presentCount: counts.present,
           recordedCount: counts.total,
         },
@@ -335,10 +395,26 @@ export async function getUserTimeline(
           eventId,
           items: {
             some: {
-              song: {
-                isPublished: true,
-                assignments: { some: { personId: person.id } },
-              },
+              OR: [
+                {
+                  eventSong: {
+                    is: {
+                      isPublished: true,
+                      assignments: { some: { personId: person.id } },
+                    },
+                  },
+                },
+                {
+                  eventSongId: null,
+                  song: {
+                    is: {
+                      eventId,
+                      isPublished: true,
+                      assignments: { some: { personId: person.id } },
+                    },
+                  },
+                },
+              ],
             },
           },
         },
@@ -350,18 +426,43 @@ export async function getUserTimeline(
           targetReviewAt: true,
           items: {
             where: {
-              song: {
-                isPublished: true,
-                assignments: { some: { personId: person.id } },
-              },
+              OR: [
+                {
+                  eventSong: {
+                    is: {
+                      isPublished: true,
+                      assignments: { some: { personId: person.id } },
+                    },
+                  },
+                },
+                {
+                  eventSongId: null,
+                  song: {
+                    is: {
+                      eventId,
+                      isPublished: true,
+                      assignments: { some: { personId: person.id } },
+                    },
+                  },
+                },
+              ],
             },
             select: {
               song: {
                 select: {
                   id: true,
                   title: true,
+                  eventId: true,
                   status: true,
                   isPublished: true,
+                },
+              },
+              eventSong: {
+                select: {
+                  eventId: true,
+                  status: true,
+                  isPublished: true,
+                  song: { select: { id: true, title: true } },
                 },
               },
             },
@@ -382,7 +483,15 @@ export async function getUserTimeline(
           status: true,
           startsAt: true,
           songs: {
-            select: { song: { select: { id: true, title: true } } },
+            select: {
+              song: {
+                select: { id: true, title: true, eventId: true },
+              },
+              eventSong: {
+                select: {
+                  eventId: true, song: { select: { id: true, title: true } } },
+              },
+            },
             orderBy: { sortOrder: "asc" },
           },
         },
@@ -399,13 +508,28 @@ export async function getUserTimeline(
         select: { id: true, name: true, status: true, dueAt: true },
       }),
       prisma.rehearsalAttendance.findMany({
-        where: { personId: person.id },
+        where: { personId: person.id, rehearsal: { eventId } },
         select: { rehearsalId: true, status: true },
       }),
     ]);
   const myAttendance = new Map(attendance.map((a) => [a.rehearsalId, a.status]));
   const mySongIds = new Set(
-    myBatches.flatMap((b) => b.items.map((i) => i.song.id)),
+    myBatches.flatMap((batch) =>
+      batch.items.map((item) => {
+        if (item.eventSong) {
+          if (item.eventSong.eventId !== eventId) {
+            throw new Error(
+              `Batch item ${item.song.id} references an EventSong from another event.`,
+            );
+          }
+          return item.eventSong.song.id;
+        }
+        if (item.song.eventId !== eventId) {
+          throw new Error(`Batch item ${item.song.id} is missing its EventSong.`);
+        }
+        return item.song.id;
+      }),
+    ),
   );
   const items: TimelineItem[] = [
     ...(event && hDay ? [hDayItem(event)] : []),
@@ -420,12 +544,41 @@ export async function getUserTimeline(
       done: b.status === "COMPLETED" || b.status === "ARCHIVED",
       detail: {
         kind: "batch" as const,
-        songs: b.items.map((i) => i.song),
+        songs: b.items.map((item) => {
+          if (item.eventSong) {
+            return {
+              ...item.eventSong.song,
+              status: item.eventSong.status,
+              isPublished: item.eventSong.isPublished,
+            };
+          }
+          return {
+            id: item.song.id,
+            title: item.song.title,
+            status: item.song.status,
+            isPublished: item.song.isPublished,
+          };
+        }),
       },
     })),
     ...rehearsals.map((r) => {
       const ownSongs = r.songs
-        .map((s) => s.song)
+        .map((item) => {
+          if (item.eventSong) {
+            if (item.eventSong.eventId !== eventId) {
+              throw new Error(
+                `Rehearsal song ${item.song.id} references an EventSong from another event.`,
+              );
+            }
+            return item.eventSong.song;
+          }
+          if (item.song.eventId !== eventId) {
+            throw new Error(
+              `Rehearsal song ${item.song.id} is missing its EventSong.`,
+            );
+          }
+          return { id: item.song.id, title: item.song.title };
+        })
         .filter((s) => mySongIds.has(s.id));
       return {
         id: `rehearsal-${r.id}`,
@@ -452,7 +605,7 @@ export async function getUserTimeline(
         id: `task-${t.id}`,
         kind: "task" as const,
         title: t.title,
-        href: "/tasks",
+        href: `/tasks?eventId=${eventId}`,
         start: t.dueAt as Date,
         end: null,
         status: t.status,
@@ -468,7 +621,7 @@ export async function getUserTimeline(
       id: `equipment-${e.id}`,
       kind: "equipment" as const,
       title: e.name,
-      href: "/equipment",
+      href: `/equipment?eventId=${eventId}`,
       start: e.dueAt as Date,
       end: null,
       status: e.status,

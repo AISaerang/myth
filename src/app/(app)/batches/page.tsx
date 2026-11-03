@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAdminUser, requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver, resolveAccessibleEventId } from "@/lib/permissions";
-import { getCurrentEvent, listEvents } from "@server/services/event-service";
+import { isAdmin } from "@/lib/permissions";
+import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import { listBatches } from "@server/services/batch-service";
 import { EventPicker } from "../songs/EventPicker";
 import { BatchForm } from "./BatchForm";
@@ -28,6 +28,7 @@ export default async function BatchesPage({
   const params = await searchParams;
   const events = await listEvents(user);
   if (events.length === 0) {
+    if (params.eventId) notFound();
     return (
       <EmptyState
         title="Belum ada event"
@@ -35,27 +36,24 @@ export default async function BatchesPage({
       />
     );
   }
-  const current = await getCurrentEvent(user);
-  const eventId = resolveAccessibleEventId(
-    events.map((event) => event.id),
-    params.eventId,
-    current?.id,
-  );
+  const current = await getActiveEventFor(user, params.eventId);
+  const eventId = current?.id;
   if (!eventId) notFound();
   const filter: BatchFilter = FILTERS.some((f) => f.value === params.filter)
     ? (params.filter as BatchFilter)
     : "active";
 
   const all = await listBatches(eventId);
+  const observer = !isAdmin(user);
   const visible = all.filter((b) =>
-    filter === "all"
+    (!observer || b.items.some((item) => item.song.isPublished)) &&
+    (filter === "all"
       ? true
       : filter === "archived"
         ? b.status === "ARCHIVED"
-        : b.status !== "ARCHIVED",
+        : b.status !== "ARCHIVED"),
   );
   // Non-admin (USER/OBSERVER): tampilan read-only, lagu Publish saja.
-  const observer = !isAdmin(user);
 
   return (
     <div className="flex flex-col gap-4">
@@ -111,7 +109,10 @@ export default async function BatchesPage({
                 >
                   {b.name}
                   <span className="block text-xs font-normal text-zinc-500 no-underline">
-                    {b.items.length} lagu
+                    {observer
+                      ? b.items.filter((item) => item.song.isPublished).length
+                      : b.items.length}{" "}
+                    lagu
                   </span>
                 </Link>
                 <span className="flex items-center gap-2">
