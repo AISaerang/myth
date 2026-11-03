@@ -1,11 +1,19 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { cacheLife } from "next/cache";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { isAdmin, isObserver, roleLabel } from "@/lib/permissions";
 import { requireFreshUser } from "@/lib/auth";
+import type { SessionUser } from "@/lib/permissions";
 import { logoutAction } from "@server/actions/auth";
 import { listAccessibleEvents } from "@server/services/event-access";
+
+async function userHasAccessibleEvents(user: SessionUser): Promise<boolean> {
+  "use cache: private";
+  cacheLife({ stale: 30 });
+  return (await listAccessibleEvents(user)).length > 0;
+}
 
 export default async function AppLayout({
   children,
@@ -13,8 +21,7 @@ export default async function AppLayout({
   const user = await requireFreshUser();
   const admin = isAdmin(user);
   const observer = isObserver(user);
-  const hasEventAccess =
-    admin || (await listAccessibleEvents(user)).length > 0;
+  const hasEventAccess = admin || (await userHasAccessibleEvents(user));
 
   return (
     <div className="flex flex-col gap-4">

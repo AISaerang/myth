@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -28,11 +30,12 @@ import {
 const linkCard =
   "block rounded-xl border border-zinc-200 bg-white p-4 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900";
 
-export default async function DashboardPage({
+async function DashboardContent({
   searchParams,
 }: {
   searchParams: Promise<{ eventId?: string }>;
 }) {
+  await connection();
   const user = await requireFreshUser();
   const params = await searchParams;
   const event = await getActiveEventFor(user, params.eventId);
@@ -555,5 +558,23 @@ export default async function DashboardPage({
         </Card>
       ) : null}
     </div>
+  );
+}
+
+export default function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ eventId?: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <p aria-busy="true" aria-live="polite" className="text-sm text-zinc-500">
+          Memuat dashboard...
+        </p>
+      }
+    >
+      <DashboardContent searchParams={searchParams} />
+    </Suspense>
   );
 }

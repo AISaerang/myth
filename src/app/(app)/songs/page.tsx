@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -15,11 +17,12 @@ import { EventPicker } from "./EventPicker";
 import { SongForm } from "./SongForm";
 import { SongStatusBadge } from "./SongStatusBadge";
 
-export default async function SongsPage({
+async function SongsContent({
   searchParams,
 }: {
   searchParams: Promise<{ eventId?: string }>;
 }) {
+  await connection();
   const user = await requireFreshUser();
   const params = await searchParams;
 
@@ -185,5 +188,23 @@ export default async function SongsPage({
         )}
       </Card>
     </div>
+  );
+}
+
+export default function SongsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ eventId?: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <p aria-busy="true" aria-live="polite" className="text-sm text-zinc-500">
+          Memuat lagu...
+        </p>
+      }
+    >
+      <SongsContent searchParams={searchParams} />
+    </Suspense>
   );
 }
