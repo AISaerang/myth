@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAdminUser, requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, resolveAccessibleEventId } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
 import { listDecisions } from "@server/services/decision-service";
@@ -10,6 +10,7 @@ import { listSongs } from "@server/services/song-service";
 import { EventPicker } from "../songs/EventPicker";
 import { DecisionTypeBadge } from "../rehearsals/OpsBadges";
 import { CreateDecisionForm } from "./DecisionForms";
+import { notFound } from "next/navigation";
 
 export default async function DecisionsPage({
   searchParams,
@@ -23,7 +24,7 @@ export default async function DecisionsPage({
     await requireAdminUser();
   }
   const params = await searchParams;
-  const events = await listEvents();
+  const events = await listEvents(user);
   if (events.length === 0) {
     return (
       <EmptyState
@@ -32,11 +33,13 @@ export default async function DecisionsPage({
       />
     );
   }
-  const current = await getCurrentEvent();
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const current = await getCurrentEvent(user);
+  const eventId = resolveAccessibleEventId(
+    events.map((event) => event.id),
+    params.eventId,
+    current?.id,
+  );
+  if (!eventId) notFound();
 
   const [decisions, songs, rehearsals] = await Promise.all([
     listDecisions(eventId),

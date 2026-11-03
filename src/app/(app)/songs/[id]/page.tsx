@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { isAdmin, isObserver } from "@/lib/permissions";
 import { getSong } from "@server/services/song-service";
+import { getEventRole } from "@server/services/event-access";
 import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-service";
 import { getMyProgress, getSongProgress } from "@server/services/progress-service";
 import { listChordCharts } from "@server/services/chord-service";
@@ -60,6 +61,8 @@ export default async function SongDetailPage({
   const { id } = await params;
   const song = await getSong(id);
   if (!song) notFound();
+  if (!song.eventId || !song.event) notFound();
+  if (!(await getEventRole(user, song.eventId))) notFound();
   const admin = isAdmin(user);
   const observer = isObserver(user);
 

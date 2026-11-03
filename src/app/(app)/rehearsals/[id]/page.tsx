@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { isAdmin, isObserver } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
-import { getCurrentEvent } from "@server/services/event-service";
+import { getEventRole } from "@server/services/event-access";
 import { listPersonnelForAdmin } from "@server/services/personnel-service";
 import { listSongs } from "@server/services/song-service";
 import { getRehearsal } from "@server/services/rehearsal-service";
@@ -32,14 +32,9 @@ export default async function RehearsalDetailPage({
   const { id } = await params;
   const rehearsal = await getRehearsal(id);
   if (!rehearsal) notFound();
+  if (!(await getEventRole(user, rehearsal.eventId))) notFound();
   const admin = isAdmin(user);
   const observer = isObserver(user);
-
-  if (!admin) {
-    // Personel hanya melihat rehearsal event berjalan.
-    const current = await getCurrentEvent();
-    if (!current || current.id !== rehearsal.eventId) notFound();
-  }
 
   const myPerson = admin
     ? null

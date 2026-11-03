@@ -1,9 +1,10 @@
 import "server-only";
-import { cache } from "react";
 import type { Event, EventStatus } from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import type { SessionUser } from "@/lib/permissions";
 import type { EventInput } from "@/lib/validation/event";
+import { getAccessibleEvent, listAccessibleEvents } from "./event-access";
 
 // Contact PIC panitia hanya untuk admin: bangun objek publik eksplisit
 // (allowlist) agar field restricted baru tidak bocor di masa depan.
@@ -25,40 +26,31 @@ export function toPublicEvent(event: Event): PublicEvent {
     liturgicalFlowUrl: event.liturgicalFlowUrl,
     committeePicName: event.committeePicName,
     notes: event.notes,
+    eventType: event.eventType,
+    region: event.region,
+    accessClosedAt: event.accessClosedAt,
+    accessClosedById: event.accessClosedById,
     createdAt: event.createdAt,
     updatedAt: event.updatedAt,
   };
 }
 
-export async function listEvents(): Promise<Event[]> {
-  return listEventsCached();
+export async function listEvents(user: SessionUser): Promise<Event[]> {
+  return listAccessibleEvents(user);
 }
 
-export async function getEvent(id: string): Promise<Event | null> {
-  return prisma.event.findUnique({ where: { id } });
+export async function getEvent(
+  id: string,
+  user: SessionUser,
+): Promise<Event | null> {
+  return getAccessibleEvent(user, id);
 }
 
-// Event berjalan: terbaru yang belum dibatalkan. Ditampilkan ke semua
-// user yang login; label DRAFT/PENDING tetap terlihat agar tidak
-// dikira final (docs/00).
-export async function getCurrentEvent(): Promise<Event | null> {
-  return getCurrentEventCached();
+// Event berjalan terbaru yang dapat diakses oleh pengguna.
+export async function getCurrentEvent(user: SessionUser): Promise<Event | null> {
+  const events = await listAccessibleEvents(user);
+  return events.find((event) => event.eventStatus !== "CANCELLED") ?? null;
 }
-
-// Memoized per request: pages often need both the list and the current
-// event (plus the layout's auth check) — one DB hit each per navigation.
-const listEventsCached = cache(() =>
-  prisma.event.findMany({
-    orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
-  }),
-);
-
-const getCurrentEventCached = cache(() =>
-  prisma.event.findFirst({
-    where: { eventStatus: { not: "CANCELLED" } },
-    orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
-  }),
-);
 
 export async function createEvent(
   actorUserId: string,

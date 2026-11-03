@@ -3,7 +3,7 @@ import { toJakartaLocalInput } from "@/lib/datetime-local";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver } from "@/lib/permissions";
+import { isAdmin, isObserver, resolveAccessibleEventId } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { isTaskOverdue } from "@/lib/task-status";
 import { prisma } from "@/lib/db";
@@ -12,6 +12,7 @@ import { listPersonnelForAdmin } from "@server/services/personnel-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
 import { listMySongs, listPublishedSongsForObserver, listSongs } from "@server/services/song-service";
 import { listObserverTasks, listRelevantTasks, listTasks } from "@server/services/task-service";
+import { notFound } from "next/navigation";
 import { EventPicker } from "../songs/EventPicker";
 import { CreateSuggestionForm, CreateTaskForm, EditSuggestionForm, EditTaskForm, MyTaskStatusForm } from "./TaskForms";
 import {
@@ -41,8 +42,8 @@ export default async function TasksPage({
   const observer = isObserver(user);
 
   const [events, current] = await Promise.all([
-    listEvents(),
-    getCurrentEvent(),
+    listEvents(user),
+    getCurrentEvent(user),
   ]);
   if (events.length === 0) {
     return (
@@ -52,10 +53,12 @@ export default async function TasksPage({
       />
     );
   }
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const eventId = resolveAccessibleEventId(
+    events.map((event) => event.id),
+    params.eventId,
+    current?.id,
+  );
+  if (!eventId) notFound();
   const filter: Filter = FILTERS.some((f) => f.value === params.filter)
     ? (params.filter as Filter)
     : "all";

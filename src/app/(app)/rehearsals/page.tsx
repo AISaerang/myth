@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, resolveAccessibleEventId } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
 import {
@@ -12,6 +12,7 @@ import {
 import { EventPicker } from "../songs/EventPicker";
 import { RehearsalForm } from "./RehearsalForm";
 import { RehearsalStatusBadge, RehearsalTypeBadge } from "./OpsBadges";
+import { notFound } from "next/navigation";
 
 export default async function RehearsalsPage({
   searchParams,
@@ -22,7 +23,7 @@ export default async function RehearsalsPage({
   const params = await searchParams;
   const admin = isAdmin(user);
 
-  const events = await listEvents();
+  const events = await listEvents(user);
   if (events.length === 0) {
     return (
       <EmptyState
@@ -31,11 +32,13 @@ export default async function RehearsalsPage({
       />
     );
   }
-  const current = await getCurrentEvent();
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const current = await getCurrentEvent(user);
+  const eventId = resolveAccessibleEventId(
+    events.map((event) => event.id),
+    params.eventId,
+    current?.id,
+  );
+  if (!eventId) notFound();
 
   if (!admin) {
     const upcoming = await listUpcomingRehearsals(eventId);

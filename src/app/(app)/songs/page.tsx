@@ -3,9 +3,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver } from "@/lib/permissions";
+import { isAdmin, isObserver, resolveAccessibleEventId } from "@/lib/permissions";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
 import { listMySongs, listPublishedSongsForObserver, listSongs } from "@server/services/song-service";
+import { notFound } from "next/navigation";
 import { EventPicker } from "./EventPicker";
 import { SongForm } from "./SongForm";
 import { SongStatusBadge } from "./SongStatusBadge";
@@ -19,7 +20,7 @@ export default async function SongsPage({
   const params = await searchParams;
 
   if (!isAdmin(user)) {
-    const current = await getCurrentEvent();
+    const current = await getCurrentEvent(user);
     if (!current) {
       return (
         <EmptyState
@@ -70,7 +71,7 @@ export default async function SongsPage({
   }
 
   if (!isAdmin(user)) {
-    const current = await getCurrentEvent();
+    const current = await getCurrentEvent(user);
     if (!current) {
       return (
         <EmptyState
@@ -117,8 +118,8 @@ export default async function SongsPage({
   }
 
   const [events, current] = await Promise.all([
-    listEvents(),
-    getCurrentEvent(),
+    listEvents(user),
+    getCurrentEvent(user),
   ]);
   if (events.length === 0) {
     return (
@@ -128,10 +129,12 @@ export default async function SongsPage({
       />
     );
   }
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const eventId = resolveAccessibleEventId(
+    events.map((event) => event.id),
+    params.eventId,
+    current?.id,
+  );
+  if (!eventId) notFound();
   const songs = await listSongs(eventId);
   const activeEvent = events.find((e) => e.id === eventId);
 

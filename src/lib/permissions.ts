@@ -1,4 +1,4 @@
-import type { Role } from "@/generated/prisma/client";
+import type { EventRole, Role } from "@/generated/prisma/client";
 
 export interface SessionUser {
   id: string;
@@ -12,6 +12,30 @@ export interface SessionUser {
 // enforced server-side on every mutation. Hiding UI is not authorization.
 export function isAdmin(user: SessionUser): boolean {
   return user.role === "ADMIN";
+}
+
+export function canAccessEvent(
+  user: SessionUser,
+  eventId: string,
+  membership: { eventId: string; role: EventRole } | null,
+  accessClosedAt: Date | null = null,
+): boolean {
+  if (isAdmin(user)) return true;
+  if (!membership || membership.eventId !== eventId) return false;
+  return !accessClosedAt || membership.role === "EVENT_ADMIN";
+}
+
+export function resolveAccessibleEventId(
+  accessibleEventIds: readonly string[],
+  requestedEventId: string | undefined,
+  currentEventId: string | undefined,
+): string | null {
+  if (requestedEventId) {
+    return accessibleEventIds.includes(requestedEventId)
+      ? requestedEventId
+      : null;
+  }
+  return currentEventId ?? accessibleEventIds[0] ?? null;
 }
 
 // OBSERVER ("Pantau" di UI): memantau semua progres lagu Publish +

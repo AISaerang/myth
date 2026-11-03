@@ -3,7 +3,7 @@ import { toJakartaLocalInput } from "@/lib/datetime-local";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, resolveAccessibleEventId } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { EQUIPMENT_STATUS_LABEL } from "@/lib/rehearsal-labels";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
@@ -12,6 +12,7 @@ import { listPersonnelForAdmin } from "@server/services/personnel-service";
 import { EventPicker } from "../songs/EventPicker";
 import { EquipmentStatusBadge } from "../rehearsals/OpsBadges";
 import { CreateEquipmentForm, EditEquipmentForm } from "./EquipmentForms";
+import { notFound } from "next/navigation";
 
 const FILTERS = [
   { value: "all", label: "Semua" },
@@ -30,7 +31,7 @@ export default async function EquipmentPage({
   const params = await searchParams;
   const admin = isAdmin(user);
 
-  const events = await listEvents();
+  const events = await listEvents(user);
   if (events.length === 0) {
     return (
       <EmptyState
@@ -39,11 +40,13 @@ export default async function EquipmentPage({
       />
     );
   }
-  const current = await getCurrentEvent();
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const current = await getCurrentEvent(user);
+  const eventId = resolveAccessibleEventId(
+    events.map((event) => event.id),
+    params.eventId,
+    current?.id,
+  );
+  if (!eventId) notFound();
   const filter = FILTERS.some((f) => f.value === params.filter)
     ? (params.filter as (typeof FILTERS)[number]["value"])
     : "all";

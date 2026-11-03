@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   canManageAccounts,
+  canAccessEvent,
   canSuggest,
   canUpdateProgress,
   canViewAllProgress,
   isAdmin,
   isObserver,
   roleLabel,
+  resolveAccessibleEventId,
   type SessionUser,
 } from "@/lib/permissions";
 
@@ -40,6 +42,31 @@ describe("permissions", () => {
     expect(isAdmin(user)).toBe(false);
     expect(canManageAccounts(admin)).toBe(true);
     expect(canManageAccounts(user)).toBe(false);
+  });
+
+  it("scopes event access to membership, except for global ADMIN", () => {
+    const eventAMembership = { eventId: "event-a", role: "MEMBER" as const };
+    expect(canAccessEvent(user, "event-a", eventAMembership)).toBe(true);
+    expect(canAccessEvent(user, "event-b", eventAMembership)).toBe(false);
+    expect(canAccessEvent(user, "event-a", null)).toBe(false);
+    expect(canAccessEvent(admin, "event-b", null)).toBe(true);
+    expect(
+      resolveAccessibleEventId(["event-a"], "event-b", "event-a"),
+    ).toBeNull();
+    expect(
+      resolveAccessibleEventId(["event-a"], "event-a", "event-a"),
+    ).toBe("event-a");
+  });
+
+  it("keeps closed events visible only to event admins and global ADMIN", () => {
+    const closedAt = new Date();
+    expect(
+      canAccessEvent(user, "event-a", { eventId: "event-a", role: "MEMBER" }, closedAt),
+    ).toBe(false);
+    expect(
+      canAccessEvent(user, "event-a", { eventId: "event-a", role: "EVENT_ADMIN" }, closedAt),
+    ).toBe(true);
+    expect(canAccessEvent(admin, "event-a", null, closedAt)).toBe(true);
   });
 
   it("lets users update only their own progress", () => {

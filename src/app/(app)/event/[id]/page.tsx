@@ -30,9 +30,9 @@ export default async function EventDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdminUser();
+  const user = await requireAdminUser();
   const { id } = await params;
-  const event = await getEvent(id);
+  const event = await getEvent(id, user);
   if (!event) notFound();
 
   return (

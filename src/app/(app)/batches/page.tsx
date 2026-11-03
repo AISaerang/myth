@@ -2,13 +2,14 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAdminUser, requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver } from "@/lib/permissions";
+import { isAdmin, isObserver, resolveAccessibleEventId } from "@/lib/permissions";
 import { getCurrentEvent, listEvents } from "@server/services/event-service";
 import { listBatches } from "@server/services/batch-service";
 import { EventPicker } from "../songs/EventPicker";
 import { BatchForm } from "./BatchForm";
 import { BatchStatusBadge } from "./BatchStatusBadge";
 import { DeleteBatchButton } from "./DeleteBatchButton";
+import { notFound } from "next/navigation";
 
 type BatchFilter = "active" | "all" | "archived";
 
@@ -25,7 +26,7 @@ export default async function BatchesPage({
 }) {
   const user = await requireFreshUser();
   const params = await searchParams;
-  const events = await listEvents();
+  const events = await listEvents(user);
   if (events.length === 0) {
     return (
       <EmptyState
@@ -34,11 +35,13 @@ export default async function BatchesPage({
       />
     );
   }
-  const current = await getCurrentEvent();
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const current = await getCurrentEvent(user);
+  const eventId = resolveAccessibleEventId(
+    events.map((event) => event.id),
+    params.eventId,
+    current?.id,
+  );
+  if (!eventId) notFound();
   const filter: BatchFilter = FILTERS.some((f) => f.value === params.filter)
     ? (params.filter as BatchFilter)
     : "active";

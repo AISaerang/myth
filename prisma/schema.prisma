@@ -44,6 +44,7 @@ model User {
   sessions Session[]
   loginTokens LoginToken[]
   person   Person?
+  memberships EventMembership[]
 }
 
 enum EventStatus {
@@ -52,6 +53,20 @@ enum EventStatus {
   CONFIRMED
   COMPLETED
   CANCELLED
+}
+
+// docs/13 §4.1: REGIONAL = event wilayah yang sudah ada,
+// INTERNAL_GEHC = ibadah internal GMIM Eben Haezer Cikarang.
+enum EventType {
+  REGIONAL
+  INTERNAL_GEHC
+}
+
+// Role di dalam satu event (docs/13 §6). Role global di User tetap ada.
+enum EventRole {
+  EVENT_ADMIN
+  MEMBER
+  OBSERVER
 }
 
 model Event {
@@ -72,17 +87,47 @@ model Event {
   // Restricted: admin eyes only (docs/05-DATABASE-SCHEMA.md).
   committeePicContact   String?
   notes                 String?
+  // docs/13: jenis event dan label wilayah (region = label saja, Q2 —
+  // tidak pernah dipakai dalam cek akses).
+  eventType             EventType   @default(REGIONAL)
+  region                String?     @db.VarChar(64)
+  // docs/13 Q8: ditutup hanya lewat aksi manual "Tutup akses event".
+  // null = akses terbuka.
+  accessClosedAt        DateTime?
+  accessClosedById      String?     @db.VarChar(191)
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
 
-  songs   Song[]
-  batches SongBatch[]
-  tasks   Task[]
-  rehearsals Rehearsal[]
-  equipment  EquipmentItem[]
-  decisions  DecisionLog[]
+  songs       Song[]
+  batches     SongBatch[]
+  tasks       Task[]
+  rehearsals  Rehearsal[]
+  equipment   EquipmentItem[]
+  decisions   DecisionLog[]
+  memberships EventMembership[]
+  eventSongs  EventSong[]
+  // Materi khusus event (docs/13 §4.2); null = materi pustaka.
+  eventMaterials SongMaterial[] @relation("EventMaterials")
 
   @@index([eventStatus, eventDate])
+  @@index([eventType, eventStatus])
+}
+
+// Unit akses lintas event (docs/13 §4.2): akses ke event = punya baris
+// di sini. Tanpa baris = event tak terlihat (404), bukan 403.
+model EventMembership {
+  id        String    @id @default(cuid())
+  eventId   String
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      EventRole @default(MEMBER)
+  note      String?   @db.Text
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([userId])
 }
 
 model Person {
@@ -210,10 +255,16 @@ enum MaterialCategory {
 
 model Song {
   id                       String             @id @default(cuid())
-  eventId                  String
-  event                    Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // docs/13 Q5: songbaris = item Pustaka Lagu. eventId kini nullable
+  // (lagu pustaka bisa lintas event); baris lama tetap menempel ke
+  // event REGIONAL melalui EventSong. Kolom di-drop hanya di release
+  // kontrak (P9) setelah persetujuan owner.
+  eventId                  String?
+  event                    Event?             @relation(fields: [eventId], references: [id], onDelete: SetNull)
   title                    String
   artistOrAuthor           String?
+  // Kredit penata (arranger) bebas panjang; VARCHAR(191) mudah over.
+  arrangerCredits          String?            @db.Text
   liturgicalFunction       String?
   key                      String?
   bpm                      Int?
@@ -242,8 +293,41 @@ model Song {
   chordCharts ChordChart[]
   chartSections ChartSection[]
   chartArrangements ChartArrangement[]
+  eventSongs  EventSong[]
 
   @@index([eventId, status])
+  @@index([eventId, isPublished])
+}
+
+// docs/13 §4.2/§6.4: satu lagu pustaka di dalam satu setlist event.
+// Order, eventKey (tampil nada ini, null = Song.key), catatan acara,
+// status kesiapan per event, publish, dan final lock per event;
+// chord (basis C) tetap milik pustaka Song.
+model EventSong {
+  id                 String     @id @default(cuid())
+  eventId            String
+  event              Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  songId             String
+  song               Song       @relation(fields: [songId], references: [id], onDelete: Restrict)
+  sortOrder          Int        @default(0)
+  // Kunci tampil untuk event ini; null = pakai Song.key pustaka.
+  eventKey           String?    @db.VarChar(16)
+  liturgicalFunction String?
+  // Catatan penataan khusus event (VARCHAR(191) mudah over → Text).
+  notes              String?    @db.Text
+  status             SongStatus @default(DRAFT)
+  isPublished        Boolean    @default(false)
+  isFinalLocked      Boolean    @default(false)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  assignments SongAssignment[]
+  progress    PracticeProgress[]
+  batchItems  SongBatchItem[]
+  rehearsalItems RehearsalSong[]
+
+  @@unique([eventId, songId])
+  @@index([eventId, sortOrder])
   @@index([eventId, isPublished])
 }
 
@@ -271,6 +355,11 @@ model SongBatchItem {
   songId      String
   song        Song      @relation(fields: [songId], references: [id], onDelete: Cascade)
   sortOrder   Int       @default(0)
+  // docs/13 §4.2: batch item kini menunjuk EventSong (lagu di dalam
+  // setlist event), bukan langsung ke pustaka. Nullable selama masa
+  // transisi (nilai lama di-backfill oleh migrasi song_library).
+  eventSongId String?
+  eventSong   EventSong? @relation(fields: [eventSongId], references: [id], onDelete: SetNull)
 
   @@id([songBatchId, songId])
 }
@@ -287,6 +376,9 @@ model SongAssignment {
   isPrimary         Boolean          @default(true)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+  // docs/13 §4.2: penugasan terikat ke lagu di dalam satu event.
+  eventSongId       String?
+  eventSong         EventSong?       @relation(fields: [eventSongId], references: [id], onDelete: SetNull)
 
   @@unique([songId, personId])
   @@index([personId])
@@ -329,6 +421,10 @@ model SongMaterial {
   createdById          String
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
+  // docs/13 §4.2: null = materi pustaka (Original, Chord Chart,
+  // Sequencer, ...); terisi = materi khusus satu event saja.
+  eventId              String?
+  event                Event?              @relation("EventMaterials", fields: [eventId], references: [id], onDelete: SetNull)
 
   @@index([songId, category, isActive])
 }
@@ -462,8 +558,13 @@ model PracticeProgress {
   // Plain user id (no FK): preserves history even if accounts change.
   updatedById String
   updatedAt   DateTime       @updatedAt
+  // docs/13 §4.2: progres terikat ke lagu di dalam satu event, jadi
+  // latihan di event GEHC tidak mengubah pemicu event regional.
+  eventSongId String?
+  eventSong   EventSong?     @relation(fields: [eventSongId], references: [id], onDelete: SetNull)
 
   @@unique([songId, personId])
+  @@unique([eventSongId, personId])
   @@index([personId, status])
 }
 
@@ -563,6 +664,9 @@ model RehearsalSong {
   songId      String
   song        Song      @relation(fields: [songId], references: [id], onDelete: Cascade)
   sortOrder   Int       @default(0)
+  // docs/13 §4.2: lagu di denah rehearsal menunjuk EventSong.
+  eventSongId String?
+  eventSong   EventSong? @relation(fields: [eventSongId], references: [id], onDelete: SetNull)
 
   @@id([rehearsalId, songId])
 }

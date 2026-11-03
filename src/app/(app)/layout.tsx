@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { isAdmin, isObserver, roleLabel } from "@/lib/permissions";
 import { requireFreshUser } from "@/lib/auth";
 import { logoutAction } from "@server/actions/auth";
+import { listAccessibleEvents } from "@server/services/event-access";
 
 export default async function AppLayout({
   children,
@@ -12,6 +13,8 @@ export default async function AppLayout({
   const user = await requireFreshUser();
   const admin = isAdmin(user);
   const observer = isObserver(user);
+  const hasEventAccess =
+    admin || (await listAccessibleEvents(user)).length > 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -23,25 +26,31 @@ export default async function AppLayout({
           >
             Dashboard
           </Link>
-          <Link
-            href="/event"
-            className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            Event Brief
-          </Link>
-          <Link
-            href="/team"
-            className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            Tim
-          </Link>
-          <Link
-            href="/songs"
-            className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            {admin ? "Lagu" : observer ? "Lagu" : "Lagu Saya"}
-          </Link>
-          {admin || observer ? (
+          {hasEventAccess ? (
+            <>
+              <Link
+                href="/event"
+                className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Event Brief
+              </Link>
+              <Link
+                href="/team"
+                className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Tim
+              </Link>
+            </>
+          ) : null}
+          {hasEventAccess ? (
+            <Link
+              href="/songs"
+              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              {admin ? "Lagu" : observer ? "Lagu" : "Lagu Saya"}
+            </Link>
+          ) : null}
+          {hasEventAccess && (admin || observer) ? (
             <Link
               href="/batches"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -49,25 +58,31 @@ export default async function AppLayout({
               Batch
             </Link>
           ) : null}
-          <Link
-            href="/tasks"
-            className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            {admin ? "Tasks" : observer ? "Tasks & Usulan" : "Task Saya"}
-          </Link>
-          <Link
-            href="/rehearsals"
-            className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            Rehearsal
-          </Link>
-          <Link
-            href="/equipment"
-            className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            Equipment
-          </Link>
-          {admin ? (
+          {hasEventAccess ? (
+            <Link
+              href="/tasks"
+              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              {admin ? "Tasks" : observer ? "Tasks & Usulan" : "Task Saya"}
+            </Link>
+          ) : null}
+          {hasEventAccess ? (
+            <Link
+              href="/rehearsals"
+              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Rehearsal
+            </Link>
+          ) : null}
+          {hasEventAccess ? (
+            <Link
+              href="/equipment"
+              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Equipment
+            </Link>
+          ) : null}
+          {hasEventAccess && admin ? (
             <Link
               href="/decisions"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"

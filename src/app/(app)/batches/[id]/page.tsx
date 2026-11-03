@@ -13,6 +13,7 @@ import {
 import { SongStatusBadge } from "../../songs/SongStatusBadge";
 import { BatchForm } from "../BatchForm";
 import { BatchStatusBadge } from "../BatchStatusBadge";
+import { getEventRole } from "@server/services/event-access";
 import { BatchItemMover } from "@/components/ui/MoveButtons";
 import {
   AddSongForm,
@@ -33,6 +34,7 @@ export default async function BatchDetailPage({
   const { id } = await params;
   const batch = await getBatch(id);
   if (!batch) notFound();
+  if (!(await getEventRole(user, batch.eventId))) notFound();
 
   if (observer) {
     const published = batch.items.filter((i) => i.song.isPublished);

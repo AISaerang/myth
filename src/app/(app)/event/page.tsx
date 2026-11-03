@@ -16,12 +16,12 @@ export default async function EventPage() {
   const user = await requireFreshUser();
 
   if (!isAdmin(user)) {
-    const current = await getCurrentEvent();
+    const current = await getCurrentEvent(user);
     if (!current) {
       return (
         <EmptyState
-          title="Belum ada event"
-          description="Event brief akan tampil di sini setelah admin membuatnya."
+          title="Belum terdaftar di acara mana pun"
+          description="Minta admin menambahkan Anda sebagai anggota acara."
         />
       );
     }
@@ -35,7 +35,7 @@ export default async function EventPage() {
     );
   }
 
-  const events = await listEvents();
+  const events = await listEvents(user);
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold tracking-tight sm:text-2xl">

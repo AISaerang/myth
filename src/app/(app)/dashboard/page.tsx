@@ -29,7 +29,7 @@ const linkCard =
 
 export default async function DashboardPage() {
   const user = await requireFreshUser();
-  const event = await getCurrentEvent();
+  const event = await getCurrentEvent(user);
 
   if (!event) {
     return (
@@ -48,8 +48,8 @@ export default async function DashboardPage() {
           </Card>
         ) : (
           <EmptyState
-            title="Belum ada event aktif"
-            description="Event brief akan tampil di sini setelah admin membuatnya."
+            title="Belum terdaftar di acara mana pun"
+            description="Minta admin menambahkan Anda sebagai anggota acara."
           />
         )}
       </div>
