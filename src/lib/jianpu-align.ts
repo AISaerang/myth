@@ -1,13 +1,12 @@
 // Sejajarkan kunci di atas baris not angka.
 //
-// Di editor, tanda oktaf (' / ,) dan garis ketukan (/) memakan kolom monospace.
-// Font JianpuASCII melipat tanda itu ke dalam glyph angka (titik di atas/bawah,
-// garis bawah), jadi kolom tampilan bergeser. Pemetaan di sini mengikuti
-// kolom editor, lalu melipat tanda yang tidak lagi punya lebar sendiri,
-// supaya kunci tetap di atas simbol yang sama.
+// Di editor, tanda oktaf (' / , / titik di depan), garis ketukan (/),
+// kurung beam, dan kurung legato memakan kolom monospace. Saat tampil
+// tanda itu dilipat ke dalam angka (titik, garis, busur) supaya kunci
+// tetap di kolom yang sama dengan nadanya.
 
 import { layoutChordLine, semitonesBetween } from "@/lib/chords";
-import { parseJianpu, type JianpuNote } from "@/lib/jianpu";
+import { tokenizeJianpuLine, type JianpuNote } from "@/lib/jianpu";
 
 export interface NotationToken {
   kind: "note" | "bar";
@@ -16,6 +15,9 @@ export interface NotationToken {
   renderCol: number;
   renderWidth: number;
   note: JianpuNote | null;
+  beam: number;
+  beamGroup: number | null;
+  slurGroup: number | null;
 }
 
 export interface PlacedChord {
@@ -59,6 +61,29 @@ function measureToken(
   return { collapse, width: 1 + extra };
 }
 
+function consumeGap(
+  lyricLine: string,
+  sourceToRender: number[],
+  from: number,
+  until: number,
+  renderCol: number,
+): number {
+  const pending: number[] = [];
+  let col = renderCol;
+  for (let i = from; i < until; i += 1) {
+    const ch = lyricLine[i] as string;
+    if (ch === " " || ch === "\t") {
+      sourceToRender[i] = col;
+      col += 1;
+      continue;
+    }
+    // Kurung beam/legato tidak punya lebar. Mereka menempel ke nada berikutnya.
+    pending.push(i);
+  }
+  for (const index of pending) sourceToRender[index] = col;
+  return col;
+}
+
 // null = baris ini lirik biasa (atau kosong), bukan not angka.
 export function alignChordsToNotation(
   chordLine: string,
@@ -66,79 +91,63 @@ export function alignChordsToNotation(
 ): NotationAlignment | null {
   if (!lyricLine.trim()) return null;
 
-  const tokens: NotationToken[] = [];
-  const sourceToRender: number[] = [];
-  let renderCol = 0;
-  let sawNote = false;
+  const tokenized = tokenizeJianpuLine(lyricLine);
+  if (!tokenized.valid || !tokenized.spans.some((span) => span.kind === "note")) {
+    return null;
+  }
 
-  for (let i = 0; i < lyricLine.length; ) {
-    const ch = lyricLine[i] as string;
-    if (ch === " " || ch === "\t") {
-      sourceToRender.push(renderCol);
-      renderCol += 1;
-      i += 1;
-      continue;
-    }
-    if (ch === "|") {
+  const tokens: NotationToken[] = [];
+  const sourceToRender: number[] = Array(lyricLine.length).fill(0);
+  let renderCol = 0;
+  let cursor = 0;
+
+  for (const span of tokenized.spans) {
+    renderCol = consumeGap(lyricLine, sourceToRender, cursor, span.sourceCol, renderCol);
+    cursor = span.sourceCol;
+
+    if (span.kind === "bar") {
       tokens.push({
         kind: "bar",
         raw: "|",
-        sourceCol: i,
+        sourceCol: span.sourceCol,
         renderCol,
         renderWidth: 1,
         note: null,
+        beam: 0,
+        beamGroup: null,
+        slurGroup: null,
       });
-      sourceToRender.push(renderCol);
+      sourceToRender[span.sourceCol] = renderCol;
       renderCol += 1;
-      i += 1;
+      cursor = span.sourceCol + 1;
       continue;
     }
 
-    let end = i + 1;
-    while (
-      end < lyricLine.length &&
-      lyricLine[end] !== " " &&
-      lyricLine[end] !== "\t" &&
-      lyricLine[end] !== "|"
-    ) {
-      end += 1;
-    }
-    const raw = lyricLine.slice(i, end);
-    const parsed = parseJianpu(raw);
-    const lineNotes = parsed.lines[0]?.notes;
-    if (
-      !parsed.valid ||
-      parsed.lines.length !== 1 ||
-      !lineNotes ||
-      lineNotes.length !== 1
-    ) {
-      return null;
-    }
-    const note = lineNotes[0] as JianpuNote;
-    const measured = measureToken(raw, note);
+    const note = span.note;
+    if (!note) return null;
+    const measured = measureToken(span.raw, note);
     if (!measured) return null;
 
-    sawNote = true;
     tokens.push({
       kind: "note",
-      raw,
-      sourceCol: i,
+      raw: span.raw,
+      sourceCol: span.sourceCol,
       renderCol,
       renderWidth: measured.width,
       note,
+      beam: span.beam,
+      beamGroup: span.beamGroup,
+      slurGroup: span.slurGroup,
     });
-    for (let k = 0; k < raw.length; k += 1) {
+    for (let k = 0; k < span.raw.length; k += 1) {
       const col =
-        k < measured.collapse
-          ? renderCol
-          : renderCol + 1 + (k - measured.collapse);
-      sourceToRender.push(col);
+        k < measured.collapse ? renderCol : renderCol + 1 + (k - measured.collapse);
+      sourceToRender[span.sourceCol + k] = col;
     }
     renderCol += measured.width;
-    i = end;
+    cursor = span.sourceCol + span.raw.length;
   }
-
-  if (!sawNote) return null;
+  consumeGap(lyricLine, sourceToRender, cursor, lyricLine.length, renderCol);
 
   const endRender = renderCol;
   const chords: PlacedChord[] = [];
@@ -159,6 +168,22 @@ export function alignChordsToNotation(
   }
 
   return { tokens, chords, columns };
+}
+
+/** True bila isi bagian hanya not angka (plus kunci, komentar, atau baris kosong). */
+export function contentIsNotationSection(content: string): boolean {
+  let notes = false;
+  let lyrics = false;
+  for (const line of content.split("\n")) {
+    if (!line.trim() || /^\s*#/.test(line) || /^\s*\{[^}]+\}\s*$/.test(line)) continue;
+    const layout = layoutChordLine(line);
+    if (layout.label) continue;
+    const lyric = layout.lyricLine.trim();
+    if (!lyric) continue;
+    if (alignChordsToNotation(layout.chordLine, layout.lyricLine)) notes = true;
+    else lyrics = true;
+  }
+  return notes && !lyrics;
 }
 
 export function contentHasNotation(chordPro: string): boolean {

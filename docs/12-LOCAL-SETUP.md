@@ -69,6 +69,14 @@ npm.cmd run import:intro-sections -- --apply
 npm.cmd run import:intro-sections -- --apply --allow-prod
 ```
 
+Not angka yang masih memakai titik di depan untuk oktaf bawah (`.6`) dan bagian intro yang berlabel `Bagian n` bisa dinormalisasi tanpa mengubah skema. Bentuk kanonik oktaf bawah adalah koma (`6,`). Skrip idempoten, default dry-run, mencetak diff per lagu. `--apply` menulis. Prefix user DB `rGq` menolak `--apply` kecuali `--allow-prod`.
+
+```powershell
+npm.cmd run normalize:notation
+npm.cmd run normalize:notation -- --apply
+npm.cmd run normalize:notation -- --apply --allow-prod
+```
+
 ### Operasi: backfill membership
 
 Jangan jalankan ulang SQL di migrasi `20261103000010_event_type_membership`.

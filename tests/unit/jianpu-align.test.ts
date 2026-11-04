@@ -61,6 +61,41 @@ describe("not angka column alignment", () => {
     ]);
   });
 
+  it("collapses a leading octave dot onto the digit and keeps the chord on that digit", () => {
+    const aligned = alignChordsToNotation(" G", ".7 1");
+    expect(aligned).not.toBeNull();
+    const low = aligned?.tokens.find((token) => token.raw === ".7");
+    expect(low?.renderWidth).toBe(1);
+    expect(low?.note?.octave).toBe(-1);
+    expect(low?.renderCol).toBe(0);
+    expect(aligned?.chords[0]?.renderCol).toBe(low?.renderCol);
+  });
+
+  it("keeps a chord on the beamed digit after brackets collapse", () => {
+    const lyric = "1 [5 6]";
+    const aligned = alignChordsToNotation("   G", lyric);
+    const five = aligned?.tokens.find((token) => token.raw === "5");
+    expect(five?.beam).toBe(1);
+    expect(five?.renderCol).toBe(aligned?.chords[0]?.renderCol);
+    expect(aligned?.tokens.find((token) => token.raw === "6")?.beamGroup).toBe(five?.beamGroup);
+  });
+
+  it("shows Intro instead of BAGIAN for a notation section labeled Bagian 1", () => {
+    const markup = renderToStaticMarkup(
+      createElement(ChordViewer, {
+        content: "{Bagian 1}\n[C]1 1 5 .7 .7 1\n[Am].6 .6 5  5/ 6/\n\n{Verse}\n[G]Bapa",
+        baseKey: "C",
+      }),
+    );
+    expect(markup).toContain('data-section-label="Intro"');
+    expect(markup).toContain("normal-case");
+    expect(markup).not.toContain("Bagian 1");
+    expect(markup).toContain('data-octave="down"');
+    expect(markup).toContain('data-underline="1"');
+    expect(markup).toContain("Bapa");
+    expect(markup).toContain('data-chord="C"');
+  });
+
   it("keeps a barline as its own column between notes", () => {
     const aligned = alignChordsToNotation("", "1 | 2");
     expect(aligned?.tokens.map((token) => [token.kind, token.renderCol])).toEqual([
@@ -121,8 +156,9 @@ describe("not angka column alignment", () => {
     expect(markup).toContain('data-chord="G"');
     expect(markup).toContain('data-render-col="3"');
     expect(markup).toContain('data-note="1&#x27;"');
-    expect(markup).toContain("notation-glyph-font");
-    expect(markup).toContain(">1&#x27;<");
+    expect(markup).toContain('data-notation="css"');
+    expect(markup).toContain('data-octave="up"');
+    expect(markup).not.toContain("notation-glyph-font");
     expect(markup).toContain("Bapa");
     expect(markup).toContain("Intro");
     expect(markup).not.toContain("-top-2");
@@ -189,12 +225,13 @@ describe("not angka column alignment", () => {
     expect(lyric).not.toContain("notation-staff");
 
     const css = readFileSync("src/app/globals.css", "utf8");
-    const staffCss = css.slice(css.indexOf(".notation-staff {"), css.indexOf(".notation-glyph-font"));
+    const staffCss = css.slice(css.indexOf(".notation-staff {"), css.indexOf(".jianpu-dot"));
     expect(staffCss).toContain("font-size: 0.875rem");
     expect(staffCss).toContain("line-height: 1.5rem");
     expect(staffCss).toContain("height: 1.5rem");
     expect(staffCss).not.toContain("1.75rem");
     expect(staffCss).not.toContain("2.4em");
+    expect(staffCss).not.toContain("JianpuASCII");
 
     const lyricsOnly = renderToStaticMarkup(
       createElement(ChartBody, { content, mode: "lyrics", renderKey: "intro-lyrics" }),

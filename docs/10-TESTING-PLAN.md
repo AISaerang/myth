@@ -19,6 +19,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Membership backfill selects only active users with zero event memberships for the newest non-cancelled regional event, leaves anyone who already belongs to an event untouched, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
 - Chart viewer renders not angka in one arrangement body and shows the transpose formula once, next to the transpose controls.
 - An Intro of three chord+notation lines, the last with `Csus4` and trailing `| |`, renders every line at the lyric size (`text-sm` / `leading-6`) in Lirik+Chord, Lirik saja, and Chord saja; transpose changes chords only.
+- Not angka parser accepts comma and leading-dot lower octaves, chromatic prefixes, beam groups `[ ]` / `[[ ]]`, and slurs `( )`. CSS markup draws octave dots, a slash or backslash through the digit, and beams/slurs above the group. Chords stay on the same column. A notation section labeled `Bagian 1` displays Intro. `canonicalizeNotationText` rewrites `.6` to `6,` and leaves lyric lines alone. `planNotationNormalization` prints a per-song diff and is a no-op when nothing changed.
 - Final lock requires intentional authorized action.
 - Overdue task and equipment blocker aggregation.
 - Cancelled rehearsal excluded from upcoming list.
