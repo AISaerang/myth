@@ -15,6 +15,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Chart section/arrangement validation rejects empty labels/content, duplicate labels, invalid item payloads, and over-limit sequences.
 - Setlist lyric seed keeps unique labels, non-empty content, and arrangement items that reference existing sections.
 - Intro-column migration builds a ChordPro Intro section (chords over not angka, note as a `#` comment), skips songs that already have an Intro section, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
+- Event brief date inputs use the Asia/Jakarta calendar day (midnight WIB round-trips; a UTC date slice does not). Saving the brief keeps the stored confirmation status unless the status field was changed.
 - Membership backfill selects only active users with zero event memberships for the newest non-cancelled regional event, leaves anyone who already belongs to an event untouched, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
 - Chart viewer renders not angka in one arrangement body and shows the transpose formula once, next to the transpose controls.
 - Final lock requires intentional authorized action.
