@@ -69,6 +69,32 @@ npm.cmd run import:intro-sections -- --apply
 npm.cmd run import:intro-sections -- --apply --allow-prod
 ```
 
+### Operasi: backfill membership
+
+Jangan jalankan ulang SQL di migrasi `20261103000010_event_type_membership`.
+SQL itu memberi setiap akun aktif membership di event REGIONAL terbaru yang
+bukan `CANCELLED`. Setelah akun khusus GEHC ada, menjalankan ulang SQL itu
+menambahkan mereka ke event Regional dan merusak isolasi POV per event
+(kejadian PROD 4 Nov 2026). Migrasi itu sudah diterapkan; biarkan file-nya.
+
+Pakai skrip `npm run backfill:memberships`. Skrip hanya menambahkan membership
+Regional untuk akun **aktif yang belum punya EventMembership sama sekali**
+(pengguna lama sebelum multi-event). Akun yang sudah anggota event mana pun,
+termasuk hanya GEHC, tidak pernah ditambahkan ke event lain. Akun nonaktif
+tanpa membership juga dilewati. Targetnya event REGIONAL non-`CANCELLED`
+terbaru (`eventDate` menurun, tanggal kosong di belakang, lalu `updatedAt`).
+
+Default dry-run (tidak menulis). `--apply` menulis. Baris pertama keluaran
+adalah host dan prefix user DB. Bila prefix user DB adalah `rGq`, `--apply`
+ditolak kecuali `--allow-prod` ikut diberikan. Membuat akun di `/people`
+tidak menggabungkan user ke event; admin memilih event lewat halaman anggota.
+
+```powershell
+npm.cmd run backfill:memberships
+npm.cmd run backfill:memberships -- --apply
+npm.cmd run backfill:memberships -- --apply --allow-prod
+```
+
 Skrip `tsx` (bootstrap/seed) butuh dua flag env karena berjalan di luar
 bundler Next — jalankan persis seperti di `package.json`:
 

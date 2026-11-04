@@ -152,7 +152,8 @@ Expand → migrate → contract. This plan covers **expand + migrate** only. Con
 1. `prisma migrate dev --name event_type_membership` locally. SQL only `ADD COLUMN` / `CREATE TABLE` / `CREATE INDEX`. No drop.
 2. Membership backfill (idempotent, `INSERT ... SELECT ... ON DUPLICATE KEY UPDATE`):
    - Every existing event → `eventType = REGIONAL`, `region = 'JABODETABEK_BANDUNG'`.
-   - Every active user → membership only on the current regional event (same newest non-`CANCELLED` selection as `getCurrentEvent()`, the 14 Nov event): `ADMIN` → `EVENT_ADMIN`, `USER` → `MEMBER`, `OBSERVER` → `OBSERVER`. Do not grant membership automatically to older regional events.
+   - Historical one-time fill (already applied): every then-active user → membership only on the current regional event (same newest non-`CANCELLED` selection as `getCurrentEvent()`, the 14 Nov event): `ADMIN` → `EVENT_ADMIN`, `USER` → `MEMBER`, `OBSERVER` → `OBSERVER`. Do not grant membership automatically to older regional events.
+   - **Do not re-run that migration SQL.** Re-running the `INSERT` adds every active user who is missing from the newest regional event, including `INTERNAL_GEHC`-only accounts (PROD, 4 Nov 2026) and breaks per-event POV isolation. Further repair is only `npm run backfill:memberships` (dry-run by default; see docs/12, "Operasi: backfill membership"). It adds the newest non-cancelled REGIONAL event solely for active users with **zero** `EventMembership` rows. A user who already belongs to any event is never auto-added to another.
    - Owner `aisaerang` (global ADMIN) gets `EVENT_ADMIN` on every GEHC event he creates (Q1). Do this in the "create event" action, not in the backfill.
 3. Library migration `song_library` (Q5), idempotent:
    - Every existing `Song` stays as the library row (same `id`) → chart sections, arrangements, versions, chords in C and original key are untouched.
@@ -166,7 +167,7 @@ Expand → migrate → contract. This plan covers **expand + migrate** only. Con
    Rules:
    - Migrations must be **additive and safe**: add column (nullable or with default), add table, add index. No drop/rename in the same release as code that still uses the old shape (expand → migrate → contract over 2 releases).
    - A failed `migrate deploy` fails the build, so the old deployment stays live. Good.
-   - Backfill is **idempotent** (`upsert`). Run it as a separate step (`npm run backfill:membership`) or inside the migration SQL (`INSERT ... SELECT ... ON DUPLICATE KEY UPDATE`). Prefer SQL in the migration so it runs in the same build.
+   - The membership `INSERT` already shipped inside migration `20261103000010_event_type_membership` and must not be run again. Later backfill is `npm run backfill:memberships` only. Account creation does not auto-join any event; an admin assigns the account to the event they choose. Creating an event still adds the creator as `EVENT_ADMIN` of that new event.
    - **Preview vs production DB:** Vercel Preview builds also run `vercel-build`. If Preview uses the production `DATABASE_URL`, a PR branch can migrate production. Set a separate Preview `DATABASE_URL` (TiDB branch/dev DB), or skip `migrate deploy` when `VERCEL_ENV !== "production"`.
    - Back up / snapshot TiDB before the first release with this change.
 
@@ -330,7 +331,7 @@ P8 implementation (release prep, branch `feature/gehc-events`, owner merge pendi
 - Integration: user in regional only → GEHC song URL returns 404; dashboard lists only regional.
 - Integration: EVENT_ADMIN GEHC → can CRUD GEHC songs; regional song action is rejected.
 - Integration: OBSERVER in GEHC → sees published only; no mutation.
-- Migration: run backfill twice → no duplicate rows.
+- Do not re-run migration `20261103000010` SQL. `npm run backfill:memberships` twice adds no further rows: users who already have any membership are excluded. A GEHC-only user is not added to the regional event.
 - Regression: existing flows in docs/10 pass for the 14 Nov event with no data change.
 - Empty state: user with zero memberships → dashboard shows only empty message; `/songs`, `/rehearsals` etc. show no data / 404.
 - Close access: EVENT_ADMIN closes → MEMBER/OBSERVER lose access; EVENT_ADMIN + global ADMIN still see it; reopen restores; 2 audit rows. MEMBER calling close action → rejected. Setting `COMPLETED` does not close access.
@@ -346,6 +347,7 @@ P8 implementation (release prep, branch `feature/gehc-events`, owner merge pendi
 | Risk | Mitigation |
 |---|---|
 | Code deployed before migration/backfill → crash or nobody sees data | `migrate deploy` runs before `next build`; failed migration fails build. |
+| Re-running the membership migration SQL attaches GEHC-only users to the regional event | Do not re-run that SQL. Use `npm run backfill:memberships`, which only fills active users with zero memberships. |
 | Library chord edit affects all events | Warning with usage count; audit. |
 | Data loss in song move | Same Song ids kept; additive columns; count checks; no drop until P9. |
 | Preview build migrates production DB | Separate Preview `DATABASE_URL` or skip migrate outside production. |
