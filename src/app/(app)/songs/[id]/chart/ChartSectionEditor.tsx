@@ -98,14 +98,19 @@ export function ChartSectionEditor({
           <ChordOverUnderEditor
             id="section-content"
             name="content"
-            heading="Kunci & lirik — basis C"
+            heading={
+              type === "INTRO" ? "Kunci & not angka — basis C" : "Kunci & lirik — basis C"
+            }
             defaultValue={section?.content ?? ""}
             rows={16}
             onChange={setContent}
+            placeholder={type === "INTRO" ? "C   G\n1' 2 3 4 5" : undefined}
             hint={
-              section
-                ? "Kunci di baris atas, lirik di baris bawah; atur posisi pakai spasi atau Tab."
-                : undefined
+              type === "INTRO"
+                ? "Kunci di baris atas, not angka di bawah. Spasi menentukan kolom; titik oktaf tidak menggeser kolom saat tampil. Transpose menggeser kunci saja — angka tetap."
+                : section
+                  ? "Kunci di baris atas, lirik di baris bawah; atur posisi pakai spasi atau Tab."
+                  : undefined
             }
           />
         </div>

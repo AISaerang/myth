@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NotAngka } from "@/components/NotAngka";
-import { parseJianpu, formatNote, formatLine, keyToFormula } from "@/lib/jianpu";
+import { parseJianpu, formatNote, formatLine, keyToFormula, toJianpuFontText } from "@/lib/jianpu";
 
 describe("JianpuASCII parser", () => {
   it("parses empty input", () => {
@@ -116,13 +116,36 @@ describe("JianpuASCII parser", () => {
     expect(notes[4].solfege).toBe(3);
   });
 
-  it("renders octave marks as positioned notation instead of object text", () => {
+  it("renders octave marks with the font ligature by default", () => {
     const markup = renderToStaticMarkup(
       createElement(NotAngka, { value: "6, 5, 1' 2 3" }),
     );
     expect(markup).not.toContain("[object Object]");
-    expect(markup).toContain(">,</span>");
-    expect(markup).toContain("relative -top-2 text-xs font-mono\">&#x27;</span>");
+    expect(markup).not.toContain("-top-2");
+    expect(markup).toContain("notation-glyph-font");
+    expect(markup).toContain('data-note="1&#x27;"');
+    expect(markup).toContain('data-note="6,"');
+    expect(markup).toContain(">1&#x27;<");
+    expect(markup).toContain(">6,<");
+  });
+
+  it("centers CSS fallback octave dots on the digit", () => {
+    const markup = renderToStaticMarkup(
+      createElement(NotAngka, { value: "6, 5, 1' 2 3", glyphs: "css" }),
+    );
+    expect(markup).not.toContain("-top-2");
+    expect(markup).toContain('data-octave="up"');
+    expect(markup).toContain('data-octave="down"');
+    expect(markup).toContain("left-1/2");
+    expect(markup).toContain("-translate-x-1/2");
+    expect(markup).toContain('data-jianpu-font="fallback"');
+  });
+
+  it("toJianpuFontText keeps octave marks so the font can ligate them", () => {
+    expect(toJianpuFontText({ solfege: 1, octave: 1, accidental: 0, duration: 1, extension: 0, dotted: false })).toBe("1'");
+    expect(toJianpuFontText({ solfege: 6, octave: -1, accidental: 0, duration: 1, extension: 0, dotted: false })).toBe("6,");
+    expect(toJianpuFontText({ solfege: 1, octave: 1, accidental: 1, duration: 0.5, extension: 0, dotted: false })).toBe("^1'/");
+    expect(toJianpuFontText({ solfege: 7, octave: -2, accidental: -1, duration: 1, extension: 0, dotted: false })).toBe("_7,,");
   });
 
   it("formatNote renders back correctly", () => {

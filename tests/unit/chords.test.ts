@@ -15,6 +15,7 @@ import {
   transposeChord,
   transposeContent,
   transposeRoot,
+  transposeSpacedChords,
 } from "@/lib/chords";
 import type { ChordLyricLayout } from "@/lib/chords";
 
@@ -260,5 +261,19 @@ describe("over-under editor format", () => {
   it("leaves non-chord bracket tokens untouched", () => {
     const pro = "[?] halo [G]tuhan";
     expect(overUnderToChordPro(chordProToOverUnder(pro))).toBe(pro);
+  });
+
+  it("roundtrips an intro not-angka line without moving chord columns", () => {
+    const editor = "C   G\n1' 2 3 4 5";
+    const pro = "[C]1' 2[G] 3 4 5";
+    expect(overUnderToChordPro(editor)).toBe(pro);
+    expect(chordProToOverUnder(pro)).toBe(editor);
+  });
+
+  it("transposes a spaced chord line without swallowing the next column", () => {
+    expect(transposeSpacedChords("C   G", 2)).toBe("D   A");
+    expect(transposeSpacedChords("C   G", 1)).toBe("C#  G#");
+    expect(transposeSpacedChords("C   G", 1, true)).toBe("Db  Ab");
+    expect(transposeSpacedChords("C   G", 0)).toBe("C   G");
   });
 });
