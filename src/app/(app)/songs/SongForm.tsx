@@ -21,6 +21,9 @@ export interface SongFormDefaults {
   estimatedDurationSeconds?: number | null;
   originalReferenceUrl?: string | null;
   arrangementNotes?: string | null;
+  introChords?: string | null;
+  introNotation?: string | null;
+  introNote?: string | null;
   status?: SongStatus;
 }
 
@@ -173,6 +176,54 @@ export function SongForm({
             name="arrangementNotes"
             rows={3}
             defaultValue={d.arrangementNotes ?? ""}
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="introChords" className="text-sm font-medium">
+              Kunci intro
+            </label>
+            <input
+              id="introChords"
+              name="introChords"
+              placeholder="cth. C F"
+              maxLength={50}
+              defaultValue={d.introChords ?? ""}
+              className={inputClass}
+            />
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Kunci untuk bagian intro lagu.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="introNotation" className="text-sm font-medium">
+              Not angka intro
+            </label>
+            <textarea
+              id="introNotation"
+              name="introNotation"
+              rows={3}
+              defaultValue={d.introNotation ?? ""}
+              placeholder="cth. 6, 5, 1 2 3"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Format: nada 1-7, diam 0, oktaf &apos; di atas / , di bawah, kres/mol # / b,
+              ketukan / dan //, panjang -, titik ritme .
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="introNote" className="text-sm font-medium">
+            Catatan intro
+          </label>
+          <textarea
+            id="introNote"
+            name="introNote"
+            rows={3}
+            defaultValue={d.introNote ?? ""}
+            placeholder="Catatan bebas tentang intro"
             className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>

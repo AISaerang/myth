@@ -10,6 +10,15 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-jianpu-ascii: "JianpuASCII", ui-monospace, monospace;
+}
+
+@font-face {
+  font-family: "JianpuASCII";
+  src: url("/fonts/JianpuASCII-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @media (prefers-color-scheme: dark) {

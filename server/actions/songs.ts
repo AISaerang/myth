@@ -23,11 +23,13 @@ import {
   activateVersion,
   addSongFromLibraryToEvent,
   addMaterial,
+  archiveSong,
   assignPerson,
   createSong,
   createVersion,
   deleteMaterial,
   lockFinal,
+  restoreSong,
   setMaterialActive,
   setSongPublished,
   unassignPerson,
@@ -54,6 +56,9 @@ function parseSongForm(formData: FormData) {
     estimatedDurationSeconds: formData.get("estimatedDurationSeconds") || undefined,
     originalReferenceUrl: formData.get("originalReferenceUrl") || undefined,
     arrangementNotes: formData.get("arrangementNotes") || undefined,
+    introChords: formData.get("introChords") || undefined,
+    introNotation: formData.get("introNotation") || undefined,
+    introNote: formData.get("introNote") || undefined,
     status: formData.get("status"),
   });
 }
@@ -69,6 +74,9 @@ function parseSongUpdateForm(formData: FormData) {
     estimatedDurationSeconds: formData.get("estimatedDurationSeconds") || undefined,
     originalReferenceUrl: formData.get("originalReferenceUrl") || undefined,
     arrangementNotes: formData.get("arrangementNotes") || undefined,
+    introChords: formData.get("introChords") || undefined,
+    introNotation: formData.get("introNotation") || undefined,
+    introNote: formData.get("introNote") || undefined,
     status: formData.get("status"),
   });
 }
@@ -320,5 +328,33 @@ export async function deleteMaterialAction(
   const result = await deleteMaterial(materialId);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(songId || undefined);
+  return { ok: true };
+}
+
+export async function archiveSongAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireActionAdmin();
+  const songId = String(formData.get("songId") ?? "");
+  const eventId = String(formData.get("eventId") ?? "");
+  if (!songId || !eventId) return { ok: false, error: "Lagu tidak valid." };
+  const result = await archiveSong(admin.id, songId, eventId);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateSongs(songId);
+  return { ok: true };
+}
+
+export async function restoreSongAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireActionAdmin();
+  const songId = String(formData.get("songId") ?? "");
+  const eventId = String(formData.get("eventId") ?? "");
+  if (!songId || !eventId) return { ok: false, error: "Lagu tidak valid." };
+  const result = await restoreSong(admin.id, songId, eventId);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateSongs(songId);
   return { ok: true };
 }

@@ -277,10 +277,17 @@ model Song {
   isFinalLocked            Boolean            @default(false)
   activeArrangementVersionId String?
   activeVersion            ArrangementVersion? @relation("SongActiveVersion", fields: [activeArrangementVersionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  // Not angka (JianpuASCII) intro untuk lagu ini; disimpan format ketik.
+  introChords         String?   // kunci intro, cth. "C F"
+  introNotation       String?   @db.Text  // not angka, cth. "6, 5, 1 2 3"
+  introNote           String?   @db.Text  // catatan bebas tentang intro
+  // Soft archive: null = aktif. Diisi waktu dan aktor saat diarsipkan.
+  archivedAt          DateTime?
+  archivedById        String?
   // Plain user id (no FK): preserves history even if accounts change.
-  createdById              String
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
+  createdById         String
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   versions    ArrangementVersion[] @relation("SongVersions")
   materials   SongMaterial[]

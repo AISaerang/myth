@@ -68,7 +68,10 @@ function toEventSongView(eventSong: EventSongRead) {
 
 export async function listSongs(eventId: string) {
   const eventSongs = await prisma.eventSong.findMany({
-    where: { eventId },
+    where: {
+      eventId,
+      song: { archivedAt: null },
+    },
     include: eventSongReadInclude(eventId),
     orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
   });
@@ -81,6 +84,7 @@ export async function listPublishedSongsForMember(eventId: string) {
     where: {
       eventId,
       isPublished: true,
+      song: { archivedAt: null },
     },
     include: eventSongReadInclude(eventId),
     orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
@@ -92,7 +96,11 @@ export async function listPublishedSongsForMember(eventId: string) {
 // assignment). DRAFT internal tidak pernah bocor ke observer.
 export async function listPublishedSongsForObserver(eventId: string) {
   const eventSongs = await prisma.eventSong.findMany({
-    where: { eventId, isPublished: true },
+    where: {
+      eventId,
+      isPublished: true,
+      song: { archivedAt: null },
+    },
     include: eventSongReadInclude(eventId),
     orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
   });
@@ -107,16 +115,20 @@ export async function getSong(id: string, eventId: string) {
   return eventSong ? toEventSongView(eventSong) : null;
 }
 
-export async function listSongLibrary() {
+export async function listSongLibrary(includeArchived = false) {
   return prisma.song.findMany({
+    where: includeArchived ? {} : { archivedAt: null },
     include: { _count: { select: { eventSongs: true } } },
-    orderBy: [{ title: "asc" }, { artistOrAuthor: "asc" }],
+    orderBy: [{ archivedAt: "asc" }, { title: "asc" }, { artistOrAuthor: "asc" }],
   });
 }
 
 export async function listAvailableSongsForEvent(eventId: string) {
   return prisma.song.findMany({
-    where: { eventSongs: { none: { eventId } } },
+    where: {
+      archivedAt: null,
+      eventSongs: { none: { eventId } },
+    },
     select: { id: true, title: true, artistOrAuthor: true, key: true },
     orderBy: [{ title: "asc" }, { artistOrAuthor: "asc" }],
   });
@@ -202,6 +214,9 @@ export async function createSong(
       timeSignature: input.timeSignature,
       estimatedDurationSeconds: input.estimatedDurationSeconds,
       originalReferenceUrl: input.originalReferenceUrl,
+      introChords: input.introChords || null,
+      introNotation: input.introNotation || null,
+      introNote: input.introNote || null,
       createdById: actorUserId,
       eventSongs: {
         create: {
@@ -260,6 +275,9 @@ export async function updateSong(
         timeSignature: input.timeSignature,
         estimatedDurationSeconds: input.estimatedDurationSeconds,
         originalReferenceUrl: input.originalReferenceUrl,
+        introChords: input.introChords || null,
+        introNotation: input.introNotation || null,
+        introNote: input.introNote || null,
       },
     }),
     prisma.eventSong.update({
@@ -776,5 +794,61 @@ export async function deleteMaterial(
   });
   if (!material) return { ok: false, error: "Materi tidak ditemukan." };
   await prisma.songMaterial.delete({ where: { id: materialId } });
+  return { ok: true };
+}
+
+export async function archiveSong(
+  actorUserId: string,
+  songId: string,
+  eventId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { eventId_songId: { eventId, songId } },
+    include: { song: { select: { title: true } } },
+  });
+  if (!eventSong) return { ok: false, error: "Lagu tidak ditemukan di event ini." };
+  await prisma.song.update({
+    where: { id: songId },
+    data: {
+      archivedAt: new Date(),
+      archivedById: actorUserId,
+    },
+  });
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.SONG_UPDATED,
+    entityType: "Song",
+    entityId: songId,
+    summary: `"${eventSong.song.title}" diarsipkan (soft archive).`,
+    metadata: { songId, eventId },
+  });
+  return { ok: true };
+}
+
+export async function restoreSong(
+  actorUserId: string,
+  songId: string,
+  eventId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { eventId_songId: { eventId, songId } },
+    include: { song: { select: { title: true } } },
+  });
+  if (!eventSong) return { ok: false, error: "Lagu tidak ditemukan di event ini." };
+  await prisma.song.update({
+    where: { id: songId },
+    data: {
+      archivedAt: null,
+      archivedById: null,
+    },
+  });
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.SONG_UPDATED,
+    entityType: "Song",
+    entityId: songId,
+    summary: `"${eventSong.song.title}" dipulihkan dari arsip.`,
+    metadata: { songId, eventId },
+  });
   return { ok: true };
 }

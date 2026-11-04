@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { NotAngka } from "@/components/NotAngka";
+import { keyToFormula } from "@/lib/jianpu";
+import { ArchiveSongButton, RestoreSongButton } from "@/components/SongArchiveButtons";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -114,6 +117,45 @@ export default async function SongDetailPage({
         )}
         {song.isFinalLocked ? <Badge tone="danger">Final terkunci</Badge> : null}
       </div>
+
+      {(song.introChords || song.introNotation || song.introNote) && (
+        <Card title="Intro">
+          <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+            {song.introChords ? (
+              <>
+                <dt className="text-zinc-500 dark:text-zinc-400">Kunci intro</dt>
+                <dd className="font-mono font-medium">{song.introChords}</dd>
+              </>
+            ) : null}
+            {song.introNotation ? (
+              <>
+                <dt className="text-zinc-500 dark:text-zinc-400">Not angka</dt>
+                <dd>
+                  <NotAngka value={song.introNotation} />
+                </dd>
+              </>
+            ) : null}
+            {song.key && song.introNotation ? (
+              <>
+                <dt className="text-zinc-500 dark:text-zinc-400">Rumus</dt>
+                <dd className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+                  {keyToFormula(song.key)}
+                </dd>
+              </>
+            ) : null}
+            {song.introNote ? (
+              <>
+                <dt className="text-zinc-500 dark:text-zinc-400 sm:col-span-2">
+                  Catatan intro
+                </dt>
+                <dd className="sm:col-span-2 text-zinc-600 dark:text-zinc-400">
+                  {song.introNote}
+                </dd>
+              </>
+            ) : null}
+          </dl>
+        </Card>
+      )}
 
       <Card title="Overview">
         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -250,6 +292,9 @@ export default async function SongDetailPage({
               estimatedDurationSeconds: song.estimatedDurationSeconds,
               originalReferenceUrl: song.originalReferenceUrl,
               arrangementNotes: song.arrangementNotes,
+              introChords: song.introChords,
+              introNotation: song.introNotation,
+              introNote: song.introNote,
               status: song.status,
             }}
           />
@@ -308,6 +353,11 @@ export default async function SongDetailPage({
           <Card title="Buat versi aransemen">
             <VersionForm songId={song.id} />
           </Card>
+          {song.archivedAt ? (
+            <RestoreSongButton songId={song.id} eventId={song.eventId} />
+          ) : (
+            <ArchiveSongButton songId={song.id} eventId={song.eventId} />
+          )}
         </>
       ) : null}
 
