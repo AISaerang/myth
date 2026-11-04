@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseJakartaDateInput } from "@/lib/datetime-local";
 
 export const eventStatusSchema = z.enum(
   ["DRAFT", "PENDING_CONFIRMATION", "CONFIRMED", "COMPLETED", "CANCELLED"],
@@ -24,10 +25,28 @@ const optionalUrl = z
   .transform((v) => (v === "" ? undefined : v))
   .optional();
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 function toOptionalDate(value: unknown): Date | undefined {
   if (value === "" || value === undefined || value === null) return undefined;
-  const date = value instanceof Date ? value : new Date(String(value));
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value;
+  }
+  const raw = String(value).trim();
+  const date = DATE_ONLY_RE.test(raw)
+    ? parseJakartaDateInput(raw)
+    : new Date(raw);
   return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+// Form edit selalu mengirim status. Nilai itu hanya dipakai bila user
+// mengubah select-nya; kalau tidak, status tersimpan tetap (bukan Draft).
+export function resolveEventStatusUpdate<T extends string>(
+  existing: T,
+  submitted: T,
+  statusFieldChanged: boolean,
+): T {
+  return statusFieldChanged ? submitted : existing;
 }
 
 const baseEventSchema = z.object({

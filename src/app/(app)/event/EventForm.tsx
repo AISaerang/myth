@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -62,13 +62,22 @@ export function EventForm({
     mode === "create" ? createEventAction : updateEventAction,
     { ok: false },
   );
+  const statusChangedRef = useRef<HTMLInputElement>(null);
   const d = defaults ?? {};
 
   return (
     <Card title={mode === "create" ? "Buat event" : "Ubah event brief"}>
       <form action={formAction} className="flex flex-col gap-4">
         {mode === "edit" ? (
-          <input type="hidden" name="eventId" value={eventId} />
+          <>
+            <input type="hidden" name="eventId" value={eventId} />
+            <input
+              ref={statusChangedRef}
+              type="hidden"
+              name="eventStatusChanged"
+              defaultValue="0"
+            />
+          </>
         ) : null}
         {mode === "create" ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -138,6 +147,11 @@ export function EventForm({
               id="eventStatus"
               name="eventStatus"
               defaultValue={d.eventStatus ?? "DRAFT"}
+              onChange={() => {
+                if (statusChangedRef.current) {
+                  statusChangedRef.current.value = "1";
+                }
+              }}
               className={inputClass}
             >
               <option value="DRAFT">Draft</option>
