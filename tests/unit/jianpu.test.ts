@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { NotAngka } from "@/components/NotAngka";
 import { parseJianpu, formatNote, formatLine, keyToFormula } from "@/lib/jianpu";
 
 describe("JianpuASCII parser", () => {
@@ -111,6 +114,15 @@ describe("JianpuASCII parser", () => {
     expect(notes[2].octave).toBe(0);
     expect(notes[3].solfege).toBe(2);
     expect(notes[4].solfege).toBe(3);
+  });
+
+  it("renders octave marks as positioned notation instead of object text", () => {
+    const markup = renderToStaticMarkup(
+      createElement(NotAngka, { value: "6, 5, 1' 2 3" }),
+    );
+    expect(markup).not.toContain("[object Object]");
+    expect(markup).toContain(">,</span>");
+    expect(markup).toContain("relative -top-2 text-xs font-mono\">&#x27;</span>");
   });
 
   it("formatNote renders back correctly", () => {
