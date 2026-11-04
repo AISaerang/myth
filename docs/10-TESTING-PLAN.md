@@ -18,6 +18,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Event brief date inputs use the Asia/Jakarta calendar day (midnight WIB round-trips; a UTC date slice does not). Saving the brief keeps the stored confirmation status unless the status field was changed.
 - Membership backfill selects only active users with zero event memberships for the newest non-cancelled regional event, leaves anyone who already belongs to an event untouched, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
 - Chart viewer renders not angka in one arrangement body and shows the transpose formula once, next to the transpose controls.
+- An Intro of three chord+notation lines, the last with `Csus4` and trailing `| |`, renders every line at the lyric size (`text-sm` / `leading-6`) in Lirik+Chord, Lirik saja, and Chord saja; transpose changes chords only.
 - Final lock requires intentional authorized action.
 - Overdue task and equipment blocker aggregation.
 - Cancelled rehearsal excluded from upcoming list.
