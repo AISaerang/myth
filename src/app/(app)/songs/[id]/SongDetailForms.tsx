@@ -280,9 +280,11 @@ const CATEGORIES = Object.entries(MATERIAL_CATEGORY_LABEL);
 
 export function MaterialForm({
   songId,
+  eventId,
   versions,
 }: {
   songId: string;
+  eventId: string;
   versions: { id: string; versionLabel: string }[];
 }) {
   const [state, formAction, pending] = useActionState(addMaterialAction, {
@@ -296,6 +298,7 @@ export function MaterialForm({
     <div className="flex flex-col gap-2">
       <form ref={formRef} action={formAction} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <input
           name="title"
           aria-label="Judul materi"
