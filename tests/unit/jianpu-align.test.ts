@@ -1,7 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ChordViewer } from "@/app/(app)/songs/[id]/ChordViewer";
+import { ChartBody, ChordViewer } from "@/app/(app)/songs/[id]/ChordViewer";
 import { layoutChordLine, overUnderToChordPro, transposeContent } from "@/lib/chords";
 import {
   alignChordsToNotation,
@@ -154,5 +155,72 @@ describe("not angka column alignment", () => {
     expect(markup).toContain("Bapa");
     expect(markup).toContain("Intro");
     expect(markup).toContain("Verse");
+  });
+
+  it("renders every intro line at the lyric size, including a last line with Csus4 and bar lines", () => {
+    const content = [
+      "{Intro}",
+      "[C]6 5 1 2 3 | |",
+      "[F]6 5 1 2 [C]3 | |",
+      "[F]6 5 1 2 3 | |[C]     [Csus4]",
+      "{Verse}",
+      "[G]Bapa [D]sentuh",
+    ].join("\n");
+
+    const both = renderToStaticMarkup(
+      createElement(ChartBody, { content, mode: "both", renderKey: "intro-size" }),
+    );
+    const staffs = [...both.matchAll(/class="([^"]*notation-staff[^"]*)"/g)].map(
+      (match) => match[1] ?? "",
+    );
+    expect(staffs).toHaveLength(3);
+    for (const className of staffs) {
+      expect(className).toContain("text-sm");
+      expect(className).toContain("leading-6");
+      expect(className).toContain("font-mono");
+    }
+    expect(both).toContain('data-chord="Csus4"');
+    expect(both).toContain('data-kind="bar"');
+    expect(both.match(/data-kind="bar"/g)).toHaveLength(6);
+    expect(both).toContain("Bapa");
+    expect(both).toContain("font-mono text-sm leading-6");
+    const lyric = both.slice(both.lastIndexOf("Bapa") - 180, both.lastIndexOf("Bapa"));
+    expect(lyric).toContain("text-sm");
+    expect(lyric).not.toContain("notation-staff");
+
+    const css = readFileSync("src/app/globals.css", "utf8");
+    const staffCss = css.slice(css.indexOf(".notation-staff {"), css.indexOf(".notation-glyph-font"));
+    expect(staffCss).toContain("font-size: 0.875rem");
+    expect(staffCss).toContain("line-height: 1.5rem");
+    expect(staffCss).toContain("height: 1.5rem");
+    expect(staffCss).not.toContain("1.75rem");
+    expect(staffCss).not.toContain("2.4em");
+
+    const lyricsOnly = renderToStaticMarkup(
+      createElement(ChartBody, { content, mode: "lyrics", renderKey: "intro-lyrics" }),
+    );
+    expect(lyricsOnly.match(/notation-staff/g)).toHaveLength(3);
+    expect(lyricsOnly).not.toContain('data-chord="Csus4"');
+    expect(lyricsOnly).toContain('data-note="6"');
+    expect(lyricsOnly).toContain('data-kind="bar"');
+    expect(lyricsOnly).toContain("Bapa");
+
+    const chordsOnly = renderToStaticMarkup(
+      createElement(ChartBody, { content, mode: "chords", renderKey: "intro-chords" }),
+    );
+    expect(chordsOnly).not.toContain("notation-staff");
+    expect(chordsOnly).toContain("Csus4");
+    expect(chordsOnly).toContain("text-sm");
+    expect(chordsOnly).toContain("Intro");
+
+    const shifted = renderToStaticMarkup(
+      createElement(ChordViewer, { content, baseKey: "C", initialOffset: 2 }),
+    );
+    expect(shifted).toContain('data-chord="Dsus4"');
+    expect(shifted).toContain('data-chord="G"');
+    expect(shifted).not.toContain('data-chord="Csus4"');
+    expect(shifted).toContain('data-note="6"');
+    expect(shifted).toContain('data-note="3"');
+    expect(shifted.match(/notation-staff/g)).toHaveLength(3);
   });
 });

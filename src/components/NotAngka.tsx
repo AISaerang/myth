@@ -31,7 +31,7 @@ export function NotationLine({
 
   return (
     <div
-      className="notation-staff"
+      className="notation-staff font-mono text-sm leading-6"
       style={{ width: `calc(${alignment.columns} * 1ch)` }}
       data-notation-line=""
       data-columns={alignment.columns}
@@ -63,14 +63,10 @@ export function NotationLine({
             data-kind={token.kind}
             data-render-col={token.renderCol}
             className="absolute whitespace-pre"
-            style={{ left: `calc(${token.renderCol} * 1ch)`, top: useCss ? "0.72em" : "0.15em" }}
+            style={{ left: `calc(${token.renderCol} * 1ch)` }}
           >
             {token.kind === "bar" ? (
-              useCss ? (
-                "|"
-              ) : (
-                <span className="notation-glyph-font">|</span>
-              )
+              "|"
             ) : useCss && token.note ? (
               <FallbackNote note={token.note} />
             ) : token.note ? (
