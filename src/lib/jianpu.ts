@@ -198,3 +198,19 @@ export function formatNote(note: JianpuNote): string {
 export function formatLine(line: JianpuLine): string {
   return line.notes.map(formatNote).join(" ");
 }
+
+// Teks untuk font JianpuASCII. Kres/mol memakai glyph ligatur font
+// (^ = sharp, _ = flat), bukan karakter ketik # / b.
+export function toJianpuFontText(note: JianpuNote): string {
+  let s = "";
+  if (note.accidental === 1) s += "^";
+  else if (note.accidental === -1) s += "_";
+  s += note.solfege.toString();
+  if (note.octave > 0) s += "'".repeat(note.octave);
+  else if (note.octave < 0) s += ",".repeat(-note.octave);
+  if (note.duration === 0.5) s += "/";
+  else if (note.duration === 0.25) s += "//";
+  s += "-".repeat(note.extension);
+  if (note.dotted) s += ".";
+  return s;
+}

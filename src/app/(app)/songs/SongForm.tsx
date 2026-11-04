@@ -193,7 +193,9 @@ export function SongForm({
               className={inputClass}
             />
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Kunci untuk bagian intro lagu.
+              Basis C. Spasi = kolom di atas not angka, contoh{" "}
+              <span className="font-mono whitespace-pre">C   G</span>. Intro
+              panjang lebih nyaman lewat bagian Intro di chart.
             </p>
           </div>
           <div className="flex flex-col gap-1">
@@ -210,7 +212,7 @@ export function SongForm({
             />
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Format: nada 1-7, diam 0, oktaf &apos; di atas / , di bawah, kres/mol # / b,
-              ketukan / dan //, panjang -, titik ritme .
+              ketukan / dan //, panjang -, titik ritme . Angka tidak berubah saat transpose.
             </p>
           </div>
         </div>

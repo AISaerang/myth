@@ -54,6 +54,8 @@ MD mengelola master bagian lagu (Intro, Verse, Pre-Chorus, Chorus, Post-Chorus, 
 
 Editor chord tampil sebagai "kunci di atas lirik": chord ditulis pada baris tersendiri di atas baris liriknya dan posisinya diatur dengan spasi, sehingga menyisipkan chart dari internet (format ini umum) maupun menggeser kunci ke pemisah suku kata gampang tanpa sintaks `[bracket]`. Di penyimpanan tetap ChordPro inline basis C; konversi format edit ⇄ ChordPro terjadi di klien dan hasil render akhir selalu identik (committed dengan unit test roundtrip). Toggle "Teks ChordPro" tersedia bila perlu mengedit sintaks mentah. Label bagian tetap diisi lewat kolom "Label bagian", bukan `{brace}` di konten.
 
+Intro not angka ditulis dengan cara yang sama: baris kunci di atas baris not angka (`1' 2 3 4 5`). Preview dan halaman lagu merender angka sebagai notasi Jianpu (titik oktaf di tengah angka) dengan kunci tetap di kolomnya. Transpose lagu menggeser kunci; angka tidak berubah. Rumus (`C + 2 = D`) tampil di kontrol transpose. Field kunci/not angka intro pada form lagu tetap ada dan ditampilkan dengan layout kolom yang sama.
+
 Alur admin: impor chart lama (opsional) → review pecahan bagian → rapikan label/isi → susun urutan → aktifkan satu aransemen. Hanya satu aransemen aktif per lagu. Chart lama tetap menjadi fallback/riwayat dan tidak ditampilkan selama aransemen aktif ada. Perubahan sensitif dicatat di audit log.
 
 Setlist fixed (acara Sabtu 14 Nov 2026; sebelumnya disebut setlist 21 Nov) dapat diisi sekaligus dengan `npm run import:lyrics` (idempoten; lagu yang sudah punya bagian/aransemen dilewati). Tujuh lagu memakai chart aktif sebagai master lirik + chord; tiga lagu tanpa chart memakai data lirik di `prisma/setlist-lyrics.ts`.

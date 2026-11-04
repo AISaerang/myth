@@ -22,6 +22,7 @@ export function ChordOverUnderEditor({
   rows = 14,
   heading,
   hint,
+  placeholder,
   onChange,
 }: {
   id: string;
@@ -30,6 +31,7 @@ export function ChordOverUnderEditor({
   rows?: number;
   heading: string;
   hint?: string;
+  placeholder?: string;
   onChange?: (chordPro: string) => void;
 }) {
   const [mode, setMode] = useState<EditMode>("stacked");
@@ -122,7 +124,7 @@ export function ChordOverUnderEditor({
           rows={rows}
           onChange={(event) => setStacked(expandTabs(event.target.value))}
           onKeyDown={handleTab}
-          placeholder={"G        D/F#\nBapa sentuh hati-ku"}
+          placeholder={placeholder ?? "G        D/F#\nBapa sentuh hati-ku"}
           className={`${textareaClass} overflow-x-auto`}
         />
       ) : (

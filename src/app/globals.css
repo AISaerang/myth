@@ -33,3 +33,46 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Satu kolom = 1ch font monospace staff. Glyph JianpuASCII advance-nya 0.6em,
+   jadi font-size calc(1ch / 0.6) membuat satu glyph selebar satu kolom kunci. */
+.notation-staff {
+  position: relative;
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 1.75rem;
+  line-height: 1;
+  letter-spacing: 0;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  vertical-align: top;
+}
+
+.notation-staff .notation-chords {
+  position: relative;
+  height: 1.35em;
+}
+
+.notation-staff .notation-notes {
+  position: relative;
+  height: 2.4em;
+}
+
+.notation-glyph-font {
+  display: inline-block;
+  font-family: "JianpuASCII", ui-monospace, monospace;
+  font-feature-settings: "liga" 1, "clig" 1;
+  font-variant-ligatures: common-ligatures;
+  font-size: calc(1ch / 0.6);
+  font-weight: 400;
+  line-height: 1;
+  white-space: pre;
+}
+
+.jianpu-dot {
+  display: block;
+  width: 0.12em;
+  height: 0.12em;
+  border-radius: 999px;
+  background: currentColor;
+}
