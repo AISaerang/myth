@@ -19,6 +19,8 @@ InstrumentSkill: `id`, `name`. PersonSkill: `personId`, `instrumentSkillId`, `pr
 ### Song
 `id`, `eventId`, `title`, `artistOrAuthor?`, `liturgicalFunction?`, `key?`, `bpm?`, `timeSignature?`, `estimatedDurationSeconds?`, `originalReferenceUrl?`, `arrangementNotes?`, `status`, `isPublished`, `isFinalLocked`, `activeArrangementVersionId?`, `createdById`, timestamps.
 
+Legacy columns `introChords`, `introNotation`, and `introNote` stay on `Song` and are no longer edited from the song form. Intro is a `ChartSection` of type `INTRO` in the active arrangement. `scripts/migrate-intro-sections.ts` copies those columns forward; it does not drop or null them.
+
 Song status: `DRAFT|SOURCE_SHARED|ARRANGEMENT_IN_PROGRESS|REFERENCE_READY|PRACTICING|NEEDS_REVIEW|READY_FOR_REHEARSAL|REHEARSAL_READY|FINAL_LOCKED`.
 
 ### SongBatch / SongBatchItem

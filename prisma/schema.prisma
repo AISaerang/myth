@@ -277,7 +277,9 @@ model Song {
   isFinalLocked            Boolean            @default(false)
   activeArrangementVersionId String?
   activeVersion            ArrangementVersion? @relation("SongActiveVersion", fields: [activeArrangementVersionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  // Not angka (JianpuASCII) intro untuk lagu ini; disimpan format ketik.
+  // Kolom intro lama. UI tidak lagi mengeditnya: intro hidup sebagai
+  // ChartSection bertipe INTRO. Jangan di-drop; skrip
+  // scripts/migrate-intro-sections.ts menyalin isi ke bagian chart.
   introChords         String?   // kunci intro, cth. "C F"
   introNotation       String?   @db.Text  // not angka, cth. "6, 5, 1 2 3"
   introNote           String?   @db.Text  // catatan bebas tentang intro

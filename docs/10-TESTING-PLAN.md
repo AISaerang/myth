@@ -14,6 +14,8 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Arrangement composition keeps item order/duplicates and applies label overrides.
 - Chart section/arrangement validation rejects empty labels/content, duplicate labels, invalid item payloads, and over-limit sequences.
 - Setlist lyric seed keeps unique labels, non-empty content, and arrangement items that reference existing sections.
+- Intro-column migration builds a ChordPro Intro section (chords over not angka, note as a `#` comment), skips songs that already have an Intro section, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
+- Chart viewer renders not angka in one arrangement body and shows the transpose formula once, next to the transpose controls.
 - Final lock requires intentional authorized action.
 - Overdue task and equipment blocker aggregation.
 - Cancelled rehearsal excluded from upcoming list.

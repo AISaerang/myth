@@ -27,7 +27,6 @@ import {
 } from "./ProgressForms";
 import { CreateSuggestionForm } from "../../tasks/TaskForms";
 import { ChordChartSection } from "./ChordChartSection";
-import { IntroStaff } from "./IntroStaff";
 import {
   OverdueBadge,
   PracticeStatusBadge,
@@ -116,21 +115,6 @@ export default async function SongDetailPage({
         )}
         {song.isFinalLocked ? <Badge tone="danger">Final terkunci</Badge> : null}
       </div>
-
-      {(song.introChords || song.introNotation || song.introNote) && (
-        <Card title="Intro">
-          {song.introChords || song.introNotation ? (
-            <IntroStaff
-              chords={song.introChords ?? ""}
-              notation={song.introNotation ?? ""}
-              note={song.introNote}
-              songKey={song.key}
-            />
-          ) : (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">{song.introNote}</p>
-          )}
-        </Card>
-      )}
 
       <Card title="Overview">
         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -267,9 +251,6 @@ export default async function SongDetailPage({
               estimatedDurationSeconds: song.estimatedDurationSeconds,
               originalReferenceUrl: song.originalReferenceUrl,
               arrangementNotes: song.arrangementNotes,
-              introChords: song.introChords,
-              introNotation: song.introNotation,
-              introNote: song.introNote,
               status: song.status,
             }}
           />

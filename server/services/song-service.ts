@@ -214,9 +214,6 @@ export async function createSong(
       timeSignature: input.timeSignature,
       estimatedDurationSeconds: input.estimatedDurationSeconds,
       originalReferenceUrl: input.originalReferenceUrl,
-      introChords: input.introChords || null,
-      introNotation: input.introNotation || null,
-      introNote: input.introNote || null,
       createdById: actorUserId,
       eventSongs: {
         create: {
@@ -275,9 +272,9 @@ export async function updateSong(
         timeSignature: input.timeSignature,
         estimatedDurationSeconds: input.estimatedDurationSeconds,
         originalReferenceUrl: input.originalReferenceUrl,
-        introChords: input.introChords || null,
-        introNotation: input.introNotation || null,
-        introNote: input.introNote || null,
+        // introChords/introNotation/introNote sengaja tidak disentuh:
+        // form lagu tidak lagi mengeditnya, dan menyimpan null di sini
+        // akan menghapus data sebelum skrip migrasi sempat menyalinnya.
       },
     }),
     prisma.eventSong.update({
