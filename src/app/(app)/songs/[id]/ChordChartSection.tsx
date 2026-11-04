@@ -361,9 +361,9 @@ function ChartRowActions({
       <form action={delAction}>
         <input type="hidden" name="chartId" value={chartId} />
         <input type="hidden" name="songId" value={songId} />
-        <Button type="submit" variant="danger" size="sm" disabled={delPending}>
-          Hapus
-        </Button>
+          <Button type="submit" variant="danger" size="sm" disabled={delPending}>
+            Hapus versi chart ini
+          </Button>
       </form>
       {!actState.ok && actState.error ? (
         <Alert tone="danger">{actState.error}</Alert>
