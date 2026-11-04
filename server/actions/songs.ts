@@ -23,6 +23,7 @@ import {
   activateVersion,
   addSongFromLibraryToEvent,
   addMaterial,
+  MATERIAL_SAVE_FAILED,
   archiveSong,
   assignPerson,
   createSong,
@@ -261,37 +262,56 @@ export async function unlockFinalAction(
   return { ok: true };
 }
 
+function materialActionError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "Unauthorized") {
+    return "Sesi berakhir. Masuk lagi untuk menambah materi.";
+  }
+  if (message === "Forbidden") {
+    return "Anda tidak punya izin menambah materi ini.";
+  }
+  if (message === "Not found") {
+    return "Lagu atau event tidak ditemukan.";
+  }
+  return MATERIAL_SAVE_FAILED;
+}
+
 export async function addMaterialAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionUser();
-  const parsed = materialSchema.safeParse({
-    songId: formData.get("songId"),
-    eventId: formData.get("eventId") || undefined,
-    arrangementVersionId: formData.get("arrangementVersionId") || undefined,
-    title: formData.get("title"),
-    category: formData.get("category"),
-    url: formData.get("url"),
-    versionLabel: formData.get("versionLabel") || undefined,
-    description: formData.get("description") || undefined,
-  });
-  if (!parsed.success) {
-    return { ok: false, error: firstIssueMessage(parsed.error) };
+  try {
+    const admin = await requireActionUser();
+    const parsed = materialSchema.safeParse({
+      songId: formData.get("songId"),
+      eventId: formData.get("eventId") || undefined,
+      arrangementVersionId: formData.get("arrangementVersionId") || undefined,
+      title: formData.get("title"),
+      category: formData.get("category"),
+      url: formData.get("url"),
+      versionLabel: formData.get("versionLabel") || undefined,
+      description: formData.get("description") || undefined,
+    });
+    if (!parsed.success) {
+      return { ok: false, error: firstIssueMessage(parsed.error) };
+    }
+    if (parsed.data.eventId) {
+      await requireEventManagerForSong(
+        admin,
+        parsed.data.songId,
+        parsed.data.eventId,
+      );
+    } else {
+      await requireGlobalAdmin(admin);
+    }
+    const result = await addMaterial(admin.id, parsed.data);
+    if (!result.ok) return { ok: false, error: result.error };
+    revalidateSongs(parsed.data.songId);
+    return { ok: true };
+  } catch (error) {
+    console.error("add-material-action-failed", error);
+    return { ok: false, error: materialActionError(error) };
   }
-  if (parsed.data.eventId) {
-    await requireEventManagerForSong(
-      admin,
-      parsed.data.songId,
-      parsed.data.eventId,
-    );
-  } else {
-    await requireGlobalAdmin(admin);
-  }
-  const result = await addMaterial(admin.id, parsed.data);
-  if (!result.ok) return { ok: false, error: result.error };
-  revalidateSongs(parsed.data.songId);
-  return { ok: true };
 }
 
 export async function setMaterialActiveAction(

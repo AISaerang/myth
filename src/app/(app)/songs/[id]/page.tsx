@@ -273,6 +273,7 @@ export default async function SongDetailPage({
           <Card title="Tambah materi">
             <MaterialForm
               songId={song.id}
+              eventId={song.eventId}
               versions={song.versions.map((v) => ({
                 id: v.id,
                 versionLabel: v.versionLabel,

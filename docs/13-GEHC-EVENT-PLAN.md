@@ -365,4 +365,4 @@ P8 implementation (release prep, branch `feature/gehc-events`, owner merge pendi
 - [x] **Q7** No membership → **empty state, no data** (global ADMIN excepted). No auto-join. *Resolved 2 Nov 2026.* See §5.3.
 - [x] **Q8** Completed events → access closes **only** via manual "Tutup akses" by the event's EVENT_ADMIN or global ADMIN, audited; visible until then; admins can view/reopen. *Resolved 2 Nov 2026.* See §6.3.
 
-Remaining assumptions (confirm during build): library edit is global ADMIN only; `SongMaterial` rows stay library-level by default.
+Remaining assumptions (confirm during build): library edit is global ADMIN only. Materi yang ditambah dari halaman lagu event menyertakan `eventId` event itu. `eventId` yang dikosongkan (seed/pustaka) disimpan `null`, bukan id palsu.
