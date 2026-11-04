@@ -140,6 +140,8 @@ export async function createUserWithTemporaryPassword(
   // Setiap login identity mendapat operational identity (docs/05).
   const { ensurePersonForUser } = await import("./personnel-service");
   await ensurePersonForUser(user.id, user.displayName);
+  // Jangan menggabungkan akun baru ke event mana pun. Admin menambahkan
+  // akun ke event yang dipilih lewat halaman anggota event.
   return { ok: true, user, temporaryPassword };
 }
 
