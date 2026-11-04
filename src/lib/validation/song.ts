@@ -108,9 +108,6 @@ export const songSchema = z.object({
   ),
   originalReferenceUrl: optionalHttpUrl,
   arrangementNotes: z.string().trim().max(5000).optional(),
-  introChords: z.string().trim().max(50).optional(),
-  introNotation: z.string().trim().max(5000).optional(),
-  introNote: z.string().trim().max(5000).optional(),
   status: songStatusSchema,
 });
 

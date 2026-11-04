@@ -125,5 +125,34 @@ describe("not angka column alignment", () => {
     expect(markup).toContain("Bapa");
     expect(markup).toContain("Intro");
     expect(markup).not.toContain("-top-2");
+    expect(markup.match(/data-key-formula=/g)).toHaveLength(1);
+    const controls = markup.slice(0, markup.indexOf('data-chart-body=""'));
+    expect(controls).toContain("data-key-formula=");
+    expect(markup.slice(markup.indexOf('data-chart-body=""'))).not.toContain(
+      "data-key-formula=",
+    );
+  });
+
+  it("shows the transpose formula once for an arrangement that starts with Intro", () => {
+    const markup = renderToStaticMarkup(
+      createElement(ChordViewer, {
+        content:
+          "{Intro}\n[C]1' 2[G] 3 4 5\n# mainkan pelan\n\n{Verse}\n[C]1 2 3 4\n[G]Bapa [D]sentuh",
+        baseKey: "C",
+        initialOffset: 2,
+      }),
+    );
+    expect(markup.match(/data-key-formula=/g)).toHaveLength(1);
+    expect(markup).toContain("C + 2 = D");
+    expect(markup).toContain('data-chord="D"');
+    expect(markup).toContain('data-render-col="0"');
+    expect(markup).toContain('data-chord="A"');
+    expect(markup).toContain('data-render-col="3"');
+    expect(markup).toContain('data-note="1&#x27;"');
+    expect(markup).toContain('data-chart-comment=""');
+    expect(markup).toContain("mainkan pelan");
+    expect(markup).toContain("Bapa");
+    expect(markup).toContain("Intro");
+    expect(markup).toContain("Verse");
   });
 });

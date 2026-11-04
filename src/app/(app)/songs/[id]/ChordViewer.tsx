@@ -23,18 +23,46 @@ const MODES: { value: ViewMode; label: string }[] = [
   { value: "chords", label: "Chord saja" },
 ];
 
-function renderChart(content: string, mode: ViewMode, key: string) {
-  if (mode === "chords") {
-    return (
-      <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-7">
-        {extractChordLines(content).join("\n")}
-      </pre>
-    );
-  }
+// Baris komentar ChordPro (`# ...`), dipakai catatan intro yang sudah
+// menjadi bagian chart. Bukan label bagian dan bukan not angka.
+function chartComment(line: string): string | null {
+  if (/[\[{]/.test(line)) return null;
+  const match = /^\s*#(.*)$/.exec(line);
+  if (!match) return null;
+  return (match[1] ?? "").trim();
+}
 
+function renderChart(content: string, mode: ViewMode, key: string) {
   return content.split("\n").map((line, index) => {
-    const { chordLine, lyricLine, label, isEmpty } = layoutChordLine(line);
     const lineKey = `${key}-${index}`;
+    const comment = chartComment(line);
+    if (comment !== null) {
+      if (!comment) return <div key={lineKey} className="h-2" />;
+      return (
+        <p
+          key={lineKey}
+          data-chart-comment=""
+          className="text-sm text-zinc-600 dark:text-zinc-400"
+        >
+          {comment}
+        </p>
+      );
+    }
+
+    if (mode === "chords") {
+      const extracted = extractChordLines(line)[0] ?? "";
+      if (!extracted.trim()) return <div key={lineKey} className="h-2" />;
+      return (
+        <pre
+          key={lineKey}
+          className="overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap"
+        >
+          {extracted}
+        </pre>
+      );
+    }
+
+    const { chordLine, lyricLine, label, isEmpty } = layoutChordLine(line);
     if (isEmpty) return <div key={lineKey} className="h-4" />;
     if (label) {
       return (
@@ -83,6 +111,19 @@ function renderChart(content: string, mode: ViewMode, key: string) {
   });
 }
 
+/** Isi chart tanpa kontrol transpose, supaya rumus nada tidak diulang per bagian. */
+export function ChartBody({
+  content,
+  mode = "both",
+  renderKey,
+}: {
+  content: string;
+  mode?: ViewMode;
+  renderKey: string;
+}) {
+  return <>{renderChart(content, mode, renderKey)}</>;
+}
+
 export function ChordViewer({
   content,
   baseKey,
@@ -109,18 +150,20 @@ export function ChordViewer({
 
   return (
     <div className="flex flex-col gap-3">
-      <KeyTransposeBar
-        baseKey={baseKey}
-        offset={offset}
-        useFlats={useFlats}
-        formula={formula || undefined}
-        onOffset={setOffset}
-        onFlats={setUseFlats}
-        onReset={() => {
-          setOffset(0);
-          setUseFlats(false);
-        }}
-      />
+      <div data-chart-controls="">
+        <KeyTransposeBar
+          baseKey={baseKey}
+          offset={offset}
+          useFlats={useFlats}
+          formula={formula || undefined}
+          onOffset={setOffset}
+          onFlats={setUseFlats}
+          onReset={() => {
+            setOffset(0);
+            setUseFlats(false);
+          }}
+        />
+      </div>
       <div className="flex flex-wrap gap-1" role="group" aria-label="Mode tampil">
         {MODES.map((item) => (
           <button
@@ -138,8 +181,12 @@ export function ChordViewer({
           </button>
         ))}
       </div>
-      <div className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
-        {renderChart(transposed, mode, `${offset}-${useFlats}-${mode}`)}
+      <div data-chart-body="" className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
+        <ChartBody
+          content={transposed}
+          mode={mode}
+          renderKey={`${offset}-${useFlats}-${mode}`}
+        />
       </div>
     </div>
   );

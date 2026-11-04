@@ -28,7 +28,7 @@ import {
   saveChartArrangementItemsAction,
   updateChartArrangementAction,
 } from "@server/actions/chart-arrangements";
-import { ChordViewer } from "../ChordViewer";
+import { ChartBody, ChordViewer } from "../ChordViewer";
 import { ChartSectionEditor, type SectionData } from "./ChartSectionEditor";
 import { HintSelect } from "@/components/ui/HintSelect";
 
@@ -284,9 +284,9 @@ export function ChartArrangementEditor({
                           · {CHART_SECTION_TYPE_LABEL[section.type]}
                         </span>
                       </p>
-                      <p className="line-clamp-2 text-xs text-zinc-500">
-                        {section.content}
-                      </p>
+                      <div className="mt-2 max-h-40 overflow-auto rounded-lg bg-zinc-50 p-2 dark:bg-zinc-900">
+                        <ChartBody content={section.content} renderKey={section.id} />
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-1">
                       <Button

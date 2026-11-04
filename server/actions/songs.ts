@@ -56,9 +56,6 @@ function parseSongForm(formData: FormData) {
     estimatedDurationSeconds: formData.get("estimatedDurationSeconds") || undefined,
     originalReferenceUrl: formData.get("originalReferenceUrl") || undefined,
     arrangementNotes: formData.get("arrangementNotes") || undefined,
-    introChords: formData.get("introChords") || undefined,
-    introNotation: formData.get("introNotation") || undefined,
-    introNote: formData.get("introNote") || undefined,
     status: formData.get("status"),
   });
 }
@@ -74,9 +71,6 @@ function parseSongUpdateForm(formData: FormData) {
     estimatedDurationSeconds: formData.get("estimatedDurationSeconds") || undefined,
     originalReferenceUrl: formData.get("originalReferenceUrl") || undefined,
     arrangementNotes: formData.get("arrangementNotes") || undefined,
-    introChords: formData.get("introChords") || undefined,
-    introNotation: formData.get("introNotation") || undefined,
-    introNote: formData.get("introNote") || undefined,
     status: formData.get("status"),
   });
 }
