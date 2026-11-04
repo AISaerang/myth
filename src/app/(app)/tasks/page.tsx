@@ -7,11 +7,16 @@ import { isAdmin, isObserver } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { isTaskOverdue } from "@/lib/task-status";
 import { prisma } from "@/lib/db";
-import { getCurrentEvent, listEvents } from "@server/services/event-service";
+import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import { listPersonnelForAdmin } from "@server/services/personnel-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
-import { listMySongs, listPublishedSongsForObserver, listSongs } from "@server/services/song-service";
+import {
+  listPublishedSongsForMember,
+  listPublishedSongsForObserver,
+  listSongs,
+} from "@server/services/song-service";
 import { listObserverTasks, listRelevantTasks, listTasks } from "@server/services/task-service";
+import { notFound } from "next/navigation";
 import { EventPicker } from "../songs/EventPicker";
 import { CreateSuggestionForm, CreateTaskForm, EditSuggestionForm, EditTaskForm, MyTaskStatusForm } from "./TaskForms";
 import {
@@ -41,10 +46,11 @@ export default async function TasksPage({
   const observer = isObserver(user);
 
   const [events, current] = await Promise.all([
-    listEvents(),
-    getCurrentEvent(),
+    listEvents(user),
+    getActiveEventFor(user, params.eventId),
   ]);
   if (events.length === 0) {
+    if (params.eventId) notFound();
     return (
       <EmptyState
         title="Belum ada event"
@@ -52,10 +58,8 @@ export default async function TasksPage({
       />
     );
   }
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const eventId = current?.id;
+  if (!eventId) notFound();
   const filter: Filter = FILTERS.some((f) => f.value === params.filter)
     ? (params.filter as Filter)
     : "all";
@@ -113,7 +117,7 @@ export default async function TasksPage({
         ])
       : await Promise.all([
           [] as { id: string; displayName: string }[],
-          listMySongs(user.id, eventId).then((s) =>
+          listPublishedSongsForMember(eventId).then((s) =>
             s.map((x) => ({ id: x.id, title: x.title })),
           ),
           listRehearsals(eventId).then((r) => r.map((x) => ({ id: x.id, title: x.title }))),
@@ -127,7 +131,7 @@ export default async function TasksPage({
         </h1>
         {admin ? (
           <EventPicker
-            events={events.map((e) => ({ id: e.id, name: e.name }))}
+            events={events.map((e) => ({ id: e.id, name: e.name, eventType: e.eventType }))}
             value={eventId}
           />
         ) : null}

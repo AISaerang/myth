@@ -3,13 +3,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAdminUser, requireFreshUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
-import { getCurrentEvent, listEvents } from "@server/services/event-service";
+import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import { listDecisions } from "@server/services/decision-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
 import { listSongs } from "@server/services/song-service";
 import { EventPicker } from "../songs/EventPicker";
 import { DecisionTypeBadge } from "../rehearsals/OpsBadges";
 import { CreateDecisionForm } from "./DecisionForms";
+import { notFound } from "next/navigation";
 
 export default async function DecisionsPage({
   searchParams,
@@ -23,8 +24,9 @@ export default async function DecisionsPage({
     await requireAdminUser();
   }
   const params = await searchParams;
-  const events = await listEvents();
+  const events = await listEvents(user);
   if (events.length === 0) {
+    if (params.eventId) notFound();
     return (
       <EmptyState
         title="Belum ada event"
@@ -32,11 +34,9 @@ export default async function DecisionsPage({
       />
     );
   }
-  const current = await getCurrentEvent();
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const current = await getActiveEventFor(user, params.eventId);
+  const eventId = current?.id;
+  if (!eventId) notFound();
 
   const [decisions, songs, rehearsals] = await Promise.all([
     listDecisions(eventId),
@@ -51,7 +51,7 @@ export default async function DecisionsPage({
           Keputusan & Catatan
         </h1>
         <EventPicker
-          events={events.map((e) => ({ id: e.id, name: e.name }))}
+          events={events.map((e) => ({ id: e.id, name: e.name, eventType: e.eventType }))}
           value={eventId}
         />
       </div>

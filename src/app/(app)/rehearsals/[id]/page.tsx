@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { isAdmin, isObserver } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
-import { getCurrentEvent } from "@server/services/event-service";
+import { getEventRole } from "@server/services/event-access";
 import { listPersonnelForAdmin } from "@server/services/personnel-service";
 import { listSongs } from "@server/services/song-service";
 import { getRehearsal } from "@server/services/rehearsal-service";
@@ -32,14 +32,12 @@ export default async function RehearsalDetailPage({
   const { id } = await params;
   const rehearsal = await getRehearsal(id);
   if (!rehearsal) notFound();
+  if (!(await getEventRole(user, rehearsal.eventId))) notFound();
   const admin = isAdmin(user);
   const observer = isObserver(user);
-
-  if (!admin) {
-    // Personel hanya melihat rehearsal event berjalan.
-    const current = await getCurrentEvent();
-    if (!current || current.id !== rehearsal.eventId) notFound();
-  }
+  const visibleSongs = admin
+    ? rehearsal.songs
+    : rehearsal.songs.filter((item) => item.song.isPublished);
 
   const myPerson = admin
     ? null
@@ -101,12 +99,12 @@ export default async function RehearsalDetailPage({
         ) : null}
       </Card>
 
-      <Card title={`Lagu (${rehearsal.songs.length})`}>
-        {rehearsal.songs.length === 0 && !admin ? (
+      <Card title={`Lagu (${visibleSongs.length})`}>
+        {visibleSongs.length === 0 && !admin ? (
           <EmptyState title="Belum ada lagu ditentukan" />
         ) : (
           <ul className="flex flex-col gap-1">
-            {rehearsal.songs.map((s, index) => (
+            {visibleSongs.map((s, index) => (
               <li
                 key={s.songId}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
@@ -115,7 +113,7 @@ export default async function RehearsalDetailPage({
                   <span className="w-6 text-center text-xs text-zinc-500">
                     {index + 1}
                   </span>
-                  <Link href={`/songs/${s.songId}`} className="font-medium underline">
+                  <Link href={`/songs/${s.songId}?eventId=${rehearsal.eventId}`} className="font-medium underline">
                     {s.song.title}
                   </Link>
                 </span>

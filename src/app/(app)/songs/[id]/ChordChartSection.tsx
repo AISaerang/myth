@@ -33,11 +33,13 @@ export interface ChartView {
 
 export function ChordChartSection({
   songId,
+  eventId,
   admin,
   charts,
   arrangement,
 }: {
   songId: string;
+  eventId: string;
   admin: boolean;
   charts: ChartView[];
   arrangement: { name: string; content: string } | null;
@@ -54,7 +56,7 @@ export function ChordChartSection({
       {admin ? (
         <div className="mb-3 flex justify-end">
           <Link
-            href={`/songs/${songId}/chart`}
+            href={`/songs/${songId}/chart?eventId=${eventId}`}
             className="text-sm font-medium underline"
           >
             Kelola bagian & aransemen
@@ -359,9 +361,9 @@ function ChartRowActions({
       <form action={delAction}>
         <input type="hidden" name="chartId" value={chartId} />
         <input type="hidden" name="songId" value={songId} />
-        <Button type="submit" variant="danger" size="sm" disabled={delPending}>
-          Hapus
-        </Button>
+          <Button type="submit" variant="danger" size="sm" disabled={delPending}>
+            Hapus versi chart ini
+          </Button>
       </form>
       {!actState.ok && actState.error ? (
         <Alert tone="danger">{actState.error}</Alert>

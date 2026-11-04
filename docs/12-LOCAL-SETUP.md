@@ -61,6 +61,14 @@ npm.cmd run import:lyrics -- --dry-run  # lihat rencana per lagu
 npm.cmd run import:lyrics               # import master bagian + aransemen
 ```
 
+Intro yang masih tersimpan di kolom lagu (`introChords`, `introNotation`, `introNote`) bisa disalin menjadi bagian master Intro dan diletakkan pertama di aransemen aktif. Skrip idempoten: lagu yang sudah punya bagian bertipe Intro dilewati. Kolom lama tidak dikosongkan. Default-nya dry-run. `--apply` menulis. Bila prefix user DB adalah `rGq`, `--apply` ditolak kecuali `--allow-prod` ikut diberikan. Baris pertama keluaran adalah host dan prefix user DB.
+
+```powershell
+npm.cmd run import:intro-sections
+npm.cmd run import:intro-sections -- --apply
+npm.cmd run import:intro-sections -- --apply --allow-prod
+```
+
 Skrip `tsx` (bootstrap/seed) butuh dua flag env karena berjalan di luar
 bundler Next — jalankan persis seperti di `package.json`:
 

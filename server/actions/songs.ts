@@ -2,7 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireActionAdmin } from "@/lib/auth";
+import { z } from "zod";
+import { requireActionAdmin, requireActionUser } from "@/lib/auth";
+import {
+  requireEventManagerForEventSong,
+  requireEventManagerForSong,
+  requireEventManager,
+  requireMaterialManager,
+  requireGlobalAdmin,
+} from "./event-authorization";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
   arrangementVersionSchema,
@@ -13,12 +21,15 @@ import {
 } from "@/lib/validation/song";
 import {
   activateVersion,
+  addSongFromLibraryToEvent,
   addMaterial,
+  archiveSong,
   assignPerson,
   createSong,
   createVersion,
   deleteMaterial,
   lockFinal,
+  restoreSong,
   setMaterialActive,
   setSongPublished,
   unassignPerson,
@@ -50,7 +61,6 @@ function parseSongForm(formData: FormData) {
 }
 
 function parseSongUpdateForm(formData: FormData) {
-  // Form edit tidak mengirim eventId (lagu tidak pindah event).
   return songUpdateSchema.safeParse({
     title: formData.get("title"),
     artistOrAuthor: formData.get("artistOrAuthor") || undefined,
@@ -80,18 +90,48 @@ export async function createSongAction(
   redirect(`/songs/${result.id}`);
 }
 
+export async function addSongFromLibraryAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireActionUser();
+  const parsed = z
+    .object({
+      eventId: z.string().min(1),
+      songId: z.string().min(1),
+    })
+    .safeParse({
+      eventId: formData.get("eventId"),
+      songId: formData.get("songId"),
+    });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  await requireEventManager(user, parsed.data.eventId);
+  const result = await addSongFromLibraryToEvent(
+    user.id,
+    parsed.data.eventId,
+    parsed.data.songId,
+  );
+  if (!result.ok) return result;
+  revalidateSongs();
+  revalidatePath(`/event/${parsed.data.eventId}`);
+  return { ok: true };
+}
+
 export async function updateSongAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const admin = await requireActionAdmin();
   const id = String(formData.get("songId") ?? "");
-  if (!id) return { ok: false, error: "Lagu tidak valid." };
+  const eventId = String(formData.get("eventId") ?? "");
+  if (!id || !eventId) return { ok: false, error: "Lagu tidak valid." };
   const parsed = parseSongUpdateForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await updateSong(admin.id, id, parsed.data);
+  const result = await updateSong(admin.id, id, eventId, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(id);
   return { ok: true };
@@ -101,11 +141,13 @@ export async function setSongPublishedAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const id = String(formData.get("songId") ?? "");
+  const eventId = String(formData.get("eventId") ?? "");
   const isPublished = formData.get("isPublished") === "true";
-  if (!id) return { ok: false, error: "Lagu tidak valid." };
-  const result = await setSongPublished(admin.id, id, isPublished);
+  if (!id || !eventId) return { ok: false, error: "Lagu tidak valid." };
+  await requireEventManagerForSong(admin, id, eventId);
+  const result = await setSongPublished(admin.id, id, eventId, isPublished);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(id);
   return { ok: true };
@@ -115,7 +157,7 @@ export async function assignPersonAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const parsed = assignmentSchema.safeParse({
     songId: formData.get("songId"),
     personId: formData.get("personId"),
@@ -126,7 +168,10 @@ export async function assignPersonAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await assignPerson(admin.id, parsed.data);
+  const eventId = String(formData.get("eventId") ?? "");
+  if (!eventId) return { ok: false, error: "Event tidak valid." };
+  const eventSong = await requireEventManagerForSong(admin, parsed.data.songId, eventId);
+  const result = await assignPerson(admin.id, eventSong.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(parsed.data.songId);
   return { ok: true };
@@ -136,11 +181,13 @@ export async function unassignPersonAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const songId = String(formData.get("songId") ?? "");
+  const eventId = String(formData.get("eventId") ?? "");
   const personId = String(formData.get("personId") ?? "");
-  if (!songId || !personId) return { ok: false, error: "Data tidak valid." };
-  const result = await unassignPerson(admin.id, songId, personId);
+  if (!songId || !eventId || !personId) return { ok: false, error: "Data tidak valid." };
+  const eventSong = await requireEventManagerForSong(admin, songId, eventId);
+  const result = await unassignPerson(admin.id, eventSong.id, personId);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(songId);
   return { ok: true };
@@ -188,11 +235,13 @@ export async function lockFinalAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const versionId = String(formData.get("versionId") ?? "");
+  const eventSongId = String(formData.get("eventSongId") ?? "");
   const songId = String(formData.get("songId") ?? "");
-  if (!versionId) return { ok: false, error: "Versi tidak valid." };
-  const result = await lockFinal(admin.id, versionId);
+  if (!versionId || !eventSongId) return { ok: false, error: "Versi tidak valid." };
+  const eventSong = await requireEventManagerForEventSong(admin, eventSongId);
+  const result = await lockFinal(admin.id, eventSong.id, versionId);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(songId || undefined);
   return { ok: true };
@@ -202,12 +251,13 @@ export async function unlockFinalAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
-  const songId = String(formData.get("songId") ?? "");
-  if (!songId) return { ok: false, error: "Lagu tidak valid." };
-  const result = await unlockFinal(admin.id, songId);
+  const admin = await requireActionUser();
+  const eventSongId = String(formData.get("eventSongId") ?? "");
+  if (!eventSongId) return { ok: false, error: "Lagu tidak valid." };
+  const eventSong = await requireEventManagerForEventSong(admin, eventSongId);
+  const result = await unlockFinal(admin.id, eventSong.id);
   if (!result.ok) return { ok: false, error: result.error };
-  revalidateSongs(songId);
+  revalidateSongs(eventSong.songId);
   return { ok: true };
 }
 
@@ -215,9 +265,10 @@ export async function addMaterialAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const parsed = materialSchema.safeParse({
     songId: formData.get("songId"),
+    eventId: formData.get("eventId") || undefined,
     arrangementVersionId: formData.get("arrangementVersionId") || undefined,
     title: formData.get("title"),
     category: formData.get("category"),
@@ -227,6 +278,15 @@ export async function addMaterialAction(
   });
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  if (parsed.data.eventId) {
+    await requireEventManagerForSong(
+      admin,
+      parsed.data.songId,
+      parsed.data.eventId,
+    );
+  } else {
+    await requireGlobalAdmin(admin);
   }
   const result = await addMaterial(admin.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
@@ -238,11 +298,12 @@ export async function setMaterialActiveAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const materialId = String(formData.get("materialId") ?? "");
   const songId = String(formData.get("songId") ?? "");
   const isActive = formData.get("isActive") === "true";
   if (!materialId) return { ok: false, error: "Materi tidak valid." };
+  await requireMaterialManager(admin, materialId);
   const result = await setMaterialActive(admin.id, materialId, isActive);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(songId || undefined);
@@ -253,12 +314,41 @@ export async function deleteMaterialAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireActionAdmin();
+  const admin = await requireActionUser();
   const materialId = String(formData.get("materialId") ?? "");
   const songId = String(formData.get("songId") ?? "");
   if (!materialId) return { ok: false, error: "Materi tidak valid." };
+  await requireMaterialManager(admin, materialId);
   const result = await deleteMaterial(materialId);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(songId || undefined);
+  return { ok: true };
+}
+
+export async function archiveSongAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireActionAdmin();
+  const songId = String(formData.get("songId") ?? "");
+  const eventId = String(formData.get("eventId") ?? "");
+  if (!songId || !eventId) return { ok: false, error: "Lagu tidak valid." };
+  const result = await archiveSong(admin.id, songId, eventId);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateSongs(songId);
+  return { ok: true };
+}
+
+export async function restoreSongAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireActionAdmin();
+  const songId = String(formData.get("songId") ?? "");
+  const eventId = String(formData.get("eventId") ?? "");
+  if (!songId || !eventId) return { ok: false, error: "Lagu tidak valid." };
+  const result = await restoreSong(admin.id, songId, eventId);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateSongs(songId);
   return { ok: true };
 }

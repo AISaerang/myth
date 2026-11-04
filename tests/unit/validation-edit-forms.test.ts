@@ -25,6 +25,9 @@ describe("edit-form payloads validate without eventId", () => {
     estimatedDurationSeconds: "",
     originalReferenceUrl: "",
     arrangementNotes: "Modulasi ke E di chorus.",
+    introChords: "C   G",
+    introNotation: "1' 2 3 4 5",
+    introNote: "catatan lama",
     status: "SOURCE_SHARED",
   };
 
@@ -36,6 +39,9 @@ describe("edit-form payloads validate without eventId", () => {
       expect(parsed.data.title).toBe("Hari Terbaik");
       expect(parsed.data.bpm).toBe(117);
       expect(parsed.data.estimatedDurationSeconds).toBeUndefined();
+      expect(parsed.data).not.toHaveProperty("introChords");
+      expect(parsed.data).not.toHaveProperty("introNotation");
+      expect(parsed.data).not.toHaveProperty("introNote");
     }
   });
 

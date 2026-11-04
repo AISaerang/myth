@@ -6,12 +6,13 @@ import { requireFreshUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { EQUIPMENT_STATUS_LABEL } from "@/lib/rehearsal-labels";
-import { getCurrentEvent, listEvents } from "@server/services/event-service";
+import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import { listEquipment } from "@server/services/equipment-service";
 import { listPersonnelForAdmin } from "@server/services/personnel-service";
 import { EventPicker } from "../songs/EventPicker";
 import { EquipmentStatusBadge } from "../rehearsals/OpsBadges";
 import { CreateEquipmentForm, EditEquipmentForm } from "./EquipmentForms";
+import { notFound } from "next/navigation";
 
 const FILTERS = [
   { value: "all", label: "Semua" },
@@ -30,8 +31,9 @@ export default async function EquipmentPage({
   const params = await searchParams;
   const admin = isAdmin(user);
 
-  const events = await listEvents();
+  const events = await listEvents(user);
   if (events.length === 0) {
+    if (params.eventId) notFound();
     return (
       <EmptyState
         title="Belum ada event"
@@ -39,11 +41,9 @@ export default async function EquipmentPage({
       />
     );
   }
-  const current = await getCurrentEvent();
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const current = await getActiveEventFor(user, params.eventId);
+  const eventId = current?.id;
+  if (!eventId) notFound();
   const filter = FILTERS.some((f) => f.value === params.filter)
     ? (params.filter as (typeof FILTERS)[number]["value"])
     : "all";
@@ -66,7 +66,7 @@ export default async function EquipmentPage({
         </h1>
         {admin ? (
           <EventPicker
-            events={events.map((e) => ({ id: e.id, name: e.name }))}
+            events={events.map((e) => ({ id: e.id, name: e.name, eventType: e.eventType }))}
             value={eventId}
           />
         ) : null}

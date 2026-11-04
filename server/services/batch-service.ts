@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import type { BatchInput } from "@/lib/validation/song";
 
 export async function listBatches(eventId: string) {
-  return prisma.songBatch.findMany({
+  const batches = await prisma.songBatch.findMany({
     where: { eventId },
     include: {
       items: {
@@ -15,6 +15,15 @@ export async function listBatches(eventId: string) {
             select: {
               id: true,
               title: true,
+              eventId: true,
+              status: true,
+              isPublished: true,
+              _count: { select: { assignments: true } },
+            },
+          },
+          eventSong: {
+            select: {
+              eventId: true,
               status: true,
               isPublished: true,
               _count: { select: { assignments: true } },
@@ -26,10 +35,33 @@ export async function listBatches(eventId: string) {
     },
     orderBy: { createdAt: "asc" },
   });
+  return batches.map((batch) => ({
+    ...batch,
+    items: batch.items.map((item) => {
+      if (
+        (item.eventSong && item.eventSong.eventId !== batch.eventId) ||
+        (!item.eventSong && item.song.eventId !== batch.eventId)
+      ) {
+        throw new Error(`Batch item ${item.songId} is missing its EventSong.`);
+      }
+      return {
+        ...item,
+        song: {
+          ...item.song,
+          status: item.eventSong?.status ?? item.song.status,
+          isPublished: item.eventSong?.isPublished ?? item.song.isPublished,
+          _count: {
+            assignments:
+              item.eventSong?._count.assignments ?? item.song._count.assignments,
+          },
+        },
+      };
+    }),
+  }));
 }
 
 export async function getBatch(id: string) {
-  return prisma.songBatch.findUnique({
+  const batch = await prisma.songBatch.findUnique({
     where: { id },
     include: {
       items: {
@@ -40,12 +72,44 @@ export async function getBatch(id: string) {
               _count: { select: { assignments: true } },
             },
           },
+          eventSong: {
+            select: {
+              eventId: true,
+              status: true,
+              isPublished: true,
+              _count: { select: { assignments: true } },
+            },
+          },
         },
         orderBy: { sortOrder: "asc" },
       },
       event: { select: { id: true, name: true } },
     },
   });
+  if (!batch) return null;
+  return {
+    ...batch,
+    items: batch.items.map((item) => {
+      if (
+        (item.eventSong && item.eventSong.eventId !== batch.eventId) ||
+        (!item.eventSong && item.song.eventId !== batch.eventId)
+      ) {
+        throw new Error(`Batch item ${item.songId} is missing its EventSong.`);
+      }
+      return {
+        ...item,
+        song: {
+          ...item.song,
+          status: item.eventSong?.status ?? item.song.status,
+          isPublished: item.eventSong?.isPublished ?? item.song.isPublished,
+          _count: {
+            assignments:
+              item.eventSong?._count.assignments ?? item.song._count.assignments,
+          },
+        },
+      };
+    }),
+  };
 }
 
 export async function createBatch(
@@ -138,9 +202,11 @@ export async function addSongToBatch(
   const batch = await prisma.songBatch.findUnique({ where: { id: batchId } });
   const song = await prisma.song.findUnique({ where: { id: songId } });
   if (!batch || !song) return { ok: false, error: "Batch atau lagu tidak valid." };
-  if (batch.eventId !== song.eventId) {
-    return { ok: false, error: "Lagu dan batch harus satu event." };
-  }
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { eventId_songId: { eventId: batch.eventId, songId } },
+    select: { id: true },
+  });
+  if (!eventSong) return { ok: false, error: "Lagu tidak ada di setlist event batch." };
   const existing = await prisma.songBatchItem.findUnique({
     where: { songBatchId_songId: { songBatchId: batchId, songId } },
   });
@@ -153,6 +219,7 @@ export async function addSongToBatch(
     data: {
       songBatchId: batchId,
       songId,
+      eventSongId: eventSong.id,
       sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
     },
   });
@@ -161,10 +228,19 @@ export async function addSongToBatch(
 
 export async function removeSongFromBatch(  batchId: string,
   songId: string,
-): Promise<void> {
-  await prisma.songBatchItem
-    .delete({ where: { songBatchId_songId: { songBatchId: batchId, songId } } })
-    .catch(() => {});
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const item = await prisma.songBatchItem.findUnique({
+    where: { songBatchId_songId: { songBatchId: batchId, songId } },
+    select: { eventSongId: true },
+  });
+  if (!item) return { ok: false, error: "Lagu tidak ditemukan di batch." };
+  if (!item.eventSongId) {
+    return { ok: false, error: "Lagu batch belum terhubung ke setlist event." };
+  }
+  await prisma.songBatchItem.delete({
+    where: { songBatchId_songId: { songBatchId: batchId, songId } },
+  });
+  return { ok: true };
 }
 
 // Susun ulang urutan lagu dalam batch (tombol naik/turun di UI).

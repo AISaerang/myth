@@ -5,6 +5,10 @@ export const eventStatusSchema = z.enum(
   { message: "Status event tidak valid." },
 );
 
+export const eventTypeSchema = z.enum(["REGIONAL", "INTERNAL_GEHC"], {
+  message: "Jenis event tidak valid.",
+});
+
 const timeString = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Jam harus format HH:mm.");
@@ -32,6 +36,8 @@ const baseEventSchema = z.object({
     .trim()
     .min(3, "Nama acara minimal 3 karakter.")
     .max(120, "Nama acara maksimal 120 karakter."),
+  eventType: eventTypeSchema.optional(),
+  region: z.string().trim().max(64, "Wilayah maksimal 64 karakter.").optional(),
   description: z.string().trim().max(2000).optional(),
   eventDate: z.preprocess(toOptionalDate, z.date().optional()),
   startTime: z.preprocess(

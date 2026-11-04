@@ -1,41 +1,63 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { canManageEvent, canManageMembers, isAdmin } from "@/lib/permissions";
+import { getEventRole } from "@server/services/event-access";
 import {
-  getCurrentEvent,
+  getActiveEventFor,
   listEvents,
   toPublicEvent,
 } from "@server/services/event-service";
 import { EventBrief } from "./EventBrief";
 import { EventForm } from "./EventForm";
 import { EventStatusBadge } from "./EventStatusBadge";
+import { EventTypeBadge } from "@/components/ui/EventTypeBadge";
 
-export default async function EventPage() {
+async function EventPageContent() {
+  await connection();
   const user = await requireFreshUser();
-
+  const [events, current] = await Promise.all([
+    listEvents(user),
+    getActiveEventFor(user),
+  ]);
   if (!isAdmin(user)) {
-    const current = await getCurrentEvent();
     if (!current) {
       return (
         <EmptyState
-          title="Belum ada event"
-          description="Event brief akan tampil di sini setelah admin membuatnya."
+          title="Belum terdaftar di acara mana pun"
+          description="Minta admin menambahkan Anda sebagai anggota acara."
         />
       );
     }
+    const role = await getEventRole(user, current.id);
+    const manager = canManageEvent(role);
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           Event Brief
         </h1>
         <EventBrief event={toPublicEvent(current)} />
+        {manager || canManageMembers(role) ? (
+          <div className="flex flex-wrap gap-3">
+            {manager ? (
+              <Link href={`/event/${current.id}`} className="text-sm font-medium underline">
+                Ubah event brief
+              </Link>
+            ) : null}
+            {canManageMembers(role) ? (
+              <Link href={`/event/${current.id}/members`} className="text-sm font-medium underline">
+                Kelola anggota event
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   }
 
-  const events = await listEvents();
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
@@ -53,7 +75,11 @@ export default async function EventPage() {
                   href={`/event/${e.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                 >
-                  <span className="font-medium">{e.name}</span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{e.name}</span>
+                    <EventTypeBadge type={e.eventType} />
+                    {e.region ? <span className="text-sm text-zinc-500">{e.region}</span> : null}
+                  </span>
                   <EventStatusBadge status={e.eventStatus} />
                 </Link>
               </li>
@@ -62,5 +88,19 @@ export default async function EventPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+export default function EventPage() {
+  return (
+    <Suspense
+      fallback={
+        <p aria-busy="true" aria-live="polite" className="text-sm text-zinc-500">
+          Memuat event...
+        </p>
+      }
+    >
+      <EventPageContent />
+    </Suspense>
   );
 }

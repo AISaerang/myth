@@ -7,7 +7,7 @@ import { isTaskOverdue } from "@/lib/task-status";
 // Semua angka bisa diklik menuju datanya (docs/04).
 export async function getAdminReadiness(eventId: string, now: Date = new Date()) {
   const [
-    songs,
+    eventSongs,
     batches,
     tasks,
     equipment,
@@ -15,16 +15,16 @@ export async function getAdminReadiness(eventId: string, now: Date = new Date())
     helpNeeded,
     latestAudit,
   ] = await Promise.all([
-    prisma.song.findMany({
+    prisma.eventSong.findMany({
       where: { eventId },
       select: {
-        id: true,
-        title: true,
+        songId: true,
         status: true,
         isPublished: true,
+        song: { select: { title: true } },
         _count: { select: { assignments: true } },
       },
-      orderBy: { title: "asc" },
+      orderBy: [{ song: { title: "asc" } }],
     }),
     prisma.songBatch.findMany({
       where: { eventId },
@@ -62,9 +62,11 @@ export async function getAdminReadiness(eventId: string, now: Date = new Date())
       take: 3,
     }),
     prisma.practiceProgress.findMany({
-      where: { song: { eventId }, status: "NEEDS_HELP" },
+      where: { eventSong: { is: { eventId } }, status: "NEEDS_HELP" },
       select: {
-        song: { select: { id: true, title: true } },
+        eventSong: {
+          select: { song: { select: { id: true, title: true } } },
+        },
         person: { select: { displayName: true } },
         note: true,
       },
@@ -76,6 +78,18 @@ export async function getAdminReadiness(eventId: string, now: Date = new Date())
     }),
   ]);
 
+  const songs = eventSongs.map((eventSong) => ({
+    id: eventSong.songId,
+    title: eventSong.song.title,
+    status: eventSong.status,
+    isPublished: eventSong.isPublished,
+    _count: eventSong._count,
+  }));
+  const helpNeededForEvent = helpNeeded.flatMap((progress) =>
+    progress.eventSong
+      ? [{ ...progress, song: progress.eventSong.song }]
+      : [],
+  );
   const overdueTasks = tasks.filter((t) => isTaskOverdue(t.status, t.dueAt, now));
   const blockedTasks = tasks.filter((t) => t.status === "BLOCKED");
   const blockedEquipment = equipment.filter((e) => e.status === "BLOCKED");
@@ -88,7 +102,7 @@ export async function getAdminReadiness(eventId: string, now: Date = new Date())
     blockedTasks,
     blockedEquipment,
     attentionSongs,
-    helpNeeded,
+    helpNeeded: helpNeededForEvent,
     upcomingRehearsals,
     equipment,
     latestAudit,
@@ -98,7 +112,7 @@ export async function getAdminReadiness(eventId: string, now: Date = new Date())
       overdueTasks: overdueTasks.length,
       blockedTasks: blockedTasks.length,
       blockedEquipment: blockedEquipment.length,
-      helpNeeded: helpNeeded.length,
+      helpNeeded: helpNeededForEvent.length,
     },
   };
 }
@@ -108,31 +122,56 @@ export async function getAdminReadiness(eventId: string, now: Date = new Date())
 // DRAFT internal tidak pernah masuk angka maupun list.
 export async function getObserverDashboard(eventId: string, now: Date = new Date()) {
   const [
-    songs,
+    eventSongs,
     batches,
     tasks,
     equipment,
     upcomingRehearsals,
     helpNeeded,
   ] = await Promise.all([
-    prisma.song.findMany({
+    prisma.eventSong.findMany({
       where: { eventId, isPublished: true },
       select: {
-        id: true,
-        title: true,
+        songId: true,
         status: true,
         isPublished: true,
+        song: { select: { title: true } },
         _count: { select: { assignments: true } },
       },
-      orderBy: { title: "asc" },
+      orderBy: [{ song: { title: "asc" } }],
     }),
     prisma.songBatch.findMany({
-      where: { eventId, status: { not: "ARCHIVED" } },
+      where: {
+        eventId,
+        status: { not: "ARCHIVED" },
+        items: {
+          some: {
+            OR: [
+              { eventSong: { is: { eventId, isPublished: true } } },
+              {
+                eventSongId: null,
+                song: { is: { eventId, isPublished: true } },
+              },
+            ],
+          },
+        },
+      },
       select: {
         id: true,
         name: true,
         status: true,
-        _count: { select: { items: true } },
+        items: {
+          where: {
+            OR: [
+              { eventSong: { is: { eventId, isPublished: true } } },
+              {
+                eventSongId: null,
+                song: { is: { eventId, isPublished: true } },
+              },
+            ],
+          },
+          select: { songId: true },
+        },
       },
       orderBy: { createdAt: "asc" },
     }),
@@ -141,7 +180,11 @@ export async function getObserverDashboard(eventId: string, now: Date = new Date
         eventId,
         OR: [
           { relatedSongId: null },
-          { relatedSong: { isPublished: true } },
+          {
+            relatedSong: {
+              eventSongs: { some: { eventId, isPublished: true } },
+            },
+          },
         ],
       },
       select: {
@@ -168,15 +211,32 @@ export async function getObserverDashboard(eventId: string, now: Date = new Date
       take: 3,
     }),
     prisma.practiceProgress.findMany({
-      where: { song: { eventId, isPublished: true }, status: "NEEDS_HELP" },
+      where: {
+        eventSong: { is: { eventId, isPublished: true } },
+        status: "NEEDS_HELP",
+      },
       select: {
-        song: { select: { id: true, title: true } },
+        eventSong: {
+          select: { song: { select: { id: true, title: true } } },
+        },
         person: { select: { displayName: true } },
         note: true,
       },
     }),
   ]);
 
+  const songs = eventSongs.map((eventSong) => ({
+    id: eventSong.songId,
+    title: eventSong.song.title,
+    status: eventSong.status,
+    isPublished: eventSong.isPublished,
+    _count: eventSong._count,
+  }));
+  const helpNeededForEvent = helpNeeded.flatMap((progress) =>
+    progress.eventSong
+      ? [{ ...progress, song: progress.eventSong.song }]
+      : [],
+  );
   const overdueTasks = tasks.filter((t) => isTaskOverdue(t.status, t.dueAt, now));
   const blockedTasks = tasks.filter((t) => t.status === "BLOCKED");
   const blockedEquipment = equipment.filter((e) => e.status === "BLOCKED");
@@ -189,7 +249,7 @@ export async function getObserverDashboard(eventId: string, now: Date = new Date
     blockedTasks,
     blockedEquipment,
     attentionSongs,
-    helpNeeded,
+    helpNeeded: helpNeededForEvent,
     upcomingRehearsals,
     equipment,
     counts: {
@@ -198,7 +258,7 @@ export async function getObserverDashboard(eventId: string, now: Date = new Date
       overdueTasks: overdueTasks.length,
       blockedTasks: blockedTasks.length,
       blockedEquipment: blockedEquipment.length,
-      helpNeeded: helpNeeded.length,
+      helpNeeded: helpNeededForEvent.length,
     },
   };
 }
@@ -217,14 +277,21 @@ export async function getUserDashboard(userId: string, eventId: string, now: Dat
   const [assignments, tasks, upcomingRehearsals, latestMaterials] =
     await Promise.all([
       prisma.songAssignment.findMany({
-        where: { personId: person.id, song: { eventId, isPublished: true } },
+        where: {
+          personId: person.id,
+          eventSong: { is: { eventId, isPublished: true } },
+        },
         select: {
-          song: {
+          eventSong: {
             select: {
-              id: true,
-              title: true,
               status: true,
               liturgicalFunction: true,
+              song: {
+                select: {
+                  id: true,
+                  title: true,
+                },
+              },
               progress: {
                 where: { personId: person.id },
                 select: { status: true },
@@ -242,7 +309,12 @@ export async function getUserDashboard(userId: string, eventId: string, now: Dat
             { assigneePersonId: person.id },
             {
               relatedSong: {
-                assignments: { some: { personId: person.id } },
+                assignments: {
+                  some: {
+                    personId: person.id,
+                    eventSong: { is: { eventId } },
+                  },
+                },
               },
             },
           ],
@@ -271,8 +343,17 @@ export async function getUserDashboard(userId: string, eventId: string, now: Dat
       }),
       prisma.songMaterial.findMany({
         where: {
-          song: { eventId, isPublished: true, assignments: { some: { personId: person.id } } },
           isActive: true,
+          OR: [{ eventId: null }, { eventId }],
+          song: {
+            eventSongs: {
+              some: {
+                eventId,
+                isPublished: true,
+                assignments: { some: { personId: person.id } },
+              },
+            },
+          },
         },
         select: {
           id: true,
@@ -286,7 +367,22 @@ export async function getUserDashboard(userId: string, eventId: string, now: Dat
       }),
     ]);
   return {
-    mySongs: assignments,
+    mySongs: assignments.flatMap((assignment) =>
+      assignment.eventSong
+        ? [
+            {
+              song: {
+                id: assignment.eventSong.song.id,
+                title: assignment.eventSong.song.title,
+                status: assignment.eventSong.status,
+                liturgicalFunction: assignment.eventSong.liturgicalFunction,
+                progress: assignment.eventSong.progress,
+              },
+              instrumentSkill: assignment.instrumentSkill,
+            },
+          ]
+        : [],
+    ),
     myTasks: tasks,
     upcomingRehearsals,
     latestMaterials,

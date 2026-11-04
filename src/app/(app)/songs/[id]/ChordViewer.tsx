@@ -1,14 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { KeyTransposeBar } from "@/components/KeyTransposeBar";
+import { NotationLine } from "@/components/NotAngka";
 import {
   extractChordLines,
   layoutChordLine,
-  stripChords,
   transposeContent,
   transposeRoot,
 } from "@/lib/chords";
+import {
+  alignChordsToNotation,
+  contentHasNotation,
+  formatTransposeFormula,
+} from "@/lib/jianpu-align";
 
 type ViewMode = "both" | "lyrics" | "chords";
 
@@ -18,33 +23,86 @@ const MODES: { value: ViewMode; label: string }[] = [
   { value: "chords", label: "Chord saja" },
 ];
 
-function renderBoth(content: string, key: string): React.ReactNode {
-  // Chord bertumpuk di atas lirik, sejajar kolom suku kata.
-  const lines = content.split("\n");
-  return lines.map((line, i) => {
-    const { chordLine, lyricLine, label, isEmpty } = layoutChordLine(line);
-    const lineKey = `${key}-${i}`;
+// Baris komentar ChordPro (`# ...`), dipakai catatan intro yang sudah
+// menjadi bagian chart. Bukan label bagian dan bukan not angka.
+function chartComment(line: string): string | null {
+  if (/[\[{]/.test(line)) return null;
+  const match = /^\s*#(.*)$/.exec(line);
+  if (!match) return null;
+  return (match[1] ?? "").trim();
+}
 
-    if (isEmpty) {
-      return <div key={lineKey} className="h-4" />;
+function renderChart(content: string, mode: ViewMode, key: string) {
+  return content.split("\n").map((line, index) => {
+    const lineKey = `${key}-${index}`;
+    const comment = chartComment(line);
+    if (comment !== null) {
+      if (!comment) return <div key={lineKey} className="h-2" />;
+      return (
+        <p
+          key={lineKey}
+          data-chart-comment=""
+          className="text-sm text-zinc-600 dark:text-zinc-400"
+        >
+          {comment}
+        </p>
+      );
     }
+
+    if (mode === "chords") {
+      const extracted = extractChordLines(line)[0] ?? "";
+      if (!extracted.trim()) return <div key={lineKey} className="h-2" />;
+      return (
+        <pre
+          key={lineKey}
+          className="overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap"
+        >
+          {extracted}
+        </pre>
+      );
+    }
+
+    const { chordLine, lyricLine, label, isEmpty } = layoutChordLine(line);
+    if (isEmpty) return <div key={lineKey} className="h-4" />;
     if (label) {
       return (
         <div
           key={lineKey}
-          className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-500 first:mt-0"
+          className="mt-3 text-xs font-semibold tracking-wide text-zinc-500 uppercase first:mt-0"
         >
           {label}
         </div>
       );
     }
+
+    const aligned = alignChordsToNotation(
+      mode === "lyrics" ? "" : chordLine,
+      lyricLine,
+    );
+    if (aligned) {
+      return (
+        <div key={lineKey} className="max-w-full overflow-x-auto overscroll-x-contain">
+          <NotationLine alignment={aligned} />
+        </div>
+      );
+    }
+
+    if (mode === "lyrics") {
+      return (
+        <pre
+          key={lineKey}
+          className="overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap"
+        >
+          {lyricLine.trimEnd()}
+        </pre>
+      );
+    }
+
     return (
       <div key={lineKey} className="overflow-x-auto overscroll-x-contain">
-        <div className="w-max whitespace-pre font-mono text-sm leading-6">
+        <div className="w-max font-mono text-sm leading-6 whitespace-pre">
           {chordLine.trim() ? (
-            <div className="font-semibold text-sky-700 dark:text-sky-400">
-              {chordLine}
-            </div>
+            <div className="font-semibold text-sky-700 dark:text-sky-400">{chordLine}</div>
           ) : null}
           {lyricLine.trim() ? <div>{lyricLine}</div> : null}
         </div>
@@ -53,14 +111,29 @@ function renderBoth(content: string, key: string): React.ReactNode {
   });
 }
 
+/** Isi chart tanpa kontrol transpose, supaya rumus nada tidak diulang per bagian. */
+export function ChartBody({
+  content,
+  mode = "both",
+  renderKey,
+}: {
+  content: string;
+  mode?: ViewMode;
+  renderKey: string;
+}) {
+  return <>{renderChart(content, mode, renderKey)}</>;
+}
+
 export function ChordViewer({
   content,
   baseKey,
+  initialOffset = 0,
 }: {
   content: string;
   baseKey: string;
+  initialOffset?: number;
 }) {
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(initialOffset);
   const [useFlats, setUseFlats] = useState(false);
   const [mode, setMode] = useState<ViewMode>("both");
 
@@ -72,81 +145,48 @@ export function ChordViewer({
     () => transposeRoot(baseKey, offset, useFlats),
     [baseKey, offset, useFlats],
   );
+  const hasNotation = useMemo(() => contentHasNotation(content), [content]);
+  const formula = hasNotation ? formatTransposeFormula(baseKey, currentKey) : "";
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium">Nada: {currentKey}</span>
-        <span className="text-zinc-500">(basis {baseKey})</span>
+      <div data-chart-controls="">
+        <KeyTransposeBar
+          baseKey={baseKey}
+          offset={offset}
+          useFlats={useFlats}
+          formula={formula || undefined}
+          onOffset={setOffset}
+          onFlats={setUseFlats}
+          onReset={() => {
+            setOffset(0);
+            setUseFlats(false);
+          }}
+        />
       </div>
       <div className="flex flex-wrap gap-1" role="group" aria-label="Mode tampil">
-        {MODES.map((m) => (
+        {MODES.map((item) => (
           <button
-            key={m.value}
+            key={item.value}
             type="button"
-            onClick={() => setMode(m.value)}
-            aria-pressed={mode === m.value}
+            onClick={() => setMode(item.value)}
+            aria-pressed={mode === item.value}
             className={`min-h-[44px] rounded-lg px-3 text-sm font-medium ${
-              mode === m.value
+              mode === item.value
                 ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                 : "border border-zinc-300 dark:border-zinc-700"
             }`}
           >
-            {m.label}
+            {item.label}
           </button>
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => setOffset((o) => o - 1)}
-          aria-label="Turunkan setengah nada"
-        >
-          −½
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => setOffset((o) => o + 1)}
-          aria-label="Naikkan setengah nada"
-        >
-          +½
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            setOffset(0);
-            setUseFlats(false);
-          }}
-        >
-          Reset ke {baseKey}
-        </Button>
-        <button
-          type="button"
-          onClick={() => setUseFlats((f) => !f)}
-          aria-pressed={useFlats}
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
-        >
-          {useFlats ? "Mol (♭)" : "Kres (♯)"}
-        </button>
-      </div>
-      <div className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
-        {mode === "lyrics" ? (
-          <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-7">
-            {stripChords(transposed)}
-          </pre>
-        ) : mode === "chords" ? (
-          <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-7">
-            {extractChordLines(transposed).join("\n")}
-          </pre>
-        ) : (
-          <div>{renderBoth(transposed, `${offset}-${useFlats}`)}</div>
-        )}
+      <div data-chart-body="" className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
+        <ChartBody
+          content={transposed}
+          mode={mode}
+          renderKey={`${offset}-${useFlats}-${mode}`}
+        />
       </div>
     </div>
   );

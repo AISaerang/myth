@@ -1,12 +1,15 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { isAdmin, isObserver } from "@/lib/permissions";
+import { notFound } from "next/navigation";
 import { formatJakarta } from "@/lib/format";
 import { isTaskOverdue } from "@/lib/task-status";
-import { getCurrentEvent } from "@server/services/event-service";
+import { getActiveEventFor } from "@server/services/event-service";
 import {
   getAdminReadiness,
   getObserverDashboard,
@@ -27,9 +30,16 @@ import {
 const linkCard =
   "block rounded-xl border border-zinc-200 bg-white p-4 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900";
 
-export default async function DashboardPage() {
+async function DashboardContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ eventId?: string }>;
+}) {
+  await connection();
   const user = await requireFreshUser();
-  const event = await getCurrentEvent();
+  const params = await searchParams;
+  const event = await getActiveEventFor(user, params.eventId);
+  if (params.eventId && !event) notFound();
 
   if (!event) {
     return (
@@ -47,10 +57,7 @@ export default async function DashboardPage() {
             </Link>
           </Card>
         ) : (
-          <EmptyState
-            title="Belum ada event aktif"
-            description="Event brief akan tampil di sini setelah admin membuatnya."
-          />
+          <EmptyState title="Belum terdaftar di acara mana pun" />
         )}
       </div>
     );
@@ -75,15 +82,15 @@ export default async function DashboardPage() {
         ) : null}
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Link href="/songs" className={linkCard}>
+          <Link href={`/songs?eventId=${event.id}`} className={linkCard}>
             <p className="text-2xl font-bold">{c.totalSongs}</p>
             <p className="text-sm text-zinc-500">Total lagu</p>
           </Link>
-          <Link href="/songs" className={linkCard}>
+          <Link href={`/songs?eventId=${event.id}`} className={linkCard}>
             <p className="text-2xl font-bold">{c.attentionSongs}</p>
             <p className="text-sm text-zinc-500">Lagu perlu review</p>
           </Link>
-          <Link href="/batches" className={linkCard}>
+          <Link href={`/batches?eventId=${event.id}`} className={linkCard}>
             <p className="text-2xl font-bold">
               {data.batches.filter((b) => b.status === "COMPLETED").length}/{data.batches.length}
             </p>
@@ -121,7 +128,7 @@ export default async function DashboardPage() {
               {data.blockedTasks.map((t) => (
                 <li key={`bt-${t.id}`}>
                   <Badge tone="danger">Blocked</Badge>{" "}
-                  <Link href="/tasks" className="font-medium underline">
+                  <Link href={`/tasks?eventId=${event.id}`} className="font-medium underline">
                     {t.title}
                   </Link>
                   {t.assignee ? ` — PIC ${t.assignee.displayName}` : " — tanpa PIC"}
@@ -132,7 +139,7 @@ export default async function DashboardPage() {
                 .map((t) => (
                   <li key={`ot-${t.id}`}>
                     <Badge tone="danger">Terlambat</Badge>{" "}
-                    <Link href="/tasks" className="font-medium underline">
+                    <Link href={`/tasks?eventId=${event.id}`} className="font-medium underline">
                       {t.title}
                     </Link>
                   </li>
@@ -140,7 +147,7 @@ export default async function DashboardPage() {
               {data.blockedEquipment.map((e) => (
                 <li key={`be-${e.id}`}>
                   <Badge tone="danger">Teknis</Badge>{" "}
-                  <Link href="/equipment" className="font-medium underline">
+                  <Link href={`/equipment?eventId=${event.id}`} className="font-medium underline">
                     {e.name}
                   </Link>
                   {e.assignee ? ` — PIC ${e.assignee.displayName}` : " — tanpa PIC"}
@@ -149,7 +156,7 @@ export default async function DashboardPage() {
               {data.helpNeeded.map((h, i) => (
                 <li key={`ph-${i}`}>
                   <Badge tone="danger">Perlu bantuan</Badge>{" "}
-                  <Link href={`/songs/${h.song.id}`} className="font-medium underline">
+                  <Link href={`/songs/${h.song.id}?eventId=${event.id}`} className="font-medium underline">
                     {h.song.title}
                   </Link>{" "}
                   — {h.person.displayName}
@@ -176,7 +183,7 @@ export default async function DashboardPage() {
                   key={s.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
-                  <Link href={`/songs/${s.id}`} className="font-medium underline">
+                  <Link href={`/songs/${s.id}?eventId=${event.id}`} className="font-medium underline">
                     {s.title}
                   </Link>
                   <span className="flex items-center gap-1">
@@ -200,7 +207,7 @@ export default async function DashboardPage() {
               {data.upcomingRehearsals.map((r) => (
                 <li key={r.id}>
                   <Link
-                    href={`/rehearsals/${r.id}`}
+                    href={`/rehearsals/${r.id}?eventId=${event.id}`}
                     className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                   >
                     <span>
@@ -226,7 +233,7 @@ export default async function DashboardPage() {
               {data.equipment.length} teruji ·{" "}
               {data.equipment.filter((e) => e.status === "BLOCKED").length} blocked ·{" "}
               {data.equipment.filter((e) => e.status === "NOT_CHECKED").length} belum dicek —{" "}
-              <Link href="/equipment" className="font-medium underline">
+              <Link href={`/equipment?eventId=${event.id}`} className="font-medium underline">
                 buka checklist
               </Link>
             </p>
@@ -277,27 +284,27 @@ export default async function DashboardPage() {
         </p>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Link href="/songs" className={linkCard}>
+          <Link href={`/songs?eventId=${event.id}`} className={linkCard}>
             <p className="text-2xl font-bold">{c.totalSongs}</p>
             <p className="text-sm text-zinc-500">Lagu publish</p>
           </Link>
-          <Link href="/songs" className={linkCard}>
+          <Link href={`/songs?eventId=${event.id}`} className={linkCard}>
             <p className="text-2xl font-bold">{c.attentionSongs}</p>
             <p className="text-sm text-zinc-500">Lagu perlu review</p>
           </Link>
-          <Link href="/batches" className={linkCard}>
+          <Link href={`/batches?eventId=${event.id}`} className={linkCard}>
             <p className="text-2xl font-bold">{data.batches.length}</p>
             <p className="text-sm text-zinc-500">Batch aktif</p>
           </Link>
-          <Link href="/tasks?filter=overdue" className={linkCard}>
+          <Link href={`/tasks?eventId=${event.id}&filter=overdue`} className={linkCard}>
             <p className="text-2xl font-bold">{c.overdueTasks}</p>
             <p className="text-sm text-zinc-500">Task terlambat</p>
           </Link>
-          <Link href="/tasks?filter=blocked" className={linkCard}>
+          <Link href={`/tasks?eventId=${event.id}&filter=blocked`} className={linkCard}>
             <p className="text-2xl font-bold">{c.blockedTasks}</p>
             <p className="text-sm text-zinc-500">Task blocked</p>
           </Link>
-          <Link href="/equipment?filter=BLOCKED" className={linkCard}>
+          <Link href={`/equipment?eventId=${event.id}&filter=BLOCKED`} className={linkCard}>
             <p className="text-2xl font-bold">{c.blockedEquipment}</p>
             <p className="text-sm text-zinc-500">Blocker teknis</p>
           </Link>
@@ -309,7 +316,7 @@ export default async function DashboardPage() {
               {data.blockedTasks.map((t) => (
                 <li key={`bt-${t.id}`}>
                   <Badge tone="danger">Blocked</Badge>{" "}
-                  <Link href="/tasks" className="font-medium underline">
+                  <Link href={`/tasks?eventId=${event.id}`} className="font-medium underline">
                     {t.title}
                   </Link>
                   {t.assignee ? ` — PIC ${t.assignee.displayName}` : " — tanpa PIC"}
@@ -320,7 +327,7 @@ export default async function DashboardPage() {
                 .map((t) => (
                   <li key={`ot-${t.id}`}>
                     <Badge tone="danger">Terlambat</Badge>{" "}
-                    <Link href="/tasks" className="font-medium underline">
+                    <Link href={`/tasks?eventId=${event.id}`} className="font-medium underline">
                       {t.title}
                     </Link>
                   </li>
@@ -328,7 +335,7 @@ export default async function DashboardPage() {
               {data.blockedEquipment.map((e) => (
                 <li key={`be-${e.id}`}>
                   <Badge tone="danger">Teknis</Badge>{" "}
-                  <Link href="/equipment" className="font-medium underline">
+                  <Link href={`/equipment?eventId=${event.id}`} className="font-medium underline">
                     {e.name}
                   </Link>
                   {e.assignee ? ` — PIC ${e.assignee.displayName}` : " — tanpa PIC"}
@@ -337,7 +344,7 @@ export default async function DashboardPage() {
               {data.helpNeeded.map((h, i) => (
                 <li key={`ph-${i}`}>
                   <Badge tone="danger">Perlu bantuan</Badge>{" "}
-                  <Link href={`/songs/${h.song.id}`} className="font-medium underline">
+                  <Link href={`/songs/${h.song.id}?eventId=${event.id}`} className="font-medium underline">
                     {h.song.title}
                   </Link>{" "}
                   — {h.person.displayName}
@@ -364,7 +371,7 @@ export default async function DashboardPage() {
                   key={s.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
-                  <Link href={`/songs/${s.id}`} className="font-medium underline">
+                  <Link href={`/songs/${s.id}?eventId=${event.id}`} className="font-medium underline">
                     {s.title}
                   </Link>
                   <span className="flex items-center gap-1">
@@ -387,7 +394,7 @@ export default async function DashboardPage() {
               {data.upcomingRehearsals.map((r) => (
                 <li key={r.id}>
                   <Link
-                    href={`/rehearsals/${r.id}`}
+                    href={`/rehearsals/${r.id}?eventId=${event.id}`}
                     className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                   >
                     <span>
@@ -413,7 +420,7 @@ export default async function DashboardPage() {
               {data.equipment.length} teruji ·{" "}
               {data.equipment.filter((e) => e.status === "BLOCKED").length} blocked ·{" "}
               {data.equipment.filter((e) => e.status === "NOT_CHECKED").length} belum dicek —{" "}
-              <Link href="/equipment" className="font-medium underline">
+              <Link href={`/equipment?eventId=${event.id}`} className="font-medium underline">
                 buka checklist
               </Link>
             </p>
@@ -444,7 +451,7 @@ export default async function DashboardPage() {
             {data.upcomingRehearsals.map((r) => (
               <li key={r.id}>
                 <Link
-                  href={`/rehearsals/${r.id}`}
+                  href={`/rehearsals/${r.id}?eventId=${event.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
                   <span>
@@ -472,7 +479,7 @@ export default async function DashboardPage() {
             {data.mySongs.map((a) => (
               <li key={a.song.id}>
                 <Link
-                  href={`/songs/${a.song.id}`}
+                  href={`/songs/${a.song.id}?eventId=${event.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
                   <span>
@@ -512,7 +519,7 @@ export default async function DashboardPage() {
                 key={t.id}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-800"
               >
-                <Link href="/tasks" className="font-medium underline">
+                <Link href={`/tasks?eventId=${event.id}`} className="font-medium underline">
                   {t.title}
                 </Link>
                 <span className="flex items-center gap-1">
@@ -541,7 +548,7 @@ export default async function DashboardPage() {
                 </a>{" "}
                 <span className="text-zinc-500">
                   · {MATERIAL_CATEGORY_LABEL[m.category]} ·{" "}
-                  <Link href={`/songs/${m.song.id}`} className="underline">
+                  <Link href={`/songs/${m.song.id}?eventId=${event.id}`} className="underline">
                     {m.song.title}
                   </Link>
                 </span>
@@ -551,5 +558,23 @@ export default async function DashboardPage() {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+export default function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ eventId?: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <p aria-busy="true" aria-live="polite" className="text-sm text-zinc-500">
+          Memuat dashboard...
+        </p>
+      }
+    >
+      <DashboardContent searchParams={searchParams} />
+    </Suspense>
   );
 }

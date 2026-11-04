@@ -1,26 +1,45 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { EventTypeBadge } from "@/components/ui/EventTypeBadge";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver } from "@/lib/permissions";
-import { getCurrentEvent, listEvents } from "@server/services/event-service";
-import { listMySongs, listPublishedSongsForObserver, listSongs } from "@server/services/song-service";
+import {
+  canManageEvent,
+  canWriteEventData,
+  isAdmin,
+  isObserver,
+} from "@/lib/permissions";
+import { getEventRole } from "@server/services/event-access";
+import { getActiveEventFor, listEvents } from "@server/services/event-service";
+import {
+  listAvailableSongsForEvent,
+  listPublishedSongsForMember,
+  listPublishedSongsForObserver,
+  listSongLibrary,
+  listSongs,
+} from "@server/services/song-service";
+import { notFound } from "next/navigation";
 import { EventPicker } from "./EventPicker";
 import { SongForm } from "./SongForm";
+import { SongLibraryPicker } from "./SongLibraryPicker";
 import { SongStatusBadge } from "./SongStatusBadge";
 
-export default async function SongsPage({
+async function SongsContent({
   searchParams,
 }: {
   searchParams: Promise<{ eventId?: string }>;
 }) {
+  await connection();
   const user = await requireFreshUser();
   const params = await searchParams;
 
-  if (!isAdmin(user)) {
-    const current = await getCurrentEvent();
+  if (isObserver(user)) {
+    const current = await getActiveEventFor(user, params.eventId);
     if (!current) {
+      if (params.eventId) notFound();
       return (
         <EmptyState
           title="Belum ada lagu"
@@ -49,7 +68,7 @@ export default async function SongsPage({
             {songs.map((s) => (
               <li key={s.id}>
                 <Link
-                  href={`/songs/${s.id}`}
+                  href={`/songs/${s.id}?eventId=${current.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                 >
                   <span>
@@ -69,44 +88,58 @@ export default async function SongsPage({
     );
   }
 
-  if (!isAdmin(user)) {
-    const current = await getCurrentEvent();
-    if (!current) {
-      return (
-        <EmptyState
-          title="Belum ada lagu"
-          description="Lagu yang ditugaskan akan tampil di sini."
-        />
-      );
-    }
-    const mine = await listMySongs(user.id, current.id);
+  const [events, current] = await Promise.all([
+    listEvents(user),
+    getActiveEventFor(user, params.eventId),
+  ]);
+  if (events.length === 0) {
+    if (params.eventId) notFound();
+    return (
+      <EmptyState
+        title="Belum ada event"
+        description="Buat event dulu sebelum mengelola lagu."
+      />
+    );
+  }
+  const eventId = current?.id;
+  if (!eventId) notFound();
+  const eventRole = await getEventRole(user, eventId);
+  const manager = isAdmin(user) || canManageEvent(eventRole);
+  const canWrite = canWriteEventData(
+    eventRole,
+    Boolean(current?.accessClosedAt),
+    isAdmin(user),
+  );
+  if (!manager) {
+    const songs = await listPublishedSongsForMember(eventId);
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-          Lagu Saya
-        </h1>
-        {mine.length === 0 ? (
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Lagu Saya</h1>
+          <EventTypeBadge type={current.eventType} />
+        </div>
+        {songs.length === 0 ? (
           <EmptyState
-            title="Belum ada lagu untukmu"
-            description="Admin/MD akan menugaskan lagu yang perlu dipelajari."
+            title="Belum ada lagu publish"
+            description="Lagu yang sudah dipublish di event ini akan tampil di sini."
           />
         ) : (
           <ul className="flex flex-col gap-2">
-            {mine.map((s) => (
-              <li key={s.id}>
+            {songs.map((song) => (
+              <li key={song.id}>
                 <Link
-                  href={`/songs/${s.id}`}
+                  href={`/songs/${song.id}?eventId=${current.id}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                 >
                   <span>
-                    <span className="font-medium">{s.title}</span>
-                    {s.liturgicalFunction ? (
+                    <span className="font-medium">{song.title}</span>
+                    {song.liturgicalFunction ? (
                       <span className="block text-xs text-zinc-500">
-                        {s.liturgicalFunction}
+                        {song.liturgicalFunction}
                       </span>
                     ) : null}
                   </span>
-                  <SongStatusBadge status={s.status} />
+                  <SongStatusBadge status={song.status} />
                 </Link>
               </li>
             ))}
@@ -115,36 +148,39 @@ export default async function SongsPage({
       </div>
     );
   }
-
-  const [events, current] = await Promise.all([
-    listEvents(),
-    getCurrentEvent(),
+  const [songs, availableLibrarySongs] = await Promise.all([
+    listSongs(eventId),
+    listAvailableSongsForEvent(eventId),
   ]);
-  if (events.length === 0) {
-    return (
-      <EmptyState
-        title="Belum ada event"
-        description="Buat event dulu sebelum mengelola lagu."
-      />
-    );
-  }
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
-  const songs = await listSongs(eventId);
+  const librarySongs = isAdmin(user) ? await listSongLibrary() : [];
   const activeEvent = events.find((e) => e.id === eventId);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Lagu</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Lagu</h1>
+          {isAdmin(user) ? (
+            <Link href="/songs/library" className="text-sm font-medium underline">
+              Pustaka Lagu
+            </Link>
+          ) : null}
+        </div>
         <EventPicker
-          events={events.map((e) => ({ id: e.id, name: e.name }))}
+          events={events.map((e) => ({ id: e.id, name: e.name, eventType: e.eventType }))}
           value={eventId}
         />
       </div>
-      <SongForm mode="create" eventId={eventId} />
+      {activeEvent ? <EventTypeBadge type={activeEvent.eventType} /> : null}
+      {isAdmin(user) ? <SongForm mode="create" eventId={eventId} /> : null}
+      {canWrite ? (
+        <Card title="Tambah dari Pustaka Lagu">
+          <SongLibraryPicker eventId={eventId} songs={availableLibrarySongs} />
+        </Card>
+      ) : null}
+      {isAdmin(user) && librarySongs.length === 0 ? (
+        <p className="text-sm text-zinc-500">Pustaka belum memiliki lagu master.</p>
+      ) : null}
       <Card title={`${activeEvent?.name} — ${songs.length} lagu`}>
         {songs.length === 0 ? (
           <EmptyState title="Belum ada lagu di event ini" />
@@ -153,7 +189,7 @@ export default async function SongsPage({
             {songs.map((s) => (
               <li key={s.id}>
                 <Link
-                  href={`/songs/${s.id}`}
+                  href={`/songs/${s.id}?eventId=${eventId}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                 >
                   <span>
@@ -174,5 +210,23 @@ export default async function SongsPage({
         )}
       </Card>
     </div>
+  );
+}
+
+export default function SongsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ eventId?: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <p aria-busy="true" aria-live="polite" className="text-sm text-zinc-500">
+          Memuat lagu...
+        </p>
+      }
+    >
+      <SongsContent searchParams={searchParams} />
+    </Suspense>
   );
 }

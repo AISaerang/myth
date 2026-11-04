@@ -187,8 +187,13 @@ async function ensureSong(
   s: SeedSong,
 ): Promise<string> {
   const existing = await prisma.song.findFirst({
-    where: { eventId, title: { equals: s.title } },
+    where: { title: { equals: s.title }, eventSongs: { some: { eventId } } },
   });
+  const existingEventSong = existing
+    ? await prisma.eventSong.findUnique({
+        where: { eventId_songId: { eventId, songId: existing.id } },
+      })
+    : null;
   const targetStatus = parseSongStatus(s.status);
   const songId =
     existing?.id ??
@@ -224,18 +229,18 @@ async function ensureSong(
     };
     const differs =
       (existing.artistOrAuthor ?? null) !== want.artistOrAuthor ||
-      (existing.liturgicalFunction ?? null) !== want.liturgicalFunction ||
-      (existing.key ?? undefined) !== want.key ||
+      (existingEventSong?.liturgicalFunction ?? null) !== want.liturgicalFunction ||
+      (existingEventSong?.eventKey ?? undefined) !== want.key ||
       (existing.bpm ?? undefined) !== want.bpm ||
       (existing.timeSignature ?? undefined) !== want.timeSignature ||
       (existing.estimatedDurationSeconds ?? undefined) !==
         want.estimatedDurationSeconds ||
-      (existing.arrangementNotes ?? null) !== want.arrangementNotes ||
+      (existingEventSong?.notes ?? null) !== want.arrangementNotes ||
       (existing.originalReferenceUrl ?? undefined) !== want.originalReferenceUrl ||
-      existing.status !== targetStatus;
-    if (differs && !existing.isFinalLocked) {
+      existingEventSong?.status !== targetStatus;
+    if (differs && !existingEventSong?.isFinalLocked) {
       const { updateSong } = await import("@server/services/song-service");
-      const updated = await updateSong(actorId, songId, {
+      const updated = await updateSong(actorId, songId, eventId, {
         title: existing.title,
         artistOrAuthor: s.artistOrAuthor,
         liturgicalFunction: s.liturgicalFunction,
@@ -391,6 +396,11 @@ async function main(): Promise<void> {
     }
     for (const s of b.songs) {
       const songId = await ensureSong(actorId, event.id, s);
+      const eventSong = await prisma.eventSong.findUnique({
+        where: { eventId_songId: { eventId: event.id, songId } },
+        select: { id: true },
+      });
+      if (!eventSong) throw new Error(`Setlist entry tidak ditemukan: ${s.title}`);
       songCount += 1;
       await addSongToBatch(batch.id, songId).catch(() => {});
       const assignees = [
@@ -400,7 +410,7 @@ async function main(): Promise<void> {
       for (const username of assignees) {
         const personId = personByUsername.get(username.toLowerCase());
         if (!personId) continue;
-        await assignPerson(actorId, {
+        await assignPerson(actorId, eventSong.id, {
           songId,
           personId,
           isPrimary: true,
@@ -435,7 +445,10 @@ async function ensureDecisions(
     let relatedSongId: string | undefined;
     if (d.relatedSongTitle) {
       const song = await prisma.song.findFirst({
-        where: { eventId, title: d.relatedSongTitle },
+        where: {
+          title: d.relatedSongTitle,
+          eventSongs: { some: { eventId } },
+        },
       });
       if (!song) {
         console.log(` Lewati decision "${d.title}": lagu tidak ditemukan.`);
@@ -469,29 +482,33 @@ async function archiveStaleSongs(
   activeTitles: Set<string>,
 ): Promise<number> {
   const { AuditAction, writeAudit } = await import("@/lib/audit");
-  const songs = await prisma.song.findMany({ where: { eventId } });
+  const eventSongs = await prisma.eventSong.findMany({
+    where: { eventId },
+    include: { song: { select: { id: true, title: true } } },
+  });
   let count = 0;
-  for (const song of songs) {
+  for (const eventSong of eventSongs) {
+    const song = eventSong.song;
     if (activeTitles.has(song.title.toLowerCase())) continue;
     const [assignments, items] = await Promise.all([
-      prisma.songAssignment.count({ where: { songId: song.id } }),
-      prisma.songBatchItem.count({ where: { songId: song.id } }),
+      prisma.songAssignment.count({ where: { eventSongId: eventSong.id } }),
+      prisma.songBatchItem.count({ where: { eventSongId: eventSong.id } }),
     ]);
     if (
-      !song.isPublished &&
+      !eventSong.isPublished &&
       assignments === 0 &&
       items === 0 &&
-      song.status === "DRAFT"
+      eventSong.status === "DRAFT"
     ) {
       continue; // Sudah arsip.
     }
     await prisma.$transaction([
-      prisma.songAssignment.deleteMany({ where: { songId: song.id } }),
-      prisma.songBatchItem.deleteMany({ where: { songId: song.id } }),
+      prisma.songAssignment.deleteMany({ where: { eventSongId: eventSong.id } }),
+      prisma.songBatchItem.deleteMany({ where: { eventSongId: eventSong.id } }),
       // Lagu arsip juga harus hilang dari daftar lagu tiap rehearsal.
-      prisma.rehearsalSong.deleteMany({ where: { songId: song.id } }),
-      prisma.song.update({
-        where: { id: song.id },
+      prisma.rehearsalSong.deleteMany({ where: { eventSongId: eventSong.id } }),
+      prisma.eventSong.update({
+        where: { id: eventSong.id },
         data: { isPublished: false, status: "DRAFT" },
       }),
     ]);

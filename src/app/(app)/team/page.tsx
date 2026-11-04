@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
+import { listAccessibleEvents } from "@server/services/event-access";
 import {
   listPersonnelForAdmin,
   listRosterForUsers,
@@ -60,6 +61,14 @@ export default async function TeamPage() {
   const user = await requireFreshUser();
 
   if (!isAdmin(user)) {
+    if ((await listAccessibleEvents(user)).length === 0) {
+      return (
+        <EmptyState
+          title="Belum terdaftar di acara mana pun"
+          description="Minta admin menambahkan Anda sebagai anggota acara."
+        />
+      );
+    }
     const roster = await listRosterForUsers();
     return (
       <div className="flex flex-col gap-4">

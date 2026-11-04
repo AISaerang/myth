@@ -1,7 +1,12 @@
 import "server-only";
-import type { MaterialCategory, SongStatus } from "@/generated/prisma/client";
+import type {
+  MaterialCategory,
+  Prisma,
+  SongStatus,
+} from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { eventSongDisplayKey } from "@/lib/event-song";
 import type {
   ArrangementVersionInput,
   AssignmentInput,
@@ -9,89 +14,179 @@ import type {
   SongInput,
 } from "@/lib/validation/song";
 
-export async function listSongs(eventId: string) {
-  return prisma.song.findMany({
-    where: { eventId },
-    include: {
-      activeVersion: { select: { id: true, versionLabel: true } },
-      assignments: {
-        include: {
-          person: { select: { id: true, displayName: true } },
-          instrumentSkill: { select: { id: true, name: true } },
+function eventSongReadInclude(eventId: string) {
+  return {
+    event: { select: { id: true, name: true } },
+    song: {
+      include: {
+        activeVersion: true,
+        versions: { orderBy: { createdAt: "desc" } },
+        materials: {
+          where: {
+            OR: [{ eventId: null }, { eventId }],
+          },
+          orderBy: [{ category: "asc" }, { createdAt: "desc" }],
         },
-        orderBy: { person: { displayName: "asc" } },
-      },
-      batchItems: {
-        include: { batch: { select: { id: true, name: true, status: true } } },
       },
     },
-    orderBy: [{ status: "asc" }, { title: "asc" }],
-  });
+    assignments: {
+      include: {
+        person: { select: { id: true, displayName: true, isActive: true } },
+        instrumentSkill: { select: { id: true, name: true } },
+      },
+      orderBy: { person: { displayName: "asc" } },
+    },
+    batchItems: {
+      include: { batch: true },
+      orderBy: { sortOrder: "asc" },
+    },
+  } satisfies Prisma.EventSongInclude;
 }
 
-// Lagu untuk personel: yang dipublikasi DAN ditugaskan ke profilnya.
-export async function listMySongs(userId: string, eventId: string) {
-  const person = await prisma.person.findUnique({ where: { userId } });
-  if (!person) return [];
-  return prisma.song.findMany({
+type EventSongRead = Prisma.EventSongGetPayload<{
+  include: ReturnType<typeof eventSongReadInclude>;
+}>;
+
+function toEventSongView(eventSong: EventSongRead) {
+  return {
+    ...eventSong.song,
+    eventId: eventSong.eventId,
+    event: eventSong.event,
+    eventSongId: eventSong.id,
+    eventKey: eventSong.eventKey,
+    sortOrder: eventSong.sortOrder,
+    key: eventSongDisplayKey(eventSong.eventKey, eventSong.song.key),
+    liturgicalFunction: eventSong.liturgicalFunction,
+    arrangementNotes: eventSong.notes,
+    status: eventSong.status,
+    isPublished: eventSong.isPublished,
+    isFinalLocked: eventSong.isFinalLocked,
+    assignments: eventSong.assignments,
+    batchItems: eventSong.batchItems,
+  };
+}
+
+export async function listSongs(eventId: string) {
+  const eventSongs = await prisma.eventSong.findMany({
+    where: {
+      eventId,
+      song: { archivedAt: null },
+    },
+    include: eventSongReadInclude(eventId),
+    orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
+  });
+  return eventSongs.map(toEventSongView);
+}
+
+// Member event melihat semua lagu yang sudah dipublikasi di setlist itu.
+export async function listPublishedSongsForMember(eventId: string) {
+  const eventSongs = await prisma.eventSong.findMany({
     where: {
       eventId,
       isPublished: true,
-      assignments: { some: { personId: person.id } },
+      song: { archivedAt: null },
     },
-    include: {
-      activeVersion: true,
-      assignments: {
-        where: { personId: person.id },
-        include: { instrumentSkill: true },
-      },
-      materials: { where: { isActive: true }, orderBy: { category: "asc" } },
-      batchItems: { include: { batch: { select: { name: true } } } },
-    },
-    orderBy: { title: "asc" },
+    include: eventSongReadInclude(eventId),
+    orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
   });
+  return eventSongs.map(toEventSongView);
 }
 
 // Lagu untuk pemantau: semua yang sudah Publish (tanpa perlu
 // assignment). DRAFT internal tidak pernah bocor ke observer.
 export async function listPublishedSongsForObserver(eventId: string) {
-  return prisma.song.findMany({
-    where: { eventId, isPublished: true },
-    include: {
-      activeVersion: { select: { id: true, versionLabel: true } },
-      assignments: {
-        include: {
-          person: { select: { id: true, displayName: true } },
-          instrumentSkill: { select: { id: true, name: true } },
-        },
-        orderBy: { person: { displayName: "asc" } },
-      },
-      batchItems: {
-        include: { batch: { select: { id: true, name: true, status: true } } },
-      },
+  const eventSongs = await prisma.eventSong.findMany({
+    where: {
+      eventId,
+      isPublished: true,
+      song: { archivedAt: null },
     },
-    orderBy: [{ status: "asc" }, { title: "asc" }],
+    include: eventSongReadInclude(eventId),
+    orderBy: [{ sortOrder: "asc" }, { song: { title: "asc" } }],
+  });
+  return eventSongs.map(toEventSongView);
+}
+
+export async function getSong(id: string, eventId: string) {
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { eventId_songId: { eventId, songId: id } },
+    include: eventSongReadInclude(eventId),
+  });
+  return eventSong ? toEventSongView(eventSong) : null;
+}
+
+export async function listSongLibrary(includeArchived = false) {
+  return prisma.song.findMany({
+    where: includeArchived ? {} : { archivedAt: null },
+    include: { _count: { select: { eventSongs: true } } },
+    orderBy: [{ archivedAt: "asc" }, { title: "asc" }, { artistOrAuthor: "asc" }],
   });
 }
 
-export async function getSong(id: string) {
-  return prisma.song.findUnique({
-    where: { id },
-    include: {
-      activeVersion: true,
-      versions: { orderBy: { createdAt: "desc" } },
-      materials: { orderBy: [{ category: "asc" }, { createdAt: "desc" }] },
-      assignments: {
-        include: {
-          person: { select: { id: true, displayName: true, isActive: true } },
-          instrumentSkill: { select: { id: true, name: true } },
-        },
-        orderBy: { person: { displayName: "asc" } },
-      },
-      batchItems: { include: { batch: true } },
-      event: { select: { id: true, name: true } },
+export async function listAvailableSongsForEvent(eventId: string) {
+  return prisma.song.findMany({
+    where: {
+      archivedAt: null,
+      eventSongs: { none: { eventId } },
     },
+    select: { id: true, title: true, artistOrAuthor: true, key: true },
+    orderBy: [{ title: "asc" }, { artistOrAuthor: "asc" }],
   });
+}
+
+export async function addSongFromLibraryToEvent(
+  actorUserId: string,
+  eventId: string,
+  songId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const result = await prisma.$transaction(async (tx) => {
+    const event = await tx.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, name: true },
+    });
+    if (!event) return { ok: false as const, error: "Event tidak ditemukan." };
+    const song = await tx.song.findUnique({
+      where: { id: songId },
+      select: { id: true, title: true },
+    });
+    if (!song) return { ok: false as const, error: "Lagu pustaka tidak ditemukan." };
+
+    await tx.$queryRaw`SELECT id FROM Event WHERE id = ${eventId} FOR UPDATE`;
+    const existing = await tx.eventSong.findUnique({
+      where: { eventId_songId: { eventId, songId } },
+      select: { id: true },
+    });
+    if (existing) {
+      return { ok: false as const, error: "Lagu sudah ada di setlist event ini." };
+    }
+    const maxOrder = await tx.eventSong.aggregate({
+      where: { eventId },
+      _max: { sortOrder: true },
+    });
+    await tx.eventSong.create({
+      data: {
+        eventId,
+        songId,
+        sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+      },
+    });
+    return {
+      ok: true as const,
+      eventName: event.name,
+      songTitle: song.title,
+    };
+  });
+  if (!result.ok) return result;
+
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.EVENT_SONG_ADDED,
+    entityType: "EventSong",
+    entityId: `${eventId}:${songId}`,
+    summary: `"${result.songTitle}" ditambahkan ke setlist "${result.eventName}".`,
+    metadata: { eventId, songId },
+  });
+  return { ok: true };
 }
 
 export async function createSong(
@@ -106,20 +201,30 @@ export async function createSong(
   }
   const event = await prisma.event.findUnique({ where: { id: input.eventId } });
   if (!event) return { ok: false, error: "Event tidak ditemukan." };
+  const maxOrder = await prisma.eventSong.aggregate({
+    where: { eventId: input.eventId },
+    _max: { sortOrder: true },
+  });
   const song = await prisma.song.create({
     data: {
-      eventId: input.eventId,
       title: input.title,
       artistOrAuthor: input.artistOrAuthor || null,
-      liturgicalFunction: input.liturgicalFunction || null,
       key: input.key,
       bpm: input.bpm,
       timeSignature: input.timeSignature,
       estimatedDurationSeconds: input.estimatedDurationSeconds,
       originalReferenceUrl: input.originalReferenceUrl,
-      arrangementNotes: input.arrangementNotes || null,
-      status: input.status as SongStatus,
       createdById: actorUserId,
+      eventSongs: {
+        create: {
+          eventId: input.eventId,
+          sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+          liturgicalFunction: input.liturgicalFunction || null,
+          eventKey: input.key,
+          notes: input.arrangementNotes || null,
+          status: input.status as SongStatus,
+        },
+      },
     },
   });
   await writeAudit({
@@ -127,8 +232,8 @@ export async function createSong(
     action: AuditAction.SONG_CREATED,
     entityType: "Song",
     entityId: song.id,
-    summary: `Lagu "${song.title}" dibuat (${song.status}).`,
-    metadata: { title: song.title, status: song.status },
+    summary: `Lagu "${song.title}" dibuat (${input.status}).`,
+    metadata: { title: song.title, status: input.status, eventId: input.eventId },
   });
   return { ok: true, id: song.id };
 }
@@ -136,10 +241,14 @@ export async function createSong(
 export async function updateSong(
   actorUserId: string,
   id: string,
+  eventId: string,
   input: Omit<SongInput, "eventId">,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const existing = await prisma.song.findUnique({ where: { id } });
-  if (!existing) return { ok: false, error: "Lagu tidak ditemukan." };
+  const existing = await prisma.eventSong.findUnique({
+    where: { eventId_songId: { eventId, songId: id } },
+    include: { song: true },
+  });
+  if (!existing) return { ok: false, error: "Lagu tidak ditemukan di event ini." };
   if (existing.isFinalLocked) {
     return {
       ok: false,
@@ -152,21 +261,32 @@ export async function updateSong(
       error: "Gunakan aksi kunci final yang disengaja, bukan edit status.",
     };
   }
-  await prisma.song.update({
-    where: { id },
-    data: {
-      title: input.title,
-      artistOrAuthor: input.artistOrAuthor || null,
-      liturgicalFunction: input.liturgicalFunction || null,
-      key: input.key,
-      bpm: input.bpm,
-      timeSignature: input.timeSignature,
-      estimatedDurationSeconds: input.estimatedDurationSeconds,
-      originalReferenceUrl: input.originalReferenceUrl,
-      arrangementNotes: input.arrangementNotes || null,
-      status: input.status as SongStatus,
-    },
-  });
+  await prisma.$transaction([
+    prisma.song.update({
+      where: { id },
+      data: {
+        title: input.title,
+        artistOrAuthor: input.artistOrAuthor || null,
+        key: input.key,
+        bpm: input.bpm,
+        timeSignature: input.timeSignature,
+        estimatedDurationSeconds: input.estimatedDurationSeconds,
+        originalReferenceUrl: input.originalReferenceUrl,
+        // introChords/introNotation/introNote sengaja tidak disentuh:
+        // form lagu tidak lagi mengeditnya, dan menyimpan null di sini
+        // akan menghapus data sebelum skrip migrasi sempat menyalinnya.
+      },
+    }),
+    prisma.eventSong.update({
+      where: { id: existing.id },
+      data: {
+        eventKey: input.key,
+        liturgicalFunction: input.liturgicalFunction || null,
+        notes: input.arrangementNotes || null,
+        status: input.status as SongStatus,
+      },
+    }),
+  ]);
   await writeAudit({
     actorUserId,
     action: AuditAction.SONG_UPDATED,
@@ -181,28 +301,39 @@ export async function updateSong(
 export async function setSongPublished(
   actorUserId: string,
   id: string,
+  eventId: string,
   isPublished: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const existing = await prisma.song.findUnique({ where: { id } });
+  const existing = await prisma.eventSong.findUnique({
+    where: { eventId_songId: { eventId, songId: id } },
+    include: { song: { select: { title: true } } },
+  });
   if (!existing) return { ok: false, error: "Lagu tidak ditemukan." };
-  await prisma.song.update({ where: { id }, data: { isPublished } });
+  await prisma.eventSong.update({ where: { id: existing.id }, data: { isPublished } });
   await writeAudit({
     actorUserId,
     action: AuditAction.SONG_PUBLISHED,
     entityType: "Song",
     entityId: id,
-    summary: `Lagu "${existing.title}" ${isPublished ? "dipublikasi" : "ditarik"}.`,
-    metadata: { title: existing.title },
+    summary: `Lagu "${existing.song.title}" ${isPublished ? "dipublikasi" : "ditarik"}.`,
+    metadata: { title: existing.song.title, eventId },
   });
   return { ok: true };
 }
 
 export async function assignPerson(
   actorUserId: string,
+  eventSongId: string,
   input: AssignmentInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const song = await prisma.song.findUnique({ where: { id: input.songId } });
-  if (!song) return { ok: false, error: "Lagu tidak ditemukan." };
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { id: eventSongId },
+    include: { song: { select: { id: true, title: true } } },
+  });
+  if (!eventSong || eventSong.songId !== input.songId) {
+    return { ok: false, error: "Lagu tidak ditemukan di event ini." };
+  }
+  const song = eventSong.song;
   const person = await prisma.person.findUnique({
     where: { id: input.personId },
   });
@@ -218,10 +349,19 @@ export async function assignPerson(
   const existing = await prisma.songAssignment.findUnique({
     where: { songId_personId: { songId: input.songId, personId: input.personId } },
   });
-  if (existing) return { ok: false, error: "Personel sudah ditugaskan di lagu ini." };
+  if (existing) {
+    return {
+      ok: false,
+      error:
+        existing.eventSongId === eventSongId
+          ? "Personel sudah ditugaskan di lagu ini."
+          : "Personel sudah ditugaskan ke lagu pustaka di event lain.",
+    };
+  }
   await prisma.songAssignment.create({
     data: {
       songId: input.songId,
+      eventSongId,
       personId: input.personId,
       instrumentSkillId: input.instrumentSkillId,
       assignmentNote: input.assignmentNote || null,
@@ -270,13 +410,19 @@ export async function assignBatchMembers(
     include: {
       items: {
         select: {
+          eventSongId: true,
           song: { select: { id: true, title: true } },
         },
       },
     },
   });
   if (!batch) return { ok: false, error: "Batch tidak ditemukan." };
-  const batchSongIds = new Set(batch.items.map((i) => i.song.id));
+  const eventSongBySongId = new Map(
+    batch.items
+      .filter((item) => item.eventSongId)
+      .map((item) => [item.song.id, item.eventSongId as string]),
+  );
+  const batchSongIds = new Set(eventSongBySongId.keys());
   const targetSongIds = songIds.filter((id) => batchSongIds.has(id));
   if (targetSongIds.length === 0) {
     return { ok: false, error: "Lagu terpilih tidak ada di batch ini." };
@@ -312,14 +458,26 @@ export async function assignBatchMembers(
       songId: { in: targetSongIds },
       personId: { in: rows.map((r) => r.personId) },
     },
-    select: { songId: true, personId: true },
+    select: { eventSongId: true, songId: true, personId: true },
   });
-  const existingPairs = new Set(existing.map((e) => `${e.songId}::${e.personId}`));
+  if (
+    existing.some(
+      (assignment) =>
+        assignment.eventSongId !== eventSongBySongId.get(assignment.songId),
+    )
+  ) {
+    return {
+      ok: false,
+      error: "Personel sudah ditugaskan ke lagu pustaka di event lain.",
+    };
+  }
+  const existingPairs = new Set(existing.map((e) => `${e.eventSongId}::${e.personId}`));
   const toCreate = rows.flatMap((row) =>
     targetSongIds
-      .filter((songId) => !existingPairs.has(`${songId}::${row.personId}`))
+      .filter((songId) => !existingPairs.has(`${eventSongBySongId.get(songId)}::${row.personId}`))
       .map((songId) => ({
         songId,
+        eventSongId: eventSongBySongId.get(songId)!,
         personId: row.personId,
         instrumentSkillId: row.instrumentSkillId || null,
         isPrimary: true,
@@ -328,14 +486,14 @@ export async function assignBatchMembers(
   if (toCreate.length > 0) {
     await prisma.songAssignment.createMany({ data: toCreate });
   }
-  const createdPairs = new Set(toCreate.map((c) => `${c.songId}::${c.personId}`));
+  const createdPairs = new Set(toCreate.map((c) => `${c.eventSongId}::${c.personId}`));
   const results: BatchAssignResult[] = rows.map((row) => {
     const person = peopleById.get(row.personId);
     const displayName = person?.displayName ?? row.personId;
     let created = 0;
     let skipped = 0;
     for (const songId of targetSongIds) {
-      if (createdPairs.has(`${songId}::${row.personId}`)) created += 1;
+      if (createdPairs.has(`${eventSongBySongId.get(songId)}::${row.personId}`)) created += 1;
       else skipped += 1;
     }
     return { personId: row.personId, displayName, created, skipped };
@@ -358,13 +516,13 @@ export async function assignBatchMembers(
 
 export async function unassignPerson(
   actorUserId: string,
-  songId: string,
+  eventSongId: string,
   personId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const assignment = await prisma.songAssignment.findUnique({
-    where: { songId_personId: { songId, personId } },
+  const assignment = await prisma.songAssignment.findFirst({
+    where: { eventSongId, personId },
     include: {
-      song: { select: { title: true } },
+      song: { select: { id: true, title: true } },
       person: { select: { displayName: true } },
     },
   });
@@ -374,7 +532,7 @@ export async function unassignPerson(
     actorUserId,
     action: AuditAction.ASSIGNMENT_REMOVED,
     entityType: "Song",
-    entityId: songId,
+    entityId: assignment.song.id,
     summary: `${assignment.person.displayName} dilepas dari "${assignment.song.title}".`,
     metadata: {
       song: assignment.song.title,
@@ -457,66 +615,55 @@ export async function activateVersion(
 // Perubahan setelah ini harus lewat buka-kunci yang tercatat.
 export async function lockFinal(
   actorUserId: string,
+  eventSongId: string,
   versionId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { id: eventSongId },
+    include: { song: { select: { id: true, title: true } } },
+  });
   const version = await prisma.arrangementVersion.findUnique({
     where: { id: versionId },
-    include: { song: true },
   });
-  if (!version) return { ok: false, error: "Versi tidak ditemukan." };
-  await prisma.$transaction([
-    prisma.arrangementVersion.updateMany({
-      where: { songId: version.songId },
-      data: { isActive: false, isFinal: false },
-    }),
-    prisma.arrangementVersion.update({
-      where: { id: versionId },
-      data: { isActive: true, isFinal: true },
-    }),
-    prisma.song.update({
-      where: { id: version.songId },
-      data: {
-        activeArrangementVersionId: versionId,
-        isFinalLocked: true,
-        status: "FINAL_LOCKED",
-      },
-    }),
-  ]);
+  if (!eventSong || !version || eventSong.songId !== version.songId) {
+    return { ok: false, error: "Versi tidak valid untuk lagu event ini." };
+  }
+  await prisma.eventSong.update({
+    where: { id: eventSongId },
+    data: { isFinalLocked: true, status: "FINAL_LOCKED" },
+  });
   await writeAudit({
     actorUserId,
     action: AuditAction.FINAL_LOCKED,
     entityType: "Song",
-    entityId: version.songId,
-    summary: `"${version.song.title}" dikunci final pada ${version.versionLabel}.`,
-    metadata: { song: version.song.title, version: version.versionLabel },
+    entityId: eventSong.songId,
+    summary: `"${eventSong.song.title}" dikunci final pada ${version.versionLabel}.`,
+    metadata: { song: eventSong.song.title, version: version.versionLabel, eventId: eventSong.eventId },
   });
   return { ok: true };
 }
 
 export async function unlockFinal(
   actorUserId: string,
-  songId: string,
+  eventSongId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const song = await prisma.song.findUnique({ where: { id: songId } });
-  if (!song) return { ok: false, error: "Lagu tidak ditemukan." };
-  if (!song.isFinalLocked) return { ok: false, error: "Lagu tidak terkunci." };
-  await prisma.$transaction([
-    prisma.arrangementVersion.updateMany({
-      where: { songId },
-      data: { isFinal: false },
-    }),
-    prisma.song.update({
-      where: { id: songId },
-      data: { isFinalLocked: false, status: "REHEARSAL_READY" },
-    }),
-  ]);
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { id: eventSongId },
+    include: { song: { select: { id: true, title: true } } },
+  });
+  if (!eventSong) return { ok: false, error: "Lagu tidak ditemukan." };
+  if (!eventSong.isFinalLocked) return { ok: false, error: "Lagu tidak terkunci." };
+  await prisma.eventSong.update({
+    where: { id: eventSongId },
+    data: { isFinalLocked: false, status: "REHEARSAL_READY" },
+  });
   await writeAudit({
     actorUserId,
     action: AuditAction.FINAL_UNLOCKED,
     entityType: "Song",
-    entityId: songId,
-    summary: `Kunci final "${song.title}" dibuka; status kembali lolos rehearsal.`,
-    metadata: { song: song.title },
+    entityId: eventSong.songId,
+    summary: `Kunci final "${eventSong.song.title}" dibuka; status kembali lolos rehearsal.`,
+    metadata: { song: eventSong.song.title, eventId: eventSong.eventId },
   });
   return { ok: true };
 }
@@ -527,6 +674,20 @@ export async function addMaterial(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const song = await prisma.song.findUnique({ where: { id: input.songId } });
   if (!song) return { ok: false, error: "Lagu tidak ditemukan." };
+  if (input.eventId) {
+    const eventSong = await prisma.eventSong.findUnique({
+      where: {
+        eventId_songId: { eventId: input.eventId, songId: input.songId },
+      },
+      select: { id: true },
+    });
+    if (!eventSong) {
+      return {
+        ok: false,
+        error: "Materi event harus terkait lagu di setlist event tersebut.",
+      };
+    }
+  }
   if (input.arrangementVersionId) {
     const version = await prisma.arrangementVersion.findUnique({
       where: { id: input.arrangementVersionId },
@@ -539,12 +700,17 @@ export async function addMaterial(
   const category = input.category as MaterialCategory;
   await prisma.$transaction([
     prisma.songMaterial.updateMany({
-      where: { songId: input.songId, category },
+      where: {
+        songId: input.songId,
+        category,
+        eventId: input.eventId ?? "library",
+      },
       data: { isActive: false },
     }),
     prisma.songMaterial.create({
       data: {
         songId: input.songId,
+        eventId: input.eventId ?? "library",
         arrangementVersionId: input.arrangementVersionId,
         title: input.title,
         category,
@@ -562,7 +728,11 @@ export async function addMaterial(
     entityType: "Song",
     entityId: input.songId,
     summary: `Materi "${input.title}" (${input.category}) ditambahkan ke "${song.title}".`,
-    metadata: { song: song.title, category: input.category },
+    metadata: {
+      song: song.title,
+      category: input.category,
+      eventId: input.eventId ?? "library",
+    },
   });
   return { ok: true };
 }
@@ -580,7 +750,11 @@ export async function setMaterialActive(
   if (isActive) {
     await prisma.$transaction([
       prisma.songMaterial.updateMany({
-        where: { songId: material.songId, category: material.category },
+        where: {
+          songId: material.songId,
+          category: material.category,
+          eventId: material.eventId,
+        },
         data: { isActive: false },
       }),
       prisma.songMaterial.update({
@@ -594,7 +768,11 @@ export async function setMaterialActive(
       entityType: "Song",
       entityId: material.songId,
       summary: `Materi "${material.title}" diaktifkan untuk "${material.song.title}".`,
-      metadata: { song: material.song.title, title: material.title },
+      metadata: {
+        song: material.song.title,
+        title: material.title,
+        eventId: material.eventId ?? "library",
+      },
     });
   } else {
     await prisma.songMaterial.update({
@@ -613,5 +791,61 @@ export async function deleteMaterial(
   });
   if (!material) return { ok: false, error: "Materi tidak ditemukan." };
   await prisma.songMaterial.delete({ where: { id: materialId } });
+  return { ok: true };
+}
+
+export async function archiveSong(
+  actorUserId: string,
+  songId: string,
+  eventId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { eventId_songId: { eventId, songId } },
+    include: { song: { select: { title: true } } },
+  });
+  if (!eventSong) return { ok: false, error: "Lagu tidak ditemukan di event ini." };
+  await prisma.song.update({
+    where: { id: songId },
+    data: {
+      archivedAt: new Date(),
+      archivedById: actorUserId,
+    },
+  });
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.SONG_UPDATED,
+    entityType: "Song",
+    entityId: songId,
+    summary: `"${eventSong.song.title}" diarsipkan (soft archive).`,
+    metadata: { songId, eventId },
+  });
+  return { ok: true };
+}
+
+export async function restoreSong(
+  actorUserId: string,
+  songId: string,
+  eventId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { eventId_songId: { eventId, songId } },
+    include: { song: { select: { title: true } } },
+  });
+  if (!eventSong) return { ok: false, error: "Lagu tidak ditemukan di event ini." };
+  await prisma.song.update({
+    where: { id: songId },
+    data: {
+      archivedAt: null,
+      archivedById: null,
+    },
+  });
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.SONG_UPDATED,
+    entityType: "Song",
+    entityId: songId,
+    summary: `"${eventSong.song.title}" dipulihkan dari arsip.`,
+    metadata: { songId, eventId },
+  });
   return { ok: true };
 }

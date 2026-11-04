@@ -47,7 +47,10 @@ export function SongForm({
         {mode === "create" ? (
           <input type="hidden" name="eventId" value={eventId} />
         ) : (
-          <input type="hidden" name="songId" value={songId} />
+          <>
+            <input type="hidden" name="songId" value={songId} />
+            <input type="hidden" name="eventId" value={eventId} />
+          </>
         )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">

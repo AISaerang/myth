@@ -6,18 +6,18 @@ import type { ProgressInput } from "@/lib/validation/work";
 
 export async function getMyProgress(
   userId: string,
-  songId: string,
+  eventSongId: string,
 ) {
   const person = await prisma.person.findUnique({ where: { userId } });
   if (!person) return null;
-  return prisma.practiceProgress.findUnique({
-    where: { songId_personId: { songId, personId: person.id } },
+  return prisma.practiceProgress.findFirst({
+    where: { eventSongId, personId: person.id },
   });
 }
 
-export async function getSongProgress(songId: string) {
+export async function getSongProgress(eventSongId: string) {
   return prisma.practiceProgress.findMany({
-    where: { songId },
+    where: { eventSongId },
     include: { person: { select: { id: true, displayName: true, isActive: true } } },
     orderBy: { person: { displayName: "asc" } },
   });
@@ -28,11 +28,16 @@ export async function getSongProgress(songId: string) {
 // OBSERVER tidak boleh update progres (pemantau + pengusul saja).
 export async function upsertMyProgress(
   userId: string,
-  input: ProgressInput,
+  eventSongId: string,
+  input: Omit<ProgressInput, "songId">,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const [user, person] = await Promise.all([
+  const [user, person, eventSong] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
     prisma.person.findUnique({ where: { userId } }),
+    prisma.eventSong.findUnique({
+      where: { id: eventSongId },
+      select: { id: true, songId: true },
+    }),
   ]);
   if (user?.role === "OBSERVER") {
     return { ok: false, error: "Akun pemantau tidak bisa update progres latihan." };
@@ -40,22 +45,37 @@ export async function upsertMyProgress(
   if (!person || !person.isActive) {
     return { ok: false, error: "Profil personel tidak aktif." };
   }
+  if (!eventSong) return { ok: false, error: "Lagu event tidak ditemukan." };
   const assignment = await prisma.songAssignment.findUnique({
-    where: { songId_personId: { songId: input.songId, personId: person.id } },
+    where: { songId_personId: { songId: eventSong.songId, personId: person.id } },
+    select: { eventSongId: true },
   });
-  if (!assignment) {
+  if (!assignment || assignment.eventSongId !== eventSongId) {
     return { ok: false, error: "Lagu ini tidak ditugaskan kepadamu." };
   }
+  const existing = await prisma.practiceProgress.findUnique({
+    where: {
+      songId_personId: { songId: eventSong.songId, personId: person.id },
+    },
+    select: { eventSongId: true },
+  });
+  if (existing?.eventSongId && existing.eventSongId !== eventSongId) {
+    return { ok: false, error: "Progres lagu pustaka ini sudah terhubung ke event lain." };
+  }
   await prisma.practiceProgress.upsert({
-    where: { songId_personId: { songId: input.songId, personId: person.id } },
+    where: {
+      songId_personId: { songId: eventSong.songId, personId: person.id },
+    },
     create: {
-      songId: input.songId,
+      songId: eventSong.songId,
       personId: person.id,
+      eventSongId,
       status: input.status as PracticeStatus,
       note: input.note || null,
       updatedById: userId,
     },
     update: {
+      eventSongId,
       status: input.status as PracticeStatus,
       note: input.note || null,
       updatedById: userId,
@@ -67,27 +87,40 @@ export async function upsertMyProgress(
 // Koreksi admin atas progres siapa pun — tercatat di audit (docs/06).
 export async function correctProgress(
   actorUserId: string,
-  songId: string,
+  eventSongId: string,
   personId: string,
   input: Omit<ProgressInput, "songId">,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const person = await prisma.person.findUnique({ where: { id: personId } });
   if (!person) return { ok: false, error: "Personel tidak ditemukan." };
-  const song = await prisma.song.findUnique({
-    where: { id: songId },
-    select: { id: true, title: true },
+  const eventSong = await prisma.eventSong.findUnique({
+    where: { id: eventSongId },
+    include: { song: { select: { id: true, title: true } } },
   });
-  if (!song) return { ok: false, error: "Lagu tidak ditemukan." };
+  if (!eventSong) return { ok: false, error: "Lagu event tidak ditemukan." };
+  const existing = await prisma.practiceProgress.findUnique({
+    where: {
+      songId_personId: { songId: eventSong.songId, personId },
+    },
+    select: { eventSongId: true },
+  });
+  if (existing?.eventSongId && existing.eventSongId !== eventSongId) {
+    return { ok: false, error: "Progres lagu pustaka ini sudah terhubung ke event lain." };
+  }
   await prisma.practiceProgress.upsert({
-    where: { songId_personId: { songId, personId } },
+    where: {
+      songId_personId: { songId: eventSong.songId, personId },
+    },
     create: {
-      songId,
+      songId: eventSong.songId,
       personId,
+      eventSongId,
       status: input.status as PracticeStatus,
       note: input.note || null,
       updatedById: actorUserId,
     },
     update: {
+      eventSongId,
       status: input.status as PracticeStatus,
       note: input.note || null,
       updatedById: actorUserId,
@@ -97,9 +130,9 @@ export async function correctProgress(
     actorUserId,
     action: AuditAction.PROGRESS_CORRECTED,
     entityType: "Song",
-    entityId: songId,
-    summary: `Progres ${person.displayName} di "${song.title}" dikoreksi menjadi ${input.status}.`,
-    metadata: { song: song.title, person: person.displayName, status: input.status },
+    entityId: eventSong.songId,
+    summary: `Progres ${person.displayName} di "${eventSong.song.title}" dikoreksi menjadi ${input.status}.`,
+    metadata: { song: eventSong.song.title, person: person.displayName, status: input.status, eventId: eventSong.eventId },
   });
   return { ok: true };
 }

@@ -88,6 +88,38 @@ export function transposeRoot(
   return indexToNote(noteIndex(root) + semitones, useFlats);
 }
 
+// Geser tiap token chord pada satu baris spasi (kunci intro / baris atas),
+// mempertahankan kolom awal. Chord yang memanjang (C → C#) tidak menelan
+// token berikutnya: token itu digeser satu spasi bila kolomnya tertimpa.
+export function transposeSpacedChords(
+  line: string,
+  semitones: number,
+  useFlats = false,
+): string {
+  if (semitones % 12 === 0 && !useFlats) return line;
+  const placed: { token: string; col: number }[] = [];
+  const tokenRe = /\S+/g;
+  let match: RegExpExecArray | null;
+  while ((match = tokenRe.exec(line)) !== null) {
+    const raw = match[0] as string;
+    let token = raw;
+    if (raw !== "|") {
+      try {
+        token = transposeChord(raw, semitones, useFlats);
+      } catch {
+        token = raw;
+      }
+    }
+    placed.push({ token, col: match.index });
+  }
+  let out = "";
+  for (const item of placed) {
+    const pos = item.col < out.length ? out.length + 1 : item.col;
+    out = out.padEnd(pos, " ") + item.token;
+  }
+  return out;
+}
+
 // Geser semua [Chord] dalam konten ChordPro.
 export function transposeContent(
   content: string,

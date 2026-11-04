@@ -9,7 +9,8 @@ const taskInclude = {
   relatedRehearsal: { select: { id: true, title: true, eventId: true } },
 } as const;
 
-export async function listTasks(eventId: string, status?: TaskStatus) {  return prisma.task.findMany({
+export async function listTasks(eventId: string, status?: TaskStatus) {
+  return prisma.task.findMany({
     where: { eventId, ...(status ? { status } : {}) },
     include: taskInclude,
     orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }, { priority: "desc" }, { createdAt: "desc" }],
@@ -23,7 +24,7 @@ export async function listRelevantTasks(userId: string, eventId: string) {
   if (!person) return [];
   const mySongIds = (
     await prisma.songAssignment.findMany({
-      where: { personId: person.id, song: { eventId } },
+      where: { personId: person.id, eventSong: { is: { eventId } } },
       select: { songId: true },
     })
   ).map((a) => a.songId);
@@ -40,9 +41,9 @@ export async function listRelevantTasks(userId: string, eventId: string) {
   });
 }
 
-export async function listSongTasks(songId: string) {
+export async function listSongTasks(songId: string, eventId: string) {
   return prisma.task.findMany({
-    where: { relatedSongId: songId },
+    where: { relatedSongId: songId, eventId },
     include: taskInclude,
     orderBy: [{ status: "asc" }, { priority: "desc" }],
   });
@@ -63,12 +64,16 @@ export async function createTask(
     }
   }
   if (input.relatedSongId) {
-    const song = await prisma.song.findUnique({
-      where: { id: input.relatedSongId },
+    const eventSong = await prisma.eventSong.findUnique({
+      where: {
+        eventId_songId: {
+          eventId: input.eventId,
+          songId: input.relatedSongId,
+        },
+      },
+      select: { id: true },
     });
-    if (!song || song.eventId !== input.eventId) {
-      return { ok: false, error: "Lagu terkait harus satu event." };
-    }
+    if (!eventSong) return { ok: false, error: "Lagu terkait harus ada di setlist event." };
   }
   if (input.relatedRehearsalId) {
     const rehearsal = await prisma.rehearsal.findUnique({
@@ -113,12 +118,16 @@ export async function updateTask(
     }
   }
   if (input.relatedSongId) {
-    const song = await prisma.song.findUnique({
-      where: { id: input.relatedSongId },
+    const eventSong = await prisma.eventSong.findUnique({
+      where: {
+        eventId_songId: {
+          eventId: existing.eventId,
+          songId: input.relatedSongId,
+        },
+      },
+      select: { id: true },
     });
-    if (!song || song.eventId !== existing.eventId) {
-      return { ok: false, error: "Lagu terkait harus satu event." };
-    }
+    if (!eventSong) return { ok: false, error: "Lagu terkait harus ada di setlist event." };
   }
   if (input.relatedRehearsalId) {
     const rehearsal = await prisma.rehearsal.findUnique({
@@ -153,7 +162,11 @@ export async function listObserverTasks(eventId: string) {
       eventId,
       OR: [
         { relatedSongId: null },
-        { relatedSong: { isPublished: true } },
+        {
+          relatedSong: {
+            eventSongs: { some: { eventId, isPublished: true } },
+          },
+        },
       ],
     },
     include: taskInclude,
@@ -170,14 +183,17 @@ export async function createSuggestion(
   const event = await prisma.event.findUnique({ where: { id: input.eventId } });
   if (!event) return { ok: false, error: "Event tidak ditemukan." };
   if (input.relatedSongId) {
-    const song = await prisma.song.findUnique({
-      where: { id: input.relatedSongId },
-      select: { id: true, eventId: true, isPublished: true, title: true },
+    const eventSong = await prisma.eventSong.findUnique({
+      where: {
+        eventId_songId: {
+          eventId: input.eventId,
+          songId: input.relatedSongId,
+        },
+      },
+      select: { isPublished: true },
     });
-    if (!song || song.eventId !== input.eventId) {
-      return { ok: false, error: "Lagu terkait harus satu event." };
-    }
-    if (!song.isPublished) {
+    if (!eventSong) return { ok: false, error: "Lagu terkait harus ada di setlist event." };
+    if (!eventSong.isPublished) {
       return { ok: false, error: "Usulan hanya untuk lagu yang sudah dipublish." };
     }
   }
@@ -224,14 +240,17 @@ export async function updateOwnSuggestion(
     return { ok: false, error: "Usulan tidak bisa pindah event." };
   }
   if (input.relatedSongId) {
-    const song = await prisma.song.findUnique({
-      where: { id: input.relatedSongId },
-      select: { id: true, eventId: true, isPublished: true },
+    const eventSong = await prisma.eventSong.findUnique({
+      where: {
+        eventId_songId: {
+          eventId: existing.eventId,
+          songId: input.relatedSongId,
+        },
+      },
+      select: { isPublished: true },
     });
-    if (!song || song.eventId !== existing.eventId) {
-      return { ok: false, error: "Lagu terkait harus satu event." };
-    }
-    if (!song.isPublished) {
+    if (!eventSong) return { ok: false, error: "Lagu terkait harus ada di setlist event." };
+    if (!eventSong.isPublished) {
       return { ok: false, error: "Usulan hanya untuk lagu yang sudah dipublish." };
     }
   }

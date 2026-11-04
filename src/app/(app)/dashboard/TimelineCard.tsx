@@ -177,7 +177,13 @@ function GanttChart({ data, now }: { data: TimelineData; now: Date }) {
   );
 }
 
-function DetailLines({ detail }: { detail: TimelineDetail }) {
+function DetailLines({
+  detail,
+  eventId,
+}: {
+  detail: TimelineDetail;
+  eventId: string;
+}) {
   switch (detail.kind) {
     case "hday":
       return (
@@ -196,7 +202,10 @@ function DetailLines({ detail }: { detail: TimelineDetail }) {
         <ul className="flex flex-col gap-1">
           {detail.songs.map((s) => (
             <li key={s.id} className="flex flex-wrap items-center gap-2">
-              <Link href={`/songs/${s.id}`} className="font-medium underline">
+              <Link
+                href={`/songs/${s.id}?eventId=${eventId}`}
+                className="font-medium underline"
+              >
                 {s.title}
               </Link>
               {!s.isPublished ? <Badge tone="neutral">Draft</Badge> : null}
@@ -241,7 +250,15 @@ function DetailLines({ detail }: { detail: TimelineDetail }) {
   }
 }
 
-function TimelineBody({ data, now }: { data: TimelineData; now: Date }) {
+function TimelineBody({
+  data,
+  now,
+  eventId,
+}: {
+  data: TimelineData;
+  now: Date;
+  eventId: string;
+}) {
   if (!data.rangeStart || !data.rangeEnd || data.items.length === 0) {
     return (
       <EmptyState
@@ -286,7 +303,7 @@ function TimelineBody({ data, now }: { data: TimelineData; now: Date }) {
                   </span>
                 </summary>
                 <div className="mt-2 text-zinc-600 dark:text-zinc-400">
-                  <DetailLines detail={item.detail} />
+                  <DetailLines detail={item.detail} eventId={eventId} />
                   <p className="mt-1">
                     <Link href={item.href} className="underline">
                       Buka {KIND_LABEL[item.kind].toLowerCase()}
@@ -322,7 +339,7 @@ export async function AdminTimelineCard({
         {eventName}
         {event.eventDate ? ` · ${shortDate(event.eventDate)}` : " · tanggal belum diisi"}
       </p>
-      <TimelineBody data={data} now={now} />
+      <TimelineBody data={data} now={now} eventId={eventId} />
     </Card>
   );
 }
@@ -349,7 +366,7 @@ export async function UserTimelineCard({
         {eventName}
         {event.eventDate ? ` · ${shortDate(event.eventDate)}` : ""}
       </p>
-      <TimelineBody data={data} now={now} />
+      <TimelineBody data={data} now={now} eventId={eventId} />
     </Card>
   );
 }

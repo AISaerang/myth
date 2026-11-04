@@ -4,7 +4,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
-import { getCurrentEvent, listEvents } from "@server/services/event-service";
+import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import {
   listRehearsals,
   listUpcomingRehearsals,
@@ -12,6 +12,7 @@ import {
 import { EventPicker } from "../songs/EventPicker";
 import { RehearsalForm } from "./RehearsalForm";
 import { RehearsalStatusBadge, RehearsalTypeBadge } from "./OpsBadges";
+import { notFound } from "next/navigation";
 
 export default async function RehearsalsPage({
   searchParams,
@@ -22,8 +23,9 @@ export default async function RehearsalsPage({
   const params = await searchParams;
   const admin = isAdmin(user);
 
-  const events = await listEvents();
+  const events = await listEvents(user);
   if (events.length === 0) {
+    if (params.eventId) notFound();
     return (
       <EmptyState
         title="Belum ada event"
@@ -31,11 +33,9 @@ export default async function RehearsalsPage({
       />
     );
   }
-  const current = await getCurrentEvent();
-  const eventId =
-    params.eventId && events.some((e) => e.id === params.eventId)
-      ? params.eventId
-      : (current?.id ?? events[0].id);
+  const current = await getActiveEventFor(user, params.eventId);
+  const eventId = current?.id;
+  if (!eventId) notFound();
 
   if (!admin) {
     const upcoming = await listUpcomingRehearsals(eventId);
@@ -77,7 +77,7 @@ export default async function RehearsalsPage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Rehearsal</h1>
         <EventPicker
-          events={events.map((e) => ({ id: e.id, name: e.name }))}
+          events={events.map((e) => ({ id: e.id, name: e.name, eventType: e.eventType }))}
           value={eventId}
         />
       </div>

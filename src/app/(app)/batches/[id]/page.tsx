@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/Card";
-import { requireAdminUser, requireFreshUser } from "@/lib/auth";
-import { isAdmin, isObserver } from "@/lib/permissions";
+import { requireFreshUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
 import { getBatch } from "@server/services/batch-service";
 import { listSongs } from "@server/services/song-service";
@@ -13,6 +13,7 @@ import {
 import { SongStatusBadge } from "../../songs/SongStatusBadge";
 import { BatchForm } from "../BatchForm";
 import { BatchStatusBadge } from "../BatchStatusBadge";
+import { getEventRole } from "@server/services/event-access";
 import { BatchItemMover } from "@/components/ui/MoveButtons";
 import {
   AddSongForm,
@@ -27,12 +28,12 @@ export default async function BatchDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireFreshUser();
-  const admin = isAdmin(user);
   // Non-admin (USER/OBSERVER): tampilan read-only, lagu Publish saja.
   const observer = !isAdmin(user);
   const { id } = await params;
   const batch = await getBatch(id);
   if (!batch) notFound();
+  if (!(await getEventRole(user, batch.eventId))) notFound();
 
   if (observer) {
     const published = batch.items.filter((i) => i.song.isPublished);
@@ -76,7 +77,7 @@ export default async function BatchDetailPage({
                     <span className="w-6 text-center text-xs text-zinc-500">
                       {index + 1}
                     </span>
-                    <Link href={`/songs/${item.songId}`} className="font-medium underline">
+                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
                       {item.song.title}
                     </Link>
                   </span>
@@ -151,7 +152,7 @@ export default async function BatchDetailPage({
                     <span className="w-6 text-center text-xs text-zinc-500">
                       {index + 1}
                     </span>
-                    <Link href={`/songs/${item.songId}`} className="font-medium underline">
+                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
                       {item.song.title}
                     </Link>
                   </span>

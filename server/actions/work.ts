@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireActionAdmin, requireActionUser } from "@/lib/auth";
+import { requireActionUser } from "@/lib/auth";
 import { canSuggest } from "@/lib/permissions";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
@@ -22,21 +22,36 @@ import {
   updateTask,
 } from "@server/services/task-service";
 import type { ActionState } from "./auth";
+import {
+  requireEventManager,
+  requireEventManagerForEntity,
+  requireEventMember,
+  requireEventMemberForEventSong,
+  requireEventMemberForTask,
+} from "./event-authorization";
+import { prisma } from "@/lib/db";
 
 export async function updateMyProgressAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireActionUser();
+  const eventSongId = String(formData.get("eventSongId") ?? "");
   const parsed = progressSchema.safeParse({
     songId: formData.get("songId"),
     status: formData.get("status"),
     note: formData.get("note") || undefined,
   });
+  if (!eventSongId) return { ok: false, error: "Lagu event tidak valid." };
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await upsertMyProgress(user.id, parsed.data);
+  const eventSong = await requireEventMemberForEventSong(user, eventSongId);
+  if (eventSong.songId !== parsed.data.songId) throw new Error("Forbidden");
+  const result = await upsertMyProgress(user.id, eventSong.id, {
+    status: parsed.data.status,
+    note: parsed.data.note,
+  });
   if (!result.ok) return { ok: false, error: result.error };
   revalidatePath(`/songs/${parsed.data.songId}`);
   return { ok: true };
@@ -46,10 +61,14 @@ export async function correctProgressAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const songId = String(formData.get("songId") ?? "");
+  const eventSongId = String(formData.get("eventSongId") ?? "");
   const personId = String(formData.get("personId") ?? "");
-  if (!songId || !personId) return { ok: false, error: "Data tidak valid." };
+  if (!songId || !eventSongId || !personId) return { ok: false, error: "Data tidak valid." };
+  const eventSong = await requireEventMemberForEventSong(admin, eventSongId);
+  if (eventSong.songId !== songId) throw new Error("Forbidden");
+  await requireEventManager(admin, eventSong.eventId);
   const parsed = progressSchema.safeParse({
     songId,
     status: formData.get("status"),
@@ -58,7 +77,7 @@ export async function correctProgressAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await correctProgress(admin.id, songId, personId, {
+  const result = await correctProgress(admin.id, eventSong.id, personId, {
     status: parsed.data.status,
     note: parsed.data.note,
   });
@@ -90,11 +109,12 @@ export async function createTaskAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const admin = await requireActionUser();
   const parsed = parseTaskForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  await requireEventManager(admin, parsed.data.eventId);
   const result = await createTask(admin.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateTasks(parsed.data.relatedSongId);
@@ -105,14 +125,15 @@ export async function updateTaskAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireActionAdmin();
+  const admin = await requireActionUser();
   const id = String(formData.get("taskId") ?? "");
-  const eventId = String(formData.get("eventId") ?? "");
-  if (!id || !eventId) return { ok: false, error: "Data tidak valid." };
+  if (!id) return { ok: false, error: "Data tidak valid." };
+  const eventId = await requireEventManagerForEntity(admin, "task", id);
   const parsed = parseTaskForm(formData);
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  if (parsed.data.eventId !== eventId) throw new Error("Forbidden");
   const result = await updateTask(id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateTasks(parsed.data.relatedSongId);
@@ -131,6 +152,7 @@ export async function updateMyTaskStatusAction(
   if (!taskId || !parsed.success) {
     return { ok: false, error: "Data tidak valid." };
   }
+  await requireEventMemberForTask(user, taskId);
   const result = await updateMyTaskStatus(user.id, taskId, parsed.data.status);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateTasks();
@@ -157,6 +179,7 @@ export async function createSuggestionAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  await requireEventMember(user, parsed.data.eventId);
   const result = await createSuggestion(user.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateTasks(parsed.data.relatedSongId);
@@ -171,6 +194,14 @@ export async function updateOwnSuggestionAction(
   const user = await requireActionUser();
   const taskId = String(formData.get("taskId") ?? "");
   if (!taskId) return { ok: false, error: "Data tidak valid." };
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { eventId: true },
+  });
+  if (!task || task.eventId !== String(formData.get("eventId") ?? "")) {
+    throw new Error("Not found");
+  }
+  await requireEventMember(user, task.eventId);
   const parsed = suggestionSchema.safeParse({
     eventId: formData.get("eventId"),
     title: formData.get("title"),

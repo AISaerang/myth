@@ -1,9 +1,12 @@
 import "server-only";
-import { cache } from "react";
+import { cookies } from "next/headers";
 import type { Event, EventStatus } from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
+import { ACTIVE_EVENT_COOKIE } from "@/lib/event-context";
 import { prisma } from "@/lib/db";
+import type { SessionUser } from "@/lib/permissions";
 import type { EventInput } from "@/lib/validation/event";
+import { getAccessibleEvent, listAccessibleEvents } from "./event-access";
 
 // Contact PIC panitia hanya untuk admin: bangun objek publik eksplisit
 // (allowlist) agar field restricted baru tidak bocor di masa depan.
@@ -25,61 +28,80 @@ export function toPublicEvent(event: Event): PublicEvent {
     liturgicalFlowUrl: event.liturgicalFlowUrl,
     committeePicName: event.committeePicName,
     notes: event.notes,
+    eventType: event.eventType,
+    region: event.region,
+    accessClosedAt: event.accessClosedAt,
+    accessClosedById: event.accessClosedById,
     createdAt: event.createdAt,
     updatedAt: event.updatedAt,
   };
 }
 
-export async function listEvents(): Promise<Event[]> {
-  return listEventsCached();
+export async function listEvents(user: SessionUser): Promise<Event[]> {
+  return listAccessibleEvents(user);
 }
 
-export async function getEvent(id: string): Promise<Event | null> {
-  return prisma.event.findUnique({ where: { id } });
+export async function getEvent(
+  id: string,
+  user: SessionUser,
+): Promise<Event | null> {
+  return getAccessibleEvent(user, id);
 }
 
-// Event berjalan: terbaru yang belum dibatalkan. Ditampilkan ke semua
-// user yang login; label DRAFT/PENDING tetap terlihat agar tidak
-// dikira final (docs/00).
-export async function getCurrentEvent(): Promise<Event | null> {
-  return getCurrentEventCached();
+// Pilih event yang diminta hanya jika dapat diakses; tanpa pilihan,
+// gunakan event non-cancelled terbaru yang dapat diakses pengguna.
+export async function getActiveEventFor(
+  user: SessionUser,
+  requestedEventId?: string,
+): Promise<Event | null> {
+  const events = await listAccessibleEvents(user);
+  if (requestedEventId) {
+    return events.find((event) => event.id === requestedEventId) ?? null;
+  }
+  const selectedEventId = (await cookies()).get(ACTIVE_EVENT_COOKIE)?.value;
+  return (
+    events.find((event) => event.id === selectedEventId) ??
+    events.find((event) => event.eventStatus !== "CANCELLED") ??
+    null
+  );
 }
 
-// Memoized per request: pages often need both the list and the current
-// event (plus the layout's auth check) — one DB hit each per navigation.
-const listEventsCached = cache(() =>
-  prisma.event.findMany({
-    orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
-  }),
-);
-
-const getCurrentEventCached = cache(() =>
-  prisma.event.findFirst({
-    where: { eventStatus: { not: "CANCELLED" } },
-    orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
-  }),
-);
+export async function getCurrentEvent(user: SessionUser): Promise<Event | null> {
+  return getActiveEventFor(user);
+}
 
 export async function createEvent(
   actorUserId: string,
   input: EventInput,
 ): Promise<Event> {
-  const event = await prisma.event.create({
-    data: {
-      name: input.name,
-      description: input.description || null,
-      eventDate: input.eventDate ?? null,
-      startTime: input.startTime,
-      endTime: input.endTime,
-      venue: input.venue || null,
-      theme: input.theme || null,
-      targetDurationMinutes: input.targetDurationMinutes,
-      eventStatus: input.eventStatus as EventStatus,
-      liturgicalFlowUrl: input.liturgicalFlowUrl,
-      committeePicName: input.committeePicName || null,
-      committeePicContact: input.committeePicContact || null,
-      notes: input.notes || null,
-    },
+  const event = await prisma.$transaction(async (tx) => {
+    const created = await tx.event.create({
+      data: {
+        name: input.name,
+        description: input.description || null,
+        eventDate: input.eventDate ?? null,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        venue: input.venue || null,
+        theme: input.theme || null,
+        targetDurationMinutes: input.targetDurationMinutes,
+        eventStatus: input.eventStatus as EventStatus,
+        liturgicalFlowUrl: input.liturgicalFlowUrl,
+        committeePicName: input.committeePicName || null,
+        committeePicContact: input.committeePicContact || null,
+        notes: input.notes || null,
+        eventType: input.eventType ?? "REGIONAL",
+        region: input.region || null,
+      },
+    });
+    await tx.eventMembership.create({
+      data: {
+        eventId: created.id,
+        userId: actorUserId,
+        role: "EVENT_ADMIN",
+      },
+    });
+    return created;
   });
   await writeAudit({
     actorUserId,
@@ -87,9 +109,50 @@ export async function createEvent(
     entityType: "Event",
     entityId: event.id,
     summary: `Event "${event.name}" dibuat (${event.eventStatus}).`,
-    metadata: { name: event.name, status: event.eventStatus },
+    metadata: {
+      name: event.name,
+      status: event.eventStatus,
+      eventType: event.eventType,
+    },
   });
   return event;
+}
+
+// Tutup/buka akses event (P7). Hanya dipanggil setelah otorisasi
+// requireEventAccessManager: EVENT_ADMIN event tsb atau global ADMIN.
+// Tidak otomatis dari eventStatus; MEMBERSHIP tidak berubah, tapi
+// getEventRole() menolak MEMBER/OBSERVER selama tertutup (read-only
+// untuk EVENT_ADMIN sampai dibuka kembali).
+export async function setEventAccessClosed(
+  actorUserId: string,
+  eventId: string,
+  closed: boolean,
+): Promise<{ ok: true; changed: boolean } | { ok: false; error: string }> {
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) return { ok: false, error: "Event tidak ditemukan." };
+  const currentlyClosed = Boolean(event.accessClosedAt);
+  if (closed === currentlyClosed) return { ok: true, changed: false };
+
+  const updated = await prisma.event.update({
+    where: { id: eventId },
+    data: closed
+      ? { accessClosedAt: new Date(), accessClosedById: actorUserId }
+      : { accessClosedAt: null, accessClosedById: null },
+  });
+
+  await writeAudit({
+    actorUserId,
+    action: closed
+      ? AuditAction.EVENT_ACCESS_CLOSED
+      : AuditAction.EVENT_ACCESS_REOPENED,
+    entityType: "Event",
+    entityId: eventId,
+    summary: closed
+      ? `Akses "${updated.name}" ditutup.`
+      : `Akses "${updated.name}" dibuka kembali.`,
+    metadata: { name: updated.name, closed: closed ? "true" : "false" },
+  });
+  return { ok: true, changed: true };
 }
 
 const WATCHED_FIELDS = [
