@@ -104,10 +104,10 @@ export function ChartSectionEditor({
             defaultValue={section?.content ?? ""}
             rows={16}
             onChange={setContent}
-            placeholder={type === "INTRO" ? "C   G\n1' 2 3 4 5" : undefined}
+            placeholder={type === "INTRO" ? "C   G\n1' 2 3 .6 5,  [5 6]" : undefined}
             hint={
               type === "INTRO"
-                ? "Kunci di baris atas, not angka di bawah. Spasi menentukan kolom; titik oktaf tidak menggeser kolom saat tampil. Transpose menggeser kunci saja — angka tetap."
+                ? "Kunci di baris atas, not angka di bawah. ' titik di atas angka; , atau .6 titik di bawah (beberapa tanda = beberapa titik). #4 garis / menembus angka, b7 garis \\. [5 6] satu garis di atas, [[5 6]] dua garis, (5 6) busur. / ketukan, - tahan, | birama. Spasi menentukan kolom. Transpose menggeser kunci saja."
                 : section
                   ? "Kunci di baris atas, lirik di baris bawah; atur posisi pakai spasi atau Tab."
                   : undefined

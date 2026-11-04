@@ -1,24 +1,11 @@
-"use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
-import { alignChordsToNotation, type NotationAlignment } from "@/lib/jianpu-align";
-import { parseJianpu, toJianpuFontText, type JianpuNote } from "@/lib/jianpu";
+import { alignChordsToNotation, type NotationAlignment, type NotationToken } from "@/lib/jianpu-align";
+import { parseJianpu, type JianpuNote } from "@/lib/jianpu";
 
 /**
  * Not angka satu baris dengan kunci di kolom yang sama.
- * Titik oktaf: font JianpuASCII (ligatur, titik di tengah glyph) bila ligatur
- * benar-benar melipat tanda; kalau tidak, titik CSS di tengah angka.
+ * Titik oktaf, garis kres/mol, beam, dan legato digambar CSS — tanpa font khusus.
  */
-export function NotationLine({
-  alignment,
-  glyphs = "font",
-}: {
-  alignment: NotationAlignment;
-  /** "css" memaksa titik oktaf CSS (uji fallback). Default memakai glyph font. */
-  glyphs?: "font" | "css";
-}) {
-  const [useCss, setUseCss] = useState(glyphs === "css");
-  const markCss = useCallback(() => setUseCss(true), []);
+export function NotationLine({ alignment }: { alignment: NotationAlignment }) {
   const notes = alignment.tokens.filter((token) => token.kind === "note");
   const aria = [
     alignment.chords.length > 0
@@ -28,18 +15,19 @@ export function NotationLine({
   ]
     .filter(Boolean)
     .join(". ");
+  const beams = groupOverlays(alignment.tokens, "beam");
+  const slurs = groupOverlays(alignment.tokens, "slur");
 
   return (
     <div
       className="notation-staff font-mono text-sm leading-6"
       style={{ width: `calc(${alignment.columns} * 1ch)` }}
       data-notation-line=""
+      data-notation="css"
       data-columns={alignment.columns}
-      data-jianpu-font={useCss ? "fallback" : "ready"}
       role="img"
       aria-label={aria}
     >
-      {glyphs === "font" ? <JianpuFontProbe onFallback={markCss} /> : null}
       {alignment.chords.length > 0 ? (
         <div className="notation-chords">
           {alignment.chords.map((chord, index) => (
@@ -47,7 +35,7 @@ export function NotationLine({
               key={`${chord.token}-${chord.renderCol}-${index}`}
               data-chord={chord.token}
               data-render-col={chord.renderCol}
-              className="absolute top-0 font-semibold text-sky-700 dark:text-sky-400"
+              className="absolute font-semibold text-sky-700 dark:text-sky-400"
               style={{ left: `calc(${chord.renderCol} * 1ch)` }}
             >
               {chord.token}
@@ -56,22 +44,40 @@ export function NotationLine({
         </div>
       ) : null}
       <div className="notation-notes">
+        {slurs.map((slur) => (
+          <span
+            key={`slur-${slur.id}`}
+            data-slur={slur.level}
+            className="notation-slur"
+            style={{
+              left: `calc(${slur.start} * 1ch)`,
+              width: `calc(${Math.max(slur.width, 1)} * 1ch)`,
+            }}
+            aria-hidden
+          />
+        ))}
+        {beams.map((beam) => (
+          <span
+            key={`beam-${beam.id}`}
+            data-beam={beam.level}
+            className="notation-beam"
+            style={{
+              left: `calc(${beam.start} * 1ch)`,
+              width: `calc(${Math.max(beam.width, 1)} * 1ch)`,
+            }}
+            aria-hidden
+          />
+        ))}
         {alignment.tokens.map((token, index) => (
           <span
             key={`${token.raw}-${token.renderCol}-${index}`}
             data-note={token.raw}
             data-kind={token.kind}
             data-render-col={token.renderCol}
-            className="absolute whitespace-pre"
+            className="notation-cell absolute whitespace-pre"
             style={{ left: `calc(${token.renderCol} * 1ch)` }}
           >
-            {token.kind === "bar" ? (
-              "|"
-            ) : useCss && token.note ? (
-              <FallbackNote note={token.note} />
-            ) : token.note ? (
-              <span className="notation-glyph-font">{toJianpuFontText(token.note)}</span>
-            ) : null}
+            {token.kind === "bar" ? "|" : token.note ? <CssNote note={token.note} /> : null}
           </span>
         ))}
       </div>
@@ -79,15 +85,7 @@ export function NotationLine({
   );
 }
 
-export function NotAngka({
-  value,
-  className = "",
-  glyphs = "font",
-}: {
-  value: string;
-  className?: string;
-  glyphs?: "font" | "css";
-}) {
+export function NotAngka({ value, className = "" }: { value: string; className?: string }) {
   const result = parseJianpu(value);
   if (!result.valid) {
     return (
@@ -112,29 +110,24 @@ export function NotAngka({
             <span key={index} className="block h-2" />
           );
         }
-        return <NotationLine key={index} alignment={aligned} glyphs={glyphs} />;
+        return <NotationLine key={index} alignment={aligned} />;
       })}
     </span>
   );
 }
 
-function FallbackNote({ note }: { note: JianpuNote }) {
+function CssNote({ note }: { note: JianpuNote }) {
   const marks = Math.abs(note.octave);
   const up = note.octave > 0;
   return (
     <>
       <span className="relative inline-block w-[1ch] text-center leading-none">
-        {note.accidental !== 0 ? (
-          <span className="absolute top-0 right-full pr-px text-[0.65em] leading-none">
-            {note.accidental === 1 ? "♯" : "♭"}
-          </span>
-        ) : null}
-        {note.solfege}
         {marks > 0 ? (
           <span
             data-octave={up ? "up" : "down"}
+            data-octave-marks={marks}
             className={`absolute left-1/2 flex -translate-x-1/2 flex-col items-center gap-px ${
-              up ? "bottom-full mb-px" : "top-full mt-px"
+              up ? "bottom-full mb-px" : "jianpu-octave-down top-full mt-px"
             }`}
           >
             {Array.from({ length: marks }, (_, index) => (
@@ -142,13 +135,21 @@ function FallbackNote({ note }: { note: JianpuNote }) {
             ))}
           </span>
         ) : null}
+        {note.solfege}
+        {note.accidental !== 0 ? (
+          <span
+            data-accidental={note.accidental === 1 ? "sharp" : "flat"}
+            className="jianpu-accidental"
+            aria-hidden
+          />
+        ) : null}
         {note.duration < 1 ? (
           <span
             data-underline={note.duration === 0.25 ? "2" : "1"}
-            className="absolute top-full right-0 left-0 mt-px flex flex-col gap-px"
+            className="jianpu-underlines"
           >
-            <span className="h-px w-full bg-current" />
-            {note.duration === 0.25 ? <span className="h-px w-full bg-current" /> : null}
+            <span className="block h-px w-full bg-current" />
+            {note.duration === 0.25 ? <span className="block h-px w-full bg-current" /> : null}
           </span>
         ) : null}
       </span>
@@ -158,48 +159,25 @@ function FallbackNote({ note }: { note: JianpuNote }) {
   );
 }
 
-function JianpuFontProbe({ onFallback }: { onFallback: () => void }) {
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const fonts = document.fonts;
-    const node = ref.current;
-    if (!fonts || !node) return;
-    let cancelled = false;
-    fonts
-      .load('16px "JianpuASCII"')
-      .then(async () => {
-        for (let attempt = 0; attempt < 8 && !cancelled; attempt += 1) {
-          await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => resolve());
-          });
-          if (cancelled) return;
-          const digit = node.querySelector("[data-probe-digit]");
-          const ligature = node.querySelector("[data-probe-liga]");
-          if (!(digit instanceof HTMLElement) || !(ligature instanceof HTMLElement)) continue;
-          const digitWidth = digit.getBoundingClientRect().width;
-          const ligatureWidth = ligature.getBoundingClientRect().width;
-          // Ligatur 1' selebar angka 1 → titik oktaf ada di tengah glyph.
-          if (digitWidth > 0 && ligatureWidth > 0 && ligatureWidth < digitWidth * 1.35) return;
-        }
-        if (!cancelled) onFallback();
-      })
-      .catch(() => {
-        if (!cancelled) onFallback();
-      });
-    return () => {
-      cancelled = true;
+function groupOverlays(tokens: NotationToken[], kind: "beam" | "slur") {
+  const groups = new Map<number, NotationToken[]>();
+  for (const token of tokens) {
+    if (token.kind !== "note") continue;
+    const id = kind === "beam" ? token.beamGroup : token.slurGroup;
+    const level = kind === "beam" ? token.beam : id ? 1 : 0;
+    if (!id || level < 1) continue;
+    const list = groups.get(id) ?? [];
+    list.push(token);
+    groups.set(id, list);
+  }
+  return [...groups.entries()].map(([id, notes]) => {
+    const first = notes[0] as NotationToken;
+    const last = notes[notes.length - 1] as NotationToken;
+    return {
+      id,
+      level: kind === "beam" ? first.beam : 1,
+      start: first.renderCol,
+      width: last.renderCol + last.renderWidth - first.renderCol,
     };
-  }, [onFallback]);
-
-  return (
-    <span ref={ref} aria-hidden className="pointer-events-none fixed top-0 left-0 -z-10 opacity-0">
-      <span data-probe-digit className="notation-glyph-font">
-        1
-      </span>
-      <span data-probe-liga className="notation-glyph-font">
-        {"1'"}
-      </span>
-    </span>
-  );
+  });
 }

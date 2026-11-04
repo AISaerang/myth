@@ -9,6 +9,7 @@ import {
   transposeContent,
   transposeRoot,
 } from "@/lib/chords";
+import { displaySectionLabel } from "@/lib/chart-arrangement";
 import {
   alignChordsToNotation,
   contentHasNotation,
@@ -32,8 +33,20 @@ function chartComment(line: string): string | null {
   return (match[1] ?? "").trim();
 }
 
+function sectionLabelAt(lines: string[], index: number): string | null {
+  const layout = layoutChordLine(lines[index] ?? "");
+  if (!layout.label) return null;
+  const body: string[] = [];
+  for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+    if (layoutChordLine(lines[cursor] ?? "").label) break;
+    body.push(lines[cursor] ?? "");
+  }
+  return displaySectionLabel(layout.label, { content: body.join("\n") });
+}
+
 function renderChart(content: string, mode: ViewMode, key: string) {
-  return content.split("\n").map((line, index) => {
+  const lines = content.split("\n");
+  return lines.map((line, index) => {
     const lineKey = `${key}-${index}`;
     const comment = chartComment(line);
     if (comment !== null) {
@@ -49,7 +62,20 @@ function renderChart(content: string, mode: ViewMode, key: string) {
       );
     }
 
+    const shownLabel = sectionLabelAt(lines, index);
+
     if (mode === "chords") {
+      if (shownLabel) {
+        return (
+          <pre
+            key={lineKey}
+            data-section-label={shownLabel}
+            className="overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap"
+          >
+            {`— ${shownLabel} —`}
+          </pre>
+        );
+      }
       const extracted = extractChordLines(line)[0] ?? "";
       if (!extracted.trim()) return <div key={lineKey} className="h-2" />;
       return (
@@ -65,12 +91,16 @@ function renderChart(content: string, mode: ViewMode, key: string) {
     const { chordLine, lyricLine, label, isEmpty } = layoutChordLine(line);
     if (isEmpty) return <div key={lineKey} className="h-4" />;
     if (label) {
+      const shown = shownLabel ?? label;
       return (
         <div
           key={lineKey}
-          className="mt-3 text-xs font-semibold tracking-wide text-zinc-500 uppercase first:mt-0"
+          data-section-label={shown}
+          className={`mt-3 text-xs font-semibold tracking-wide text-zinc-500 first:mt-0 ${
+            shown === "Intro" ? "normal-case" : "uppercase"
+          }`}
         >
-          {label}
+          {shown}
         </div>
       );
     }

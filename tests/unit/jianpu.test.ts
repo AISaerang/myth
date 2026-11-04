@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NotAngka } from "@/components/NotAngka";
-import { parseJianpu, formatNote, formatLine, keyToFormula, toJianpuFontText } from "@/lib/jianpu";
+import {
+  canonicalizeNotationText,
+  parseJianpu,
+  formatNote,
+  formatLine,
+  keyToFormula,
+  toJianpuFontText,
+} from "@/lib/jianpu";
 
 describe("JianpuASCII parser", () => {
   it("parses empty input", () => {
@@ -116,29 +123,77 @@ describe("JianpuASCII parser", () => {
     expect(notes[4].solfege).toBe(3);
   });
 
-  it("renders octave marks with the font ligature by default", () => {
+  it("draws octave dots with CSS for comma and leading-dot forms", () => {
     const markup = renderToStaticMarkup(
-      createElement(NotAngka, { value: "6, 5, 1' 2 3" }),
+      createElement(NotAngka, { value: "6, .7 ..1 1' 2''" }),
     );
     expect(markup).not.toContain("[object Object]");
-    expect(markup).not.toContain("-top-2");
-    expect(markup).toContain("notation-glyph-font");
-    expect(markup).toContain('data-note="1&#x27;"');
-    expect(markup).toContain('data-note="6,"');
-    expect(markup).toContain(">1&#x27;<");
-    expect(markup).toContain(">6,<");
+    expect(markup).not.toContain("notation-glyph-font");
+    expect(markup).toContain('data-notation="css"');
+    expect(markup).toContain('data-octave="down"');
+    expect(markup).toContain('data-octave="up"');
+    expect(markup).toContain('data-octave-marks="2"');
+    expect(markup).toContain("jianpu-dot");
+    expect(markup).toContain("left-1/2");
+    expect(markup).not.toContain(">.7<");
+    expect(markup).not.toContain(">..1<");
   });
 
-  it("centers CSS fallback octave dots on the digit", () => {
+  it("draws a rising slash through # and a falling slash through b", () => {
+    const markup = renderToStaticMarkup(createElement(NotAngka, { value: "#4 b7" }));
+    expect(markup).toContain('data-accidental="sharp"');
+    expect(markup).toContain('data-accidental="flat"');
+    expect(markup).toContain("jianpu-accidental");
+    expect(markup).not.toContain(">♯<");
+    expect(markup).not.toContain(">#4<");
+  });
+
+  it("draws one beam, two beams, and a slur above groups", () => {
     const markup = renderToStaticMarkup(
-      createElement(NotAngka, { value: "6, 5, 1' 2 3", glyphs: "css" }),
+      createElement(NotAngka, { value: "[5 6] [[1 2 3 4]] (5 6)" }),
     );
-    expect(markup).not.toContain("-top-2");
-    expect(markup).toContain('data-octave="up"');
-    expect(markup).toContain('data-octave="down"');
-    expect(markup).toContain("left-1/2");
-    expect(markup).toContain("-translate-x-1/2");
-    expect(markup).toContain('data-jianpu-font="fallback"');
+    expect(markup).toContain('data-beam="1"');
+    expect(markup).toContain('data-beam="2"');
+    expect(markup).toContain('data-slur="1"');
+    expect(markup).toContain("notation-beam");
+    expect(markup).toContain("notation-slur");
+  });
+
+  it("parses leading dots as lower octave, summed with comma suffixes", () => {
+    const result = parseJianpu(".6 ..7 .#4 #.5 .6,");
+    expect(result.valid).toBe(true);
+    expect(result.lines[0]?.notes.map((note) => note.octave)).toEqual([-1, -2, -1, -1, -2]);
+    expect(result.lines[0]?.notes.map((note) => note.accidental)).toEqual([0, 0, 1, 1, 0]);
+    expect(result.lines[0]?.notes.map((note) => note.solfege)).toEqual([6, 7, 4, 5, 6]);
+  });
+
+  it("parses beams and slurs without dropping the notes", () => {
+    const beamed = parseJianpu("[5 6] [[5 6 5 6]] (5 6) ([1 2])");
+    expect(beamed.valid).toBe(true);
+    const notes = beamed.lines[0]?.notes ?? [];
+    expect(notes.map((note) => note.solfege)).toEqual([5, 6, 5, 6, 5, 6, 5, 6, 1, 2]);
+    expect(notes[0]?.beam).toBe(1);
+    expect(notes[0]?.beamGroup).toBe(notes[1]?.beamGroup);
+    expect(notes[2]?.beam).toBe(2);
+    expect(notes[2]?.beamGroup).not.toBe(notes[0]?.beamGroup);
+    expect(notes[6]?.slurGroup).toBe(notes[7]?.slurGroup);
+    expect(notes[6]?.beam).toBe(0);
+    expect(notes[8]?.beam).toBe(1);
+    expect(notes[8]?.slurGroup).toBe(notes[9]?.slurGroup);
+  });
+
+  it("rejects an unclosed beam", () => {
+    const result = parseJianpu("[5 6");
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("tidak tertutup");
+  });
+
+  it("canonicalizes leading-dot octaves and leaves lyrics and rhythm dots", () => {
+    expect(canonicalizeNotationText(".6 ..7 .#4 #.5/ .6.")).toBe("6, 7,, #4, #5,/ 6,.");
+    expect(canonicalizeNotationText("[C].6 .7 1\n# pelan")).toBe("[C]6, 7, 1\n# pelan");
+    expect(canonicalizeNotationText("[[.6 .7]]")).toBe("[[6, 7,]]");
+    expect(canonicalizeNotationText("Bapa lihat no. 6")).toBe("Bapa lihat no. 6");
+    expect(canonicalizeNotationText("1. 2")).toBe("1. 2");
   });
 
   it("toJianpuFontText keeps octave marks so the font can ligate them", () => {
