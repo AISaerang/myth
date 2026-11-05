@@ -34,6 +34,27 @@ function indexToNote(idx: number, useFlats: boolean): string {
   return names[((idx % 12) + 12) % 12] as string;
 }
 
+import { looksLikeNotationLine } from "@/lib/jianpu";
+
+// ---------------------------------------------------------------------------
+// Token ChordPro inline: [Chord] = chord; [[ ... ]] = literal (beam notation
+// di baris not angka) dan tidak boleh dianggap chord.
+// ---------------------------------------------------------------------------
+
+// Terapkan pemetaan hanya ke token chord; [[ ... ]] dilewati apa adanya.
+function mapInlineChords(
+  content: string,
+  map: (token: string) => string,
+): string {
+  return content.replace(
+    /\[\[[^[\]]*\]\]|\[([^\][]+)\]/g,
+    (match, token: string | undefined) => {
+      if (token === undefined) return match; // [[...]] literal
+      return `[${map(token)}]`;
+    },
+  );
+}
+
 interface ParsedChord {
   root: string;
   suffix: string;
@@ -120,19 +141,20 @@ export function transposeSpacedChords(
   return out;
 }
 
-// Geser semua [Chord] dalam konten ChordPro.
+// Geser semua [Chord] dalam konten ChordPro. Literal [[ ... ]] (beam not
+// angka) dilewati.
 export function transposeContent(
   content: string,
   semitones: number,
   useFlats = false,
 ): string {
   if (semitones % 12 === 0) return content;
-  return content.replace(/\[([^\]]+)\]/g, (_match, token: string) => {
+  return mapInlineChords(content, (token) => {
     try {
-      return `[${transposeChord(token.trim(), semitones, useFlats)}]`;
+      return transposeChord(token.trim(), semitones, useFlats);
     } catch {
       // Token bukan chord valid: biarkan apa adanya, jangan rusak lirik.
-      return `[${token}]`;
+      return token;
     }
   });
 }
@@ -189,7 +211,8 @@ export function layoutChordLine(line: string): ChordLyricLayout {
   let chordLine = "";
   let lyricLine = "";
   let column = 0;
-  const tokens = /\[([^\]]+)\]|\{([^}]+)\}/g;
+  // [[ ... ]] literal (beam not angka) = teks lirik, bukan chord.
+  const tokens = /\[\[[^[\]]*\]\]|\[([^\][]+)\]|\{([^}]+)\}/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -205,10 +228,15 @@ export function layoutChordLine(line: string): ChordLyricLayout {
           ? column
           : chordLine.length + (chordLine.length > 0 ? 1 : 0);
       chordLine = chordLine.padEnd(position, " ") + chord;
-    } else {
+    } else if (match[2] !== undefined) {
       const label = (match[2] as string).trim();
       lyricLine += label;
       column += label.length;
+    } else {
+      // Literal [[ ... ]]: masuk ke lirik apa adanya supaya parser nota bisa
+      // membaca tanda beam.
+      lyricLine += match[0] as string;
+      column += (match[0] as string).length;
     }
     lastIndex = match.index + match[0].length;
   }
@@ -225,10 +253,13 @@ export function layoutChordLine(line: string): ChordLyricLayout {
   };
 }
 
-// Mode lirik saja: buang [chord], tandai {label} sebagai teks biasa.
+// Mode lirik saja: buang [chord] ([[ ... ]] literal tetap), tandai {label}.
 export function stripChords(content: string): string {
   return content
-    .replace(/\[([^\]]+)\]/g, "")
+    .replace(
+      /\[\[[^[\]]*\]\]|\[([^\][]+)\]/g,
+      (match, token: string | undefined) => (token === undefined ? match : ""),
+    )
     .replace(/\{([^}]+)\}/g, (_m, label: string) => label.trim());
 }
 
@@ -237,10 +268,11 @@ export function stripChords(content: string): string {
 export function extractChordLines(content: string): string[] {
   return content.split("\n").map((line) => {
     const chords: string[] = [];
-    line.replace(/\[([^\]]+)\]/g, (_m, token: string) => {
+    mapInlineChords(line, (token) => {
       chords.push(token.trim());
       return "";
     });
+    // [[ ... ]] literal bukan chord; mode chord abaikan.
     if (chords.length > 0) return chords.join("  ");
     const label = /^\s*\{([^}]+)\}\s*$/.exec(line);
     if (label) return `— ${(label[1] as string).trim()} —`;
@@ -287,22 +319,55 @@ function parseOverUnderChordLine(line: string): ChordLineParse | null {
       trailing.push(token);
       continue;
     }
+    // Baris berawal bracket bukan baris chord editor (itu ChordPro/literal).
+    if (token.startsWith("[")) return null;
     if (!CHORD_TOKEN_RE.test(token)) return null;
     chords.push({ token, col: match.index });
   }
   return chords.length > 0 ? { chords, trailing } : null;
 }
 
+// Batas yang diizinkan untuk posisi chord di baris not angka: mulai/akhir
+// token whitespace (termasuk ujung baris). Chord tidak boleh membelah token
+// nada (mis. "1-" atau ".6)") saat dipetakan ke ChordPro.
+function snapNotationChordPos(lyric: string, col: number): number {
+  const boundaries = new Set<number>([0, lyric.length]);
+  for (const match of lyric.matchAll(/\S+/g)) {
+    boundaries.add(match.index);
+    boundaries.add(match.index + (match[0] as string).length);
+  }
+  if (col >= lyric.length || boundaries.has(col)) return col;
+  let best = col;
+  let bestDist = Infinity;
+  for (const boundary of boundaries) {
+    const dist = Math.abs(boundary - col);
+    // Seri jarak: ambil batas lebih kiri agar chord tidak melesat ke kanan.
+    if (dist < bestDist || (dist === bestDist && boundary < best)) {
+      best = boundary;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
 // Sisipkan [chord] ke teks lirik sesuai kolom. Pemetaan kolom-eksak: chord
 // tetap di kolom tempat dia berada (termasuk di atas spasi). Kolom di luar
 // panjang baris lirik diwakili spasi di akhir baris, jadi kunci yang
 // diletakkan setelah lirik habis tetap melayang di tempat itu saat render.
-function mergeOverUnderLine(chords: OverUnderChord[], lyric: string): string {
+// Untuk baris not angka (notation=true), kolom chord disnap ke batas token
+// supaya ChordPro tidak membelah token nada atau menyisip chord di dalam
+// kurung slur/beam.
+function mergeOverUnderLine(
+  chords: OverUnderChord[],
+  lyric: string,
+  notation = false,
+): string {
   const byPos = new Map<number, string[]>();
   let lastPos = -1;
   for (const { token, col } of chords) {
+    const target = notation ? snapNotationChordPos(lyric, col) : col;
     // Jaga urutan chord tetap naik bila kolomnya menimpa/mundur.
-    const pos = Math.max(col, lastPos);
+    const pos = Math.max(target, lastPos);
     lastPos = pos;
     const existing = byPos.get(pos) ?? [];
     existing.push(token);
@@ -323,10 +388,12 @@ function mergeOverUnderLine(chords: OverUnderChord[], lyric: string): string {
 }
 
 // Ubah baris chord-only menjadi ChordPro, spasi asli dipertahankan.
+// Literal [[ ... ]] bukan chord editor; tolak barisnya seperti lirik biasa.
 function serializeChordOnly(line: string): string {
-  return line.replace(/\S+/g, (token) =>
-    token === "|" || CHORD_TOKEN_RE.test(token) ? `[${token}]` : token,
-  );
+  return line.replace(/\S+/g, (token) => {
+    if (token.startsWith("[[")) return token;
+    return token === "|" || CHORD_TOKEN_RE.test(token) ? `[${token}]` : token;
+  });
 }
 
 // Ubah karakter tab (mis. dari keyboard HP) menjadi spasi hingga tab-stop,
@@ -367,15 +434,20 @@ export function chordProToOverUnder(content: string): string {
     }
     // Token [..] yang bukan chord valid tidak bisa direpresentasikan di
     // format over-under; barisnya dibiarkan mentah agar tidak rusak.
+    // Literal [[ ... ]] dilewati (bukan chord).
     let allTokensValid = true;
-    line.replace(/\[([^\]]+)\]/g, (_m, token: string) => {
-      try {
-        parseChord(token.trim());
-      } catch {
-        allTokensValid = false;
-      }
-      return "";
-    });
+    line.replace(
+      /\[\[[^[\]]*\]\]|\[([^\][]+)\]/g,
+      (_m, token: string | undefined) => {
+        if (token === undefined) return "";
+        try {
+          parseChord(token.trim());
+        } catch {
+          allTokensValid = false;
+        }
+        return "";
+      },
+    );
     if (!allTokensValid) {
       outLines.push(line);
       continue;
@@ -421,7 +493,11 @@ export function overUnderToChordPro(content: string): string {
       !LABEL_LINE_RE.test(next) &&
       !parseOverUnderChordLine(next)
     ) {
-      outLines.push(mergeOverUnderLine(chordLine.chords, next));
+      // Baris not angka butuh snap batas token agar chord tidak masuk tengah
+      // not atau kurung slur/beam.
+      outLines.push(
+        mergeOverUnderLine(chordLine.chords, next, looksLikeNotationLine(next)),
+      );
       i++;
       continue;
     }
@@ -449,10 +525,11 @@ export function isOverUnderFormat(content: string): boolean {
   return false;
 }
 
-// Daftar semua chord unik (untuk validasi/preview).
+// Daftar semua chord unik (untuk validasi/preview). Literal [[ ... ]] dihitung
+// satu token literal, bukan chord.
 export function listChords(content: string): string[] {
   const seen = new Set<string>();
-  content.replace(/\[([^\]]+)\]/g, (_m, token: string) => {
+  mapInlineChords(content, (token) => {
     const t = token.trim();
     try {
       parseChord(t);
@@ -460,7 +537,7 @@ export function listChords(content: string): string[] {
     } catch {
       // abaikan
     }
-    return "";
+    return t;
   });
   return [...seen];
 }

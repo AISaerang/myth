@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { KeyTransposeBar } from "@/components/KeyTransposeBar";
 import { NotationLine } from "@/components/NotAngka";
+import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
 import {
   extractChordLines,
   layoutChordLine,
@@ -13,6 +14,7 @@ import {
   alignChordsToNotation,
   contentHasNotation,
   formatTransposeFormula,
+  notationLineError,
 } from "@/lib/jianpu-align";
 
 type ViewMode = "both" | "lyrics" | "chords";
@@ -98,6 +100,28 @@ function renderChart(content: string, mode: ViewMode, key: string) {
       );
     }
 
+    // Baris "kelihatan not angka" tapi gagal align: jangan diam-diam mentah —
+    // tampilkan alasan parser supaya MD tahu chart-nya perlu dirapikan.
+    const notationError = notationLineError(lyricLine);
+    if (notationError || looksLikeNoteLine(lyricLine)) {
+      return (
+        <div key={lineKey} className="overflow-x-auto overscroll-x-contain">
+          <div className="w-max font-mono text-sm leading-6 whitespace-pre">
+            {chordLine.trim() ? (
+              <div className="font-semibold text-sky-700 dark:text-sky-400">{chordLine}</div>
+            ) : null}
+            {lyricLine.trim() ? <div>{lyricLine}</div> : null}
+          </div>
+          <p
+            data-notation-error=""
+            className="mt-1 text-xs text-red-600 dark:text-red-400"
+          >
+            Baris ini terlihat seperti not angka tapi gagal dirender
+            {notationError ? `: ${notationError}` : ", periksa pola nada 0–7."}
+          </p>        </div>
+      );
+    }
+
     return (
       <div key={lineKey} className="overflow-x-auto overscroll-x-contain">
         <div className="w-max font-mono text-sm leading-6 whitespace-pre">
@@ -109,6 +133,16 @@ function renderChart(content: string, mode: ViewMode, key: string) {
       </div>
     );
   });
+}
+
+// Heuristik lokal "kelihatan notasi": angka 0-7 dengan tanda khas
+// `' , . ( ) [ ] # -`. Baris lirik biasa tetap jatuh ke cabang mentah.
+const NOTE_LOOK_RE = /^[#b(){}\[\]|.'’,0-9\s-]*$/;
+
+function looksLikeNoteLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  return /[0-9]/.test(trimmed) && NOTE_LOOK_RE.test(trimmed);
 }
 
 /** Isi chart tanpa kontrol transpose, supaya rumus nada tidak diulang per bagian. */
@@ -163,6 +197,9 @@ export function ChordViewer({
             setUseFlats(false);
           }}
         />
+        <div className="mt-2">
+          <NotationSymbolGuide compact />
+        </div>
       </div>
       <div className="flex flex-wrap gap-1" role="group" aria-label="Mode tampil">
         {MODES.map((item) => (

@@ -10,15 +10,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-jianpu-ascii: "JianpuASCII", ui-monospace, monospace;
-}
-
-@font-face {
-  font-family: "JianpuASCII";
-  src: url("/fonts/JianpuASCII-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -34,8 +25,8 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Satu kolom = 1ch font monospace staff. Glyph JianpuASCII advance-nya 0.6em,
-   jadi font-size calc(1ch / 0.6) membuat satu glyph selebar satu kolom kunci. */
+/* Satu kolom = 1ch font monospace staff. Semua glyph not angka (angka, titik
+   oktaf, kres/mol, garis ketukan, slur, beam, birama) dibentuk CSS. */
 .notation-staff {
   position: relative;
   display: inline-block;
@@ -58,21 +49,41 @@ body {
   height: 2.4em;
 }
 
-.notation-glyph-font {
-  display: inline-block;
-  font-family: "JianpuASCII", ui-monospace, monospace;
-  font-feature-settings: "liga" 1, "clig" 1;
-  font-variant-ligatures: common-ligatures;
-  font-size: calc(1ch / 0.6);
-  font-weight: 400;
-  line-height: 1;
-  white-space: pre;
-}
-
 .jianpu-dot {
   display: block;
   width: 0.12em;
   height: 0.12em;
   border-radius: 999px;
   background: currentColor;
+}
+
+/* Kurva slur menjulur di bawah angka-angka dalam grup ( ) . */
+.notation-slur {
+  position: absolute;
+  top: auto;
+  bottom: 0.15em;
+  height: 0.34em;
+  border-bottom: 0.06em solid currentColor;
+  border-right: 0.03em solid transparent;
+  border-left: 0.03em solid transparent;
+  border-radius: 0 0 100% 100% / 0 0 100% 100%;
+  pointer-events: none;
+}
+
+/* Garis beam di atas angka-angka dalam grup [[ ]] . */
+.notation-beam {
+  position: absolute;
+  top: 0.08em;
+  height: 0.1em;
+  border-top: 0.07em solid currentColor;
+  pointer-events: none;
+}
+
+.notation-beam[data-lines="2"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0.16em;
+  border-top: 0.07em solid currentColor;
 }

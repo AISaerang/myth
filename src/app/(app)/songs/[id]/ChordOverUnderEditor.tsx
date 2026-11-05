@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
+import { normalizeNotationInput } from "@/lib/jianpu";
 import {
   chordProToOverUnder,
   expandTabs,
@@ -40,8 +42,14 @@ export function ChordOverUnderEditor({
   );
   const [source, setSource] = useState<string>(defaultValue);
 
+  // Satu sumber kebenaran untuk preview dan submit. Input (hasil paste dari
+  // WA/Word, sering punya NBSP/titik unicode) dan output sama-sama
+  // dinormalkan, khusus baris yang kelihatan not angka.
   const chordProValue = useMemo(
-    () => (mode === "stacked" ? overUnderToChordPro(stacked) : source),
+    () =>
+      mode === "stacked"
+        ? normalizeNotationInput(overUnderToChordPro(normalizeNotationInput(stacked)))
+        : normalizeNotationInput(source),
     [mode, stacked, source],
   );
 
@@ -143,6 +151,7 @@ export function ChordOverUnderEditor({
         {" "}
         Tempel dari internet boleh dalam format ini maupun ChordPro.
       </p>
+      <NotationSymbolGuide />
       <input type="hidden" name={name} value={chordProValue} />
     </div>
   );

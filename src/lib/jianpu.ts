@@ -1,18 +1,25 @@
-// Parser not angka (JianpuASCII) untuk intro lagu.
+// Parser not angka untuk intro lagu. Rendering selalu CSS (.jianpu-dot dst),
+// bukan font khusus.
 //
 // Format ketik:
 //   nada 1–7, diam 0
 //   oktaf atas: ' (satu) / '' (dua) di belakang nada
-//   oktaf bawah: , (satu) / ,, (dua) di belakang nada
+//   oktaf bawah: , (satu) / ,, (dua) di belakang nada, atau . / .. di DEPAN nada
 //   kres/mol: # / b di DEPAN nada
 //   ketukan: / = setengah, // = seperempat di belakang nada
 //   panjang: - (satu per nada sebelumnya)
 //   titik ritme: . di belakang nada
 //   birama: | pemisah
 //   antar-nada: spasi
+//   slur/legato: ( ) meliputi kelompok nada
+//   beam: [[ ]] meliputi kelompok nada (1 garis)
 //
 // Contoh: "6, 5, 1 2 3" → nada 6 oktaf bawah, nada 5 oktaf bawah, nada 1, nada 2, nada 3
 // Contoh: "1' 2' 3'" → nada 1, 2, 3 oktaf atas
+// Contoh: "(2 3 2)" → slur tiga nada
+//
+// Input sering berasal dari tempel WA/Word: NBSP, titik unicode (．· •),
+// apostrof cerdas, dst. dinormalkan lewat normalizeNotationInput.
 
 export interface JianpuNote {
   /** Nada dasar 1–7, atau 0 untuk diam. */
@@ -83,7 +90,97 @@ function parseDurationAndExtensions(
   return { duration, extension, dotted, rest };
 }
 
+// ---------------------------------------------------------------------------
+// Normalisasi input tempel (WA/Word/web): unicode whitespace, titik unicode,
+// apostrof cerdas, dan kurung fullwidth dicocokkan ke ASCII. Hanya diterapkan
+// pada baris yang kelihatan not angka agar lirik/chord tidak tersentuh.
+// ---------------------------------------------------------------------------
+
+const CHAR_MAP: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  // Spasi unicode (NBSP, thin, ideografis, dst).
+  for (const ch of "\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000") {
+    map[ch] = " ";
+  }
+  // Titik unicode yang dipakai sebagai titik oktaf/ritme.
+  for (const ch of "\uff0e\u00b7\u2022\u2024\u2219\ufe52") {
+    map[ch] = ".";
+  }
+  // Apostrof/kutip cerdas (oktaf atas).
+  for (const ch of "\u2018\u2019\u201b\u2032\uff07\u02bc") {
+    map[ch] = "'";
+  }
+  // Koma unicode (oktaf bawah).
+  for (const ch of "\uff0c\u3001") {
+    map[ch] = ",";
+  }
+  // Kurung/birama fullwidth.
+  map["\uff08"] = "(";
+  map["\uff09"] = ")";
+  map["\uff5c"] = "|";
+  map["\uff3b"] = "[";
+  map["\uff3d"] = "]";
+  return map;
+})();
+
+export function normalizeNotationChars(text: string): string {
+  let out = "";
+  for (const ch of text) out += CHAR_MAP[ch] ?? ch;
+  return out;
+}
+
+const GROUP_CHARS_RE = /\(|\)|\[\[|\]\]/g;
+
+// Bentuk isi token nada (tanpa kurung/birama): titik oktaf di depan opsional,
+// accidental, digit 0–7, lalu modifier di belakang.
+const NOTATION_INNER_RE =
+  /^[.]{1,2}[#b]?[0-7]'{0,3},{0,2}[.]{0,1}(?:\/\/|\/)?[-]{0,8}[.]{0,1}$/;
+const NOTATION_INNER_PREFIX_RE =
+  /^[#b]?[0-7]'{0,3},{0,2}[.]{0,1}(?:\/\/|\/)?[-]{0,8}[.]{0,1}$/;
+
+// Baris kelihatan not angka bila semua tokennya (setelah kurung të pola
+// slur/beam dan birama dihapus) berisi digit 0–7 dengan modifier, dan minimal
+// satu nada. Lirik seperti "Bapa sentuh" atau "1 2 hai" tidak lolos.
+export function looksLikeNotationLine(line: string): boolean {
+  if (!line) return false;
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  const normalized = normalizeNotationChars(trimmed);
+  let sawNote = false;
+  for (const match of normalized.matchAll(/\S+/g)) {
+    const raw = match[0];
+    if (raw === "|") continue;
+    const stripped = raw.replace(GROUP_CHARS_RE, "");
+    if (!stripped) continue;
+    const ok =
+      NOTATION_INNER_RE.test(stripped) || NOTATION_INNER_PREFIX_RE.test(stripped);
+    if (!ok) return false;
+    if (/[0-7]/.test(stripped)) sawNote = true;
+  }
+  return sawNote;
+}
+
+// Normalisasi seluruh konten chart: hanya baris kelihatan not angka yang
+// diubah (unicode → ASCII, trim spasi di ujung). Lirik & chord dibiarkan.
+export function normalizeNotationInput(content: string): string {
+  if (!content) return content;
+  return content
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) =>
+      looksLikeNotationLine(line)
+        ? normalizeNotationChars(line).trimEnd()
+        : line,
+    )
+    .join("\n");
+}
+
 export function parseJianpu(input: string): JianpuParseResult {
+  if (!input || input.trim() === "") {
+    return { lines: [], valid: true };
+  }
+  input = normalizeNotationChars(input);
   if (!input || input.trim() === "") {
     return { lines: [], valid: true };
   }
@@ -103,6 +200,12 @@ export function parseJianpu(input: string): JianpuParseResult {
 
       let rest = token;
       let accidental = 0;
+      // Oktaf bawah lewat titik di depan (setara 5, / 5,,): ".5", "..5".
+      let dotOctave = 0;
+      while (rest.startsWith(".")) {
+        dotOctave -= 1;
+        rest = rest.slice(1);
+      }
 
       // Accidental di depan
       if (rest.startsWith("#")) { accidental = 1; rest = rest.slice(1); }
@@ -112,7 +215,9 @@ export function parseJianpu(input: string): JianpuParseResult {
         return {
           lines,
           valid: false,
-          error: `Token tidak valid: "${token}" (hanya accidental tanpa nada).`,
+          error: dotOctave !== 0
+            ? `Token tidak valid: "${token}" (hanya titik tanpa nada).`
+            : `Token tidak valid: "${token}" (hanya accidental tanpa nada).`,
         };
       }
 
@@ -128,6 +233,7 @@ export function parseJianpu(input: string): JianpuParseResult {
       rest = rest.slice(1);
 
       const { octave, rest: afterOctave } = parseOctaveModifiers(rest);
+      const octaveTotal = octave + dotOctave;
       const { duration, extension, dotted, rest: afterExt } =
         parseDurationAndExtensions(afterOctave);
 
@@ -141,7 +247,7 @@ export function parseJianpu(input: string): JianpuParseResult {
 
       notes.push({
         solfege,
-        octave,
+        octave: octaveTotal,
         accidental,
         duration,
         extension,
@@ -197,20 +303,4 @@ export function formatNote(note: JianpuNote): string {
 
 export function formatLine(line: JianpuLine): string {
   return line.notes.map(formatNote).join(" ");
-}
-
-// Teks untuk font JianpuASCII. Kres/mol memakai glyph ligatur font
-// (^ = sharp, _ = flat), bukan karakter ketik # / b.
-export function toJianpuFontText(note: JianpuNote): string {
-  let s = "";
-  if (note.accidental === 1) s += "^";
-  else if (note.accidental === -1) s += "_";
-  s += note.solfege.toString();
-  if (note.octave > 0) s += "'".repeat(note.octave);
-  else if (note.octave < 0) s += ",".repeat(-note.octave);
-  if (note.duration === 0.5) s += "/";
-  else if (note.duration === 0.25) s += "//";
-  s += "-".repeat(note.extension);
-  if (note.dotted) s += ".";
-  return s;
 }

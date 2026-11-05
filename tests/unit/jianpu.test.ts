@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NotAngka } from "@/components/NotAngka";
-import { parseJianpu, formatNote, formatLine, keyToFormula, toJianpuFontText } from "@/lib/jianpu";
+import {
+  formatNote,
+  formatLine,
+  keyToFormula,
+  looksLikeNotationLine,
+  normalizeNotationInput,
+  parseJianpu,
+} from "@/lib/jianpu";
 
 describe("JianpuASCII parser", () => {
   it("parses empty input", () => {
@@ -116,36 +123,98 @@ describe("JianpuASCII parser", () => {
     expect(notes[4].solfege).toBe(3);
   });
 
-  it("renders octave marks with the font ligature by default", () => {
+  it("normalizes unicode whitespace and dots before parsing", () => {
+    const nbsp = "\u00a0";
+    const fullwidthDot = "\uff0e";
+    const middleDot = "\u00b7";
+    // parseJianpu tetap token-level; kurung slur dibersihkan di jianpu-align.
+    const result = parseJianpu(`3 1${nbsp}2${nbsp}${fullwidthDot}5 ${middleDot}6`);
+    expect(result.valid).toBe(true);
+    const notes = result.lines[0].notes;
+    expect(notes.map((n) => n.solfege)).toEqual([3, 1, 2, 5, 6]);
+    expect(notes[3].octave).toBe(-1);
+    expect(notes[4].octave).toBe(-1);
+  });
+
+  it("parses leading dot tokens as octave down (setara koma)", () => {
+    const result = parseJianpu(".5 .6 5,");
+    expect(result.valid).toBe(true);
+    expect(result.lines[0].notes.map((n) => n.octave)).toEqual([-1, -1, -1]);
+  });
+
+  it("parses double leading dots as two octaves down", () => {
+    const result = parseJianpu("..5");
+    expect(result.lines[0].notes[0].octave).toBe(-2);
+  });
+
+  it("keeps trailing-dotted rhythm notes intact", () => {
+    const result = parseJianpu("1. 2");
+    expect(result.lines[0].notes[0].dotted).toBe(true);
+    expect(result.lines[0].notes[0].octave).toBe(0);
+  });
+
+  it("rejects a lone dot token", () => {
+    const result = parseJianpu("1 . 2");
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("hanya titik tanpa nada");
+  });
+
+  it("looksLikeNotationLine only accepts notation-looking lines", () => {
+    expect(looksLikeNotationLine("3 (2 3 2) 1 2 (1 2 1)  .5 .6")).toBe(true);
+    expect(looksLikeNotationLine("(3 1 .5) (2 .7 .5)")).toBe(true);
+    expect(looksLikeNotationLine("1\u00a02\u00a0(1\u00a02\u00a01)\u00a0\u00a0.5\u00a0.6")).toBe(true);
+    expect(looksLikeNotationLine("#1 b7 1// 1-- 1.")).toBe(true);
+    expect(looksLikeNotationLine("[[5 6]]")).toBe(true);
+    expect(looksLikeNotationLine("Bapa sentuh")).toBe(false);
+    expect(looksLikeNotationLine("1 2 hai")).toBe(false);
+    expect(looksLikeNotationLine("Am  D")).toBe(false);
+  });
+
+  it("normalizeNotationInput fixes only notation-looking lines", () => {
+    const nbsp = "\u00a0";
+    const thin = "\u2009";
+    const input = [
+      "C   G",
+      `3 (2 3 2) 1${nbsp}2 (1 2 1)${nbsp}${nbsp}.5${nbsp}.6`,
+      `[Am]Bapa${nbsp}sentuh${thin}hatiku`,
+      "   ",
+    ].join("\n");
+    const output = normalizeNotationInput(input);
+    expect(output.split("\n")[0]).toBe("C   G");
+    expect(output.split("\n")[1]).toBe("3 (2 3 2) 1 2 (1 2 1)  .5 .6");
+    // Lirik biasa tidak disentuh.
+    expect(output.split("\n")[2]).toBe(`[Am]Bapa${nbsp}sentuh${thin}hatiku`);
+  });
+
+  it("normalizeNotationInput converts smart apostrophes and fullwidth marks", () => {
+    const output = normalizeNotationInput("1\u2019 5\uff0c 5\u00b7");
+    expect(output).toBe("1' 5, 5.");
+  });
+
+  it("renders octave marks as CSS dots without the font path", () => {
     const markup = renderToStaticMarkup(
       createElement(NotAngka, { value: "6, 5, 1' 2 3" }),
     );
     expect(markup).not.toContain("[object Object]");
     expect(markup).not.toContain("-top-2");
-    expect(markup).toContain("notation-glyph-font");
+    expect(markup).not.toContain("notation-glyph-font");
+    expect(markup).not.toContain("jianpu-ascii");
     expect(markup).toContain('data-note="1&#x27;"');
     expect(markup).toContain('data-note="6,"');
-    expect(markup).toContain(">1&#x27;<");
-    expect(markup).toContain(">6,<");
-  });
-
-  it("centers CSS fallback octave dots on the digit", () => {
-    const markup = renderToStaticMarkup(
-      createElement(NotAngka, { value: "6, 5, 1' 2 3", glyphs: "css" }),
-    );
-    expect(markup).not.toContain("-top-2");
     expect(markup).toContain('data-octave="up"');
     expect(markup).toContain('data-octave="down"');
-    expect(markup).toContain("left-1/2");
-    expect(markup).toContain("-translate-x-1/2");
-    expect(markup).toContain('data-jianpu-font="fallback"');
+    expect(markup).toContain("jianpu-dot");
+    expect(markup).toContain(">1<");
+    expect(markup).toContain(">6<");
   });
 
-  it("toJianpuFontText keeps octave marks so the font can ligate them", () => {
-    expect(toJianpuFontText({ solfege: 1, octave: 1, accidental: 0, duration: 1, extension: 0, dotted: false })).toBe("1'");
-    expect(toJianpuFontText({ solfege: 6, octave: -1, accidental: 0, duration: 1, extension: 0, dotted: false })).toBe("6,");
-    expect(toJianpuFontText({ solfege: 1, octave: 1, accidental: 1, duration: 0.5, extension: 0, dotted: false })).toBe("^1'/");
-    expect(toJianpuFontText({ solfege: 7, octave: -2, accidental: -1, duration: 1, extension: 0, dotted: false })).toBe("_7,,");
+  it("renders leading-dot octave notes with CSS dots", () => {
+    const markup = renderToStaticMarkup(
+      createElement(NotAngka, { value: ".5 .6" }),
+    );
+    expect(markup).toContain('data-note=".5"');
+    expect(markup).toContain('data-octave="down"');
+    expect(markup).toContain("jianpu-dot");
   });
 
   it("formatNote renders back correctly", () => {

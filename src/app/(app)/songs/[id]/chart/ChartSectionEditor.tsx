@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import {
@@ -43,10 +44,16 @@ export function ChartSectionEditor({
     section ? updateChartSectionAction : createChartSectionAction,
     { ok: false },
   );
+  const router = useRouter();
 
   useEffect(() => {
-    if (state.ok) onDone();
-  }, [state.ok, onDone]);
+    if (state.ok) {
+      // Ambil ulang data server supaya daftar bagian/ChordBody langsung
+      // menampilkan isi terbaru (mencegah "beda dari preview saat simpan").
+      router.refresh();
+      onDone();
+    }
+  }, [state.ok, onDone, router]);
 
   return (
     <form
