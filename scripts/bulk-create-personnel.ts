@@ -31,11 +31,12 @@ const PERSONNEL: { displayName: string; username: string }[] = [
 
 async function main(): Promise<void> {
   const admin = await prisma.user.findFirst({
-    where: { username: "aisaerang", role: "ADMIN", isActive: true },
-    select: { id: true, username: true },
+    where: { role: "ADMIN", isActive: true },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
   });
   if (!admin) {
-    console.error("Akun admin aisaerang tidak ditemukan/aktif.");
+    console.error("Tidak ada akun ADMIN aktif.");
     process.exit(1);
   }
   let created = 0;

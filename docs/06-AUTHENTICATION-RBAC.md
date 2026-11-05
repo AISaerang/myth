@@ -43,6 +43,13 @@ Use environment variables or a secure one-time admin command. It must be idempot
 - Reset should invalidate old sessions where practical.
 - Inactive users cannot log in.
 
+## Edit | Preview (event admin)
+Global `ADMIN` and an event's `EVENT_ADMIN` can switch the shell between **Edit** and **Preview**. The choice is stored in the HttpOnly cookie `myth_ui_mode` as a list of event ids currently in Preview. It is per browser and per event. It is not a session role.
+
+Preview renders the musician song path: published list, batch badges, own practice progress, and no admin forms. Edit restores the current event-admin screens. Mutations still go through `requireEventManager` / `isAdmin`. A closed event still refuses writes. A member or observer cookie cannot turn Preview into extra access, and Preview cannot open draft songs in the UI.
+
+Privilege is `User.role` plus `EventMembership.role`. Nothing in the request path grants access by username. Operationally, the global admin account is `alvandi` (`ADMIN`, and `EVENT_ADMIN` on the events that need it). The keyboard event admin `aisaerang` stays global `USER` and is `EVENT_ADMIN` only on events assigned at `/event/[id]/members`. Do not promote that account to global `ADMIN`. Hiding Edit controls in Preview is not authorization.
+
 ## Authorization checklist
 For each server request: validate session; active account; role; event scope; ownership/assignment; schema; then mutate. Log sensitive actions. Hidden UI is not authorization.
 

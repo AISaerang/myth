@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { ArchiveSongButton, RestoreSongButton } from "@/components/SongArchiveButtons";
 import { BatchOrderBadge } from "@/components/BatchOrderBadge";
@@ -8,7 +9,9 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { resolveMedleyNav } from "@/lib/medley-nav";
+import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
 import {
+  canManageEvent,
   canReadDrafts,
   canReadEventSong,
   canWriteEventData,
@@ -104,8 +107,13 @@ export default async function SongDetailPage({
     Boolean(eventAccess?.accessClosedAt),
     admin,
   );
+  const previewing =
+    uiModeForEvent((await cookies()).get(UI_MODE_COOKIE)?.value, song.eventId) ===
+      "preview" &&
+    (admin || canManageEvent(eventRole));
+  const showAdminChrome = admin && !previewing;
   const medleyNav = resolveMedleyNav(song.id, catalog, {
-    publishedOnly: !(admin || canReadDrafts(eventRole)),
+    publishedOnly: previewing || !(admin || canReadDrafts(eventRole)),
   });
   const medleyLabels = [
     ...new Set(
@@ -125,8 +133,9 @@ export default async function SongDetailPage({
   ) {
     notFound();
   }
+  if (previewing && !song.isPublished) notFound();
   let myAssignment: (typeof song.assignments)[number] | undefined;
-  if (!admin && !observer) {
+  if (!showAdminChrome && !observer) {
     const person = await prisma.person.findUnique({
       where: { userId: user.id },
     });
@@ -230,7 +239,7 @@ export default async function SongDetailPage({
         ) : null}
       </Card>
 
-      {canWrite && batchBadges.length > 0 ? (
+      {canWrite && !previewing && batchBadges.length > 0 ? (
         <Card title="Medley">
           <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
             Isi label yang sama pada lagu berurutan di satu batch untuk membuat koridor.
@@ -255,7 +264,7 @@ export default async function SongDetailPage({
         </Card>
       ) : null}
 
-      {!admin && myAssignment ? (
+      {!showAdminChrome && myAssignment ? (
         <Card title="Tugasmu">
           <p className="text-sm">
             {myAssignment.instrumentSkill
@@ -266,12 +275,12 @@ export default async function SongDetailPage({
         </Card>
       ) : null}
 
-      {admin || observer || myAssignment ? (
+      {showAdminChrome || observer || myAssignment ? (
         <SongProgress
           songId={song.id}
           eventSongId={song.eventSongId}
-          admin={admin}
-          observer={observer}
+          admin={showAdminChrome}
+          observer={observer && !previewing}
           userId={user.id}
         />
       ) : (
@@ -286,7 +295,7 @@ export default async function SongDetailPage({
       <SongChordChart
         songId={song.id}
         eventId={song.eventId}
-        admin={admin}
+        admin={showAdminChrome}
       />
 
       <Card title="Materi aktif">
@@ -318,7 +327,7 @@ export default async function SongDetailPage({
                   {m.description ? (
                     <p className="text-zinc-600 dark:text-zinc-400">{m.description}</p>
                   ) : null}
-                  {admin ? (
+                  {showAdminChrome ? (
                     <div className="mt-2">
                       <MaterialActions
                         songId={song.id}
@@ -333,7 +342,7 @@ export default async function SongDetailPage({
         )}
       </Card>
 
-      {admin ? (
+      {showAdminChrome ? (
         <>
           <SongForm
             mode="edit"
@@ -458,7 +467,7 @@ export default async function SongDetailPage({
                     </a>
                   </p>
                 ) : null}
-                {admin ? (
+                {showAdminChrome ? (
                   <div className="mt-2">
                     <VersionActions
                       songId={song.id}
@@ -477,7 +486,7 @@ export default async function SongDetailPage({
 
       <SongTasks songId={song.id} eventId={song.eventId} />
 
-      {!admin ? (
+      {!showAdminChrome ? (
         <SongSuggestion
           eventId={song.eventId}
           songId={song.id}
