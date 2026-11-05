@@ -12,12 +12,14 @@ import {
   batchSchema,
   batchStatusSchema,
   batchUpdateSchema,
+  medleyLabelSchema,
 } from "@/lib/validation/song";
 import {
   addSongToBatch,
   createBatch,
   getBatch,
   removeSongFromBatch,
+  setBatchItemMedley,
   setBatchStatus,
   updateBatch,
 } from "@server/services/batch-service";
@@ -230,4 +232,30 @@ export async function assignBatchAction(
   if (!result.ok) return { ok: false, error: result.error };
   revalidateBatches(batchId);
   return { ok: true, summary: result.results };
+}
+
+export async function setBatchItemMedleyAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireActionUser();
+  const parsed = medleyLabelSchema.safeParse({
+    batchId: formData.get("batchId"),
+    songId: formData.get("songId"),
+    label: formData.get("label") ?? "",
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  await requireEventManagerForEntity(user, "batch", parsed.data.batchId);
+  const result = await setBatchItemMedley(
+    user.id,
+    parsed.data.batchId,
+    parsed.data.songId,
+    parsed.data.label,
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateBatches(parsed.data.batchId);
+  revalidatePath(`/songs/${parsed.data.songId}`);
+  return { ok: true };
 }

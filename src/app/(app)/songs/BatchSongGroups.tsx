@@ -55,6 +55,11 @@ export function BatchSongGroups({
                             {row.song.liturgicalFunction}
                           </span>
                         ) : null}
+                        {row.medleyLabel ? (
+                          <span className="block text-xs text-zinc-500">
+                            Medley: {row.medleyLabel}
+                          </span>
+                        ) : null}
                       </span>
                     </span>
                     <SongStatusBadge status={row.song.status} />

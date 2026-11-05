@@ -17,6 +17,7 @@ import { BatchForm } from "../BatchForm";
 import { BatchStatusBadge } from "../BatchStatusBadge";
 import { getEventRole } from "@server/services/event-access";
 import { BatchItemMover } from "@/components/ui/MoveButtons";
+import { MedleyLabelForm } from "../MedleyLabelForm";
 import {
   AddSongForm,
   AssignBatchForm,
@@ -154,28 +155,36 @@ export default async function BatchDetailPage({
                 <li
                   key={item.songId}
                   id={batchBadgeAnchor(batch.id, badge)}
-                  className="flex scroll-mt-24 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  className="flex scroll-mt-24 flex-col gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
-                  <span className="flex items-center gap-2">
-                    <BatchOrderBadge badge={badge} />
-                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
-                      {item.song.title}
-                    </Link>
+                  <span className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <BatchOrderBadge badge={badge} />
+                      <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
+                        {item.song.title}
+                      </Link>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <BatchItemMover
+                        batchId={batch.id}
+                        orderedIds={batch.items.map((i) => i.songId)}
+                        index={index}
+                        title={item.song.title}
+                      />
+                      <SongStatusBadge status={item.song.status} />
+                      <RemoveSongButton
+                        batchId={batch.id}
+                        songId={item.songId}
+                        title={item.song.title}
+                      />
+                    </span>
                   </span>
-                  <span className="flex items-center gap-2">
-                    <BatchItemMover
-                      batchId={batch.id}
-                      orderedIds={batch.items.map((i) => i.songId)}
-                      index={index}
-                      title={item.song.title}
-                    />
-                    <SongStatusBadge status={item.song.status} />
-                    <RemoveSongButton
-                      batchId={batch.id}
-                      songId={item.songId}
-                      title={item.song.title}
-                    />
-                  </span>
+                  <MedleyLabelForm
+                    batchId={batch.id}
+                    songId={item.songId}
+                    songTitle={item.song.title}
+                    label={item.medleyLabel}
+                  />
                 </li>
                 );
               })}
