@@ -61,6 +61,13 @@ describe("parseLegacyChart", () => {
     expect(parsed[0]?.content).toContain("[G]Tanpa label");
   });
 
+  it("names an unlabeled notation chunk Intro instead of Bagian", () => {
+    const parsed = parseLegacyChart("[C].6 .7 1\n[Am]5/ 6/");
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.label).toBe("Intro");
+    expect(parsed[0]?.type).toBe("INTRO");
+  });
+
   it("handles leading unlabeled content and CRLF", () => {
     const parsed = parseLegacyChart(
       "[C]Intro tanpa label\r\n{Verse}\r\n[G]Verse isi",

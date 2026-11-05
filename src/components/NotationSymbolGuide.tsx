@@ -63,12 +63,14 @@ export function NotationSymbolGuide({
                 <td className="align-top">kres (♯) / mol (♭) pada angka</td>
               </tr>
               <tr>
-                <td className="pr-3 align-top whitespace-nowrap">[[5 6]]</td>
-                <td className="align-top">beam 1 garis di atas</td>
+                <td className="pr-3 align-top whitespace-nowrap">
+                  [5 6] / [[5 6]]
+                </td>
+                <td className="align-top">beam 1 / 2 garis di atas</td>
               </tr>
               <tr>
                 <td className="pr-3 align-top whitespace-nowrap">(5 6)</td>
-                <td className="align-top">slur/legato</td>
+                <td className="align-top">slur/legato di bawah angka</td>
               </tr>
               <tr>
                 <td className="pr-3 align-top whitespace-nowrap">5/ 5//</td>

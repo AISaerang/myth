@@ -15,7 +15,12 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Chart section/arrangement validation rejects empty labels/content, duplicate labels, invalid item payloads, and over-limit sequences.
 - Setlist lyric seed keeps unique labels, non-empty content, and arrangement items that reference existing sections.
 - Intro-column migration builds a ChordPro Intro section (chords over not angka, note as a `#` comment), skips songs that already have an Intro section, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
+- Event brief date inputs use the Asia/Jakarta calendar day (midnight WIB round-trips; a UTC date slice does not). Saving the brief keeps the stored confirmation status unless the status field was changed.
+- Membership backfill selects only active users with zero event memberships for the newest non-cancelled regional event, leaves anyone who already belongs to an event untouched, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
 - Chart viewer renders not angka in one arrangement body and shows the transpose formula once, next to the transpose controls.
+- An Intro of three chord+notation lines, the last with `Csus4` and trailing `| |`, renders every line at the lyric size (`text-sm` / `leading-6`) in Lirik+Chord, Lirik saja, and Chord saja; transpose changes chords only.
+- Not angka parser accepts comma and leading-dot lower octaves, chromatic prefixes, beam groups `[ ]` / `[[ ]]`, and slurs `( )`. CSS markup draws octave dots, a slash or backslash through the digit, and beams/slurs above the group. Chords stay on the same column. A notation section labeled `Bagian 1` displays Intro. `canonicalizeNotationText` rewrites `.6` to `6,` and leaves lyric lines alone. `planNotationNormalization` prints a per-song diff and is a no-op when nothing changed.
+- Adding a rehearsal recording stores the song page's event id. Omitting the event id stores `null` (library), never the string `library`. A database or authorization failure on that action returns a form error instead of throwing.
 - Final lock requires intentional authorized action.
 - Overdue task and equipment blocker aggregation.
 - Cancelled rehearsal excluded from upcoming list.

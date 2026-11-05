@@ -19,13 +19,13 @@ InstrumentSkill: `id`, `name`. PersonSkill: `personId`, `instrumentSkillId`, `pr
 ### Song
 `id`, `eventId`, `title`, `artistOrAuthor?`, `liturgicalFunction?`, `key?`, `bpm?`, `timeSignature?`, `estimatedDurationSeconds?`, `originalReferenceUrl?`, `arrangementNotes?`, `status`, `isPublished`, `isFinalLocked`, `activeArrangementVersionId?`, `createdById`, timestamps.
 
-Legacy columns `introChords`, `introNotation`, and `introNote` stay on `Song` and are no longer edited from the song form. Intro is a `ChartSection` of type `INTRO` in the active arrangement. `scripts/migrate-intro-sections.ts` copies those columns forward; it does not drop or null them.
+Legacy columns `introChords`, `introNotation`, and `introNote` stay on `Song` and are no longer edited from the song form. Intro is a `ChartSection` of type `INTRO` in the active arrangement. `scripts/migrate-intro-sections.ts` copies those columns forward; it does not drop or null them. `scripts/normalize-notation.ts` rewrites leading-dot octave marks to the comma form inside those strings and chart section content, and renames a generic `Bagian n` intro label to `Intro`. It does not change the schema.
 
 Song status: `DRAFT|SOURCE_SHARED|ARRANGEMENT_IN_PROGRESS|REFERENCE_READY|PRACTICING|NEEDS_REVIEW|READY_FOR_REHEARSAL|REHEARSAL_READY|FINAL_LOCKED`.
 
 ### SongBatch / SongBatchItem
 SongBatch: `id`, `eventId`, `name`, `description?`, `releaseAt?`, `targetReviewAt?`, `status` (`DRAFT|PUBLISHED|REVIEWING|COMPLETED|ARCHIVED`), `createdById`, timestamps.  
-SongBatchItem: `songBatchId`, `songId`, `sortOrder`; unique pair. Enforce one active batch per song if product rule requires it.
+SongBatchItem: `songBatchId`, `songId`, `sortOrder`; unique pair. The musician-facing batch badge is the 1-based rank of `SongBatchItem.sortOrder` inside that batch (1…N, same order as the admin batch list). It is not `EventSong.sortOrder` (setlist order) and not the song status badge. Anchor on the published list: `#badge-{batchId}-{n}`. Enforce one active batch per song if product rule requires it.
 
 ### SongAssignment
 `id`, `songId`, `personId`, `instrumentSkillId?`, `assignmentNote?`, `isPrimary`, timestamps. Define uniqueness according to assignment semantics.
@@ -43,7 +43,7 @@ ChartArrangementItem: `id`, `arrangementId`, `sectionId`, `sortOrder`, `labelOve
 Legacy `ChordChart` remains as fallback/history. Public display precedence: active structured arrangement → active legacy `ChordChart` → empty. Legacy charts can be imported into sections/arrangement by an admin and then reviewed before saving. All chart mutations are admin-only and audited.
 
 ### SongMaterial
-`id`, `songId`, `arrangementVersionId?`, `title`, `category`, `url`, `versionLabel?`, `description?`, `isActive`, `createdById`, timestamps. Categories: `ORIGINAL|ARRANGEMENT_REFERENCE|PART_GUIDE|CHORD_CHART|LYRICS|CLICK_CUE|SEQUENCER|REHEARSAL_RECORDING|FINAL_ASSET|OTHER`.
+`id`, `songId`, `eventId?`, `arrangementVersionId?`, `title`, `category`, `url`, `versionLabel?`, `description?`, `isActive`, `createdById`, timestamps. Categories: `ORIGINAL|ARRANGEMENT_REFERENCE|PART_GUIDE|CHORD_CHART|LYRICS|CLICK_CUE|SEQUENCER|REHEARSAL_RECORDING|FINAL_ASSET|OTHER`. `eventId` null = materi pustaka (tampil di setiap event yang memakai lagu). Terisi = materi khusus event itu. Kolom ini foreign key ke `Event`; jangan isi sentinel.
 
 ### PracticeProgress
 `id`, `songId`, `personId`, `status` (`NOT_STARTED|LEARNING|TRIED_WITH_REFERENCE|NEEDS_HELP|READY_FOR_REHEARSAL`), `note?`, `updatedById`, `updatedAt`; unique song/person.

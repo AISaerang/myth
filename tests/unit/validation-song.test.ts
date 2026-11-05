@@ -117,4 +117,19 @@ describe("batch / assignment / version / material validation", () => {
       }).success,
     ).toBe(true);
   });
+
+  it("accepts a rehearsal recording on an event, with or without a version", () => {
+    const url =
+      "https://drive.google.com/file/d/19rB4-WkXeN0Au1XCsFf47Lszo1KC_B8w/view";
+    const base = {
+      songId: "s1",
+      eventId: "evt_gehc",
+      title: "Rekaman latihan terbaru",
+      category: "REHEARSAL_RECORDING",
+      url,
+    };
+    expect(materialSchema.safeParse({ ...base, versionLabel: "v1" }).success).toBe(true);
+    expect(materialSchema.safeParse(base).success).toBe(true);
+    expect(materialSchema.safeParse({ ...base, versionLabel: "" }).success).toBe(true);
+  });
 });

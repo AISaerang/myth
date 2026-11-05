@@ -20,7 +20,9 @@
     "onboard:observers": "tsx --env-file=.env scripts/onboard-observers.ts",
     "import:charts": "node --conditions=react-server --import tsx --env-file=.env scripts/import-legacy-charts.ts",
     "import:intro-sections": "node --conditions=react-server --import tsx --env-file=.env scripts/migrate-intro-sections.ts",
+    "normalize:notation": "node --conditions=react-server --import tsx --env-file=.env scripts/normalize-notation.ts",
     "import:lyrics": "node --conditions=react-server --import tsx --env-file=.env scripts/import-setlist-lyrics.ts",
+    "backfill:memberships": "node --conditions=react-server --import tsx --env-file=.env scripts/backfill-memberships.ts",
     "seed:event": "tsx --env-file=.env prisma/seed-event.ts"
   },
   "dependencies": {

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BatchOrderBadge } from "@/components/BatchOrderBadge";
 import { Card } from "@/components/ui/Card";
+import { badgeFromSortOrders, batchBadgeAnchor } from "@/lib/batch-badge";
 import { requireFreshUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
@@ -35,6 +37,7 @@ export default async function BatchDetailPage({
   if (!batch) notFound();
   if (!(await getEventRole(user, batch.eventId))) notFound();
 
+  const sortOrders = batch.items.map((item) => item.sortOrder);
   if (observer) {
     const published = batch.items.filter((i) => i.song.isPublished);
     return (
@@ -68,22 +71,24 @@ export default async function BatchDetailPage({
             <p className="text-sm text-zinc-500">Belum ada lagu publish di batch ini.</p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {published.map((item, index) => (
+              {published.map((item) => {
+                const badge = badgeFromSortOrders(item.sortOrder, sortOrders);
+                return (
                 <li
                   key={item.songId}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  id={batchBadgeAnchor(batch.id, badge)}
+                  className="flex scroll-mt-24 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
                   <span className="flex items-center gap-2">
-                    <span className="w-6 text-center text-xs text-zinc-500">
-                      {index + 1}
-                    </span>
+                    <BatchOrderBadge badge={badge} />
                     <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
                       {item.song.title}
                     </Link>
                   </span>
                   <SongStatusBadge status={item.song.status} />
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </Card>
@@ -143,15 +148,16 @@ export default async function BatchDetailPage({
             <p className="text-sm text-zinc-500">Belum ada lagu.</p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {batch.items.map((item, index) => (
+              {batch.items.map((item, index) => {
+                const badge = badgeFromSortOrders(item.sortOrder, sortOrders);
+                return (
                 <li
                   key={item.songId}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  id={batchBadgeAnchor(batch.id, badge)}
+                  className="flex scroll-mt-24 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
                   <span className="flex items-center gap-2">
-                    <span className="w-6 text-center text-xs text-zinc-500">
-                      {index + 1}
-                    </span>
+                    <BatchOrderBadge badge={badge} />
                     <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
                       {item.song.title}
                     </Link>
@@ -171,7 +177,8 @@ export default async function BatchDetailPage({
                     />
                   </span>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
           <AddSongForm batchId={batch.id} songs={available} />

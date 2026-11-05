@@ -69,6 +69,40 @@ npm.cmd run import:intro-sections -- --apply
 npm.cmd run import:intro-sections -- --apply --allow-prod
 ```
 
+Not angka yang masih memakai titik di depan untuk oktaf bawah (`.6`) dan bagian intro yang berlabel `Bagian n` bisa dinormalisasi tanpa mengubah skema. Bentuk kanonik oktaf bawah adalah koma (`6,`). Skrip idempoten, default dry-run, mencetak diff per lagu. `--apply` menulis. Prefix user DB `rGq` menolak `--apply` kecuali `--allow-prod`.
+
+```powershell
+npm.cmd run normalize:notation
+npm.cmd run normalize:notation -- --apply
+npm.cmd run normalize:notation -- --apply --allow-prod
+```
+
+### Operasi: backfill membership
+
+Jangan jalankan ulang SQL di migrasi `20261103000010_event_type_membership`.
+SQL itu memberi setiap akun aktif membership di event REGIONAL terbaru yang
+bukan `CANCELLED`. Setelah akun khusus GEHC ada, menjalankan ulang SQL itu
+menambahkan mereka ke event Regional dan merusak isolasi POV per event
+(kejadian PROD 4 Nov 2026). Migrasi itu sudah diterapkan; biarkan file-nya.
+
+Pakai skrip `npm run backfill:memberships`. Skrip hanya menambahkan membership
+Regional untuk akun **aktif yang belum punya EventMembership sama sekali**
+(pengguna lama sebelum multi-event). Akun yang sudah anggota event mana pun,
+termasuk hanya GEHC, tidak pernah ditambahkan ke event lain. Akun nonaktif
+tanpa membership juga dilewati. Targetnya event REGIONAL non-`CANCELLED`
+terbaru (`eventDate` menurun, tanggal kosong di belakang, lalu `updatedAt`).
+
+Default dry-run (tidak menulis). `--apply` menulis. Baris pertama keluaran
+adalah host dan prefix user DB. Bila prefix user DB adalah `rGq`, `--apply`
+ditolak kecuali `--allow-prod` ikut diberikan. Membuat akun di `/people`
+tidak menggabungkan user ke event; admin memilih event lewat halaman anggota.
+
+```powershell
+npm.cmd run backfill:memberships
+npm.cmd run backfill:memberships -- --apply
+npm.cmd run backfill:memberships -- --apply --allow-prod
+```
+
 Skrip `tsx` (bootstrap/seed) butuh dua flag env karena berjalan di luar
 bundler Next — jalankan persis seperti di `package.json`:
 
@@ -299,3 +333,7 @@ Script `prisma/realign-event-2026-11-14.ts` (dry-run default, `APPLY=1`) menyela
 - Event: 20 Nov → **Sab 14 Nov 2026**.
 - Batch (review + latihan mandiri, urut lagu): B1 25→29 Okt, B2 26→31 Okt, B3 27 Okt→3 Nov, B4 28 Okt→5 Nov.
 - Rehearsal (per tipe, WIB): monitoring online Rab 28 Okt 19:00; onsite Sab 31 Okt 10:00; full Sab 7 Nov 10:00; gladi bersih Jum 13 Nov 15:00; soundcheck Sab 14 Nov 07:00.
+
+## 22. Tambah materi tidak lagi 500
+
+Form "Tambah materi" di halaman lagu event mengirim `eventId` event yang sedang dibuka. Service menyimpan `null` bila event tidak dikirim (materi pustaka). Nilai `"library"` tidak ditulis: `SongMaterial.eventId` adalah foreign key ke `Event`, dan sentinel itu membuat Prisma melempar P2003 sampai error boundary ("Terjadi kesalahan"). Kegagalan simpan atau izin dikembalikan sebagai pesan form. Tidak ada migrasi.

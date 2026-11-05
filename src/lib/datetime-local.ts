@@ -26,6 +26,20 @@ export function toJakartaLocalInput(value?: Date | string | null): string {
 }
 
 const LOCAL_INPUT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/;
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Date → "YYYY-MM-DD" kalender WIB, untuk <input type="date">. */
+export function toJakartaDateInput(value?: Date | string | null): string {
+  const local = toJakartaLocalInput(value);
+  return local ? local.slice(0, 10) : "";
+}
+
+/** "YYYY-MM-DD" → tengah malam Asia/Jakarta, bukan tengah malam UTC. */
+export function parseJakartaDateInput(value: string): Date {
+  const v = value.trim();
+  if (!DATE_ONLY_RE.test(v)) return new Date(Number.NaN);
+  return parseJakartaLocalInput(`${v}T00:00`);
+}
 
 /** "YYYY-MM-DDTHH:mm" tanpa zona → Date yang ditafsirkan sebagai WIB. String berzona dibiarkan. */
 export function parseJakartaLocalInput(value: string): Date {

@@ -79,6 +79,9 @@ export async function listSongs(eventId: string) {
 }
 
 // Member event melihat semua lagu yang sudah dipublikasi di setlist itu.
+// Urutan badge (1…N) bukan orderBy di sini: itu peringkat
+// SongBatchItem.sortOrder per batch (lihat listEventBatchCatalog).
+// sortOrder EventSong hanya urutan setlist admin.
 export async function listPublishedSongsForMember(eventId: string) {
   const eventSongs = await prisma.eventSong.findMany({
     where: {
@@ -668,73 +671,84 @@ export async function unlockFinal(
   return { ok: true };
 }
 
+export const MATERIAL_SAVE_FAILED =
+  "Materi gagal disimpan. Coba lagi, atau hubungi admin bila masalah berlanjut.";
+
 export async function addMaterial(
   actorUserId: string,
   input: MaterialInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const song = await prisma.song.findUnique({ where: { id: input.songId } });
-  if (!song) return { ok: false, error: "Lagu tidak ditemukan." };
-  if (input.eventId) {
-    const eventSong = await prisma.eventSong.findUnique({
-      where: {
-        eventId_songId: { eventId: input.eventId, songId: input.songId },
-      },
-      select: { id: true },
-    });
-    if (!eventSong) {
-      return {
-        ok: false,
-        error: "Materi event harus terkait lagu di setlist event tersebut.",
-      };
+  try {
+    const song = await prisma.song.findUnique({ where: { id: input.songId } });
+    if (!song) return { ok: false, error: "Lagu tidak ditemukan." };
+    // docs/13 §4.2: null = materi pustaka. Kolom ini FK ke Event, jadi
+    // sentinel "library" melanggar constraint dan menggagalkan seluruh simpan.
+    const eventId = input.eventId ?? null;
+    if (eventId) {
+      const eventSong = await prisma.eventSong.findUnique({
+        where: {
+          eventId_songId: { eventId, songId: input.songId },
+        },
+        select: { id: true },
+      });
+      if (!eventSong) {
+        return {
+          ok: false,
+          error: "Materi event harus terkait lagu di setlist event tersebut.",
+        };
+      }
     }
-  }
-  if (input.arrangementVersionId) {
-    const version = await prisma.arrangementVersion.findUnique({
-      where: { id: input.arrangementVersionId },
-    });
-    if (!version || version.songId !== input.songId) {
-      return { ok: false, error: "Versi aransemen tidak cocok dengan lagu." };
+    if (input.arrangementVersionId) {
+      const version = await prisma.arrangementVersion.findUnique({
+        where: { id: input.arrangementVersionId },
+      });
+      if (!version || version.songId !== input.songId) {
+        return { ok: false, error: "Versi aransemen tidak cocok dengan lagu." };
+      }
     }
+    // Satu materi aktif per (lagu, kategori, ruang lingkup event/pustaka).
+    const category = input.category as MaterialCategory;
+    await prisma.$transaction([
+      prisma.songMaterial.updateMany({
+        where: {
+          songId: input.songId,
+          category,
+          eventId,
+        },
+        data: { isActive: false },
+      }),
+      prisma.songMaterial.create({
+        data: {
+          songId: input.songId,
+          eventId,
+          arrangementVersionId: input.arrangementVersionId,
+          title: input.title,
+          category,
+          url: input.url,
+          versionLabel: input.versionLabel || null,
+          description: input.description || null,
+          isActive: true,
+          createdById: actorUserId,
+        },
+      }),
+    ]);
+    await writeAudit({
+      actorUserId,
+      action: AuditAction.MATERIAL_ADDED,
+      entityType: "Song",
+      entityId: input.songId,
+      summary: `Materi "${input.title}" (${input.category}) ditambahkan ke "${song.title}".`,
+      metadata: {
+        song: song.title,
+        category: input.category,
+        eventId: eventId ?? "library",
+      },
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error("add-material-failed", error);
+    return { ok: false, error: MATERIAL_SAVE_FAILED };
   }
-  // Satu materi aktif per (lagu, kategori): nonaktifkan yang lama.
-  const category = input.category as MaterialCategory;
-  await prisma.$transaction([
-    prisma.songMaterial.updateMany({
-      where: {
-        songId: input.songId,
-        category,
-        eventId: input.eventId ?? "library",
-      },
-      data: { isActive: false },
-    }),
-    prisma.songMaterial.create({
-      data: {
-        songId: input.songId,
-        eventId: input.eventId ?? "library",
-        arrangementVersionId: input.arrangementVersionId,
-        title: input.title,
-        category,
-        url: input.url,
-        versionLabel: input.versionLabel || null,
-        description: input.description || null,
-        isActive: true,
-        createdById: actorUserId,
-      },
-    }),
-  ]);
-  await writeAudit({
-    actorUserId,
-    action: AuditAction.MATERIAL_ADDED,
-    entityType: "Song",
-    entityId: input.songId,
-    summary: `Materi "${input.title}" (${input.category}) ditambahkan ke "${song.title}".`,
-    metadata: {
-      song: song.title,
-      category: input.category,
-      eventId: input.eventId ?? "library",
-    },
-  });
-  return { ok: true };
 }
 
 export async function setMaterialActive(

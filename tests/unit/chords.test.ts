@@ -258,6 +258,17 @@ describe("over-under editor format", () => {
     expect(isOverUnderFormat("Bapa sentuh hatiku tanpa chord")).toBe(false);
   });
 
+  it("keeps notation beams in the lyric line and out of the chord list", () => {
+    const line = "[C]1 [5 6] [[1 2 3 4]]";
+    const layout = layoutChordLine(line);
+    expect(layout.lyricLine.trimEnd()).toBe("1 [5 6] [[1 2 3 4]]");
+    expect(layout.chordLine.trim()).toBe("C");
+    expect(extractChordLines(line)).toEqual(["C"]);
+    expect(stripChords(line)).toBe("1 [5 6] [[1 2 3 4]]");
+    expect(transposeContent("[C].7 [5 6] [[1 2]]", 2)).toBe("[D].7 [5 6] [[1 2]]");
+    expect(overUnderToChordPro(chordProToOverUnder(line))).toBe(line);
+  });
+
   it("leaves non-chord bracket tokens untouched", () => {
     const pro = "[?] halo [G]tuhan";
     expect(overUnderToChordPro(chordProToOverUnder(pro))).toBe(pro);

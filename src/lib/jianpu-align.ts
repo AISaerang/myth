@@ -1,40 +1,28 @@
 // Sejajarkan kunci di atas baris not angka.
 //
-// Di editor, tanda oktaf (' / ,) dan garis ketukan (/) memakan kolom monospace.
-// Render CSS melipat tanda itu ke dalam glyph angka (titik di atas/bawah,
-// garis bawah) plus kurung slur/beam tidak memakai kolom, jadi pemetaan di
-// sini mengikuti kolom editor lalu melipat simbol yang tidak lagi punya
-// lebar sendiri, supaya kunci tetap di atas simbol yang sama.
-//
-// Input yang kelihatan not angka dinormalkan dulu (NBSP/titik unicode/apostrof
-// cerdas → ASCII); baris lirik biasa tidak disentuh.
+// Di editor, tanda oktaf (' / , / titik di depan), garis ketukan (/),
+// kurung beam, dan kurung legato memakan kolom monospace. Saat tampil
+// tanda itu dilipat ke dalam angka (titik, garis, busur) supaya kunci
+// tetap di kolom yang sama dengan nadanya.
 
 import { layoutChordLine, semitonesBetween } from "@/lib/chords";
 import {
   looksLikeNotationLine,
   normalizeNotationChars,
-  parseJianpu,
+  tokenizeJianpuLine,
   type JianpuNote,
 } from "@/lib/jianpu";
 
-export type NotationTokenKind = "note" | "bar" | "group";
-
 export interface NotationToken {
-  kind: NotationTokenKind;
+  kind: "note" | "bar";
   raw: string;
   sourceCol: number;
   renderCol: number;
   renderWidth: number;
   note: JianpuNote | null;
-}
-
-/** Kurva/garis yang membentang di atas beberapa nada (slur/beam). */
-export interface NotationGroup {
-  kind: "slur" | "beam";
-  /** Kolom render nada pertama dalam grup. */
-  from: number;
-  /** Kolom render terakhir yang tercakup (inclusive). */
-  to: number;
+  beam: number;
+  beamGroup: number | null;
+  slurGroup: number | null;
 }
 
 export interface PlacedChord {
@@ -46,7 +34,6 @@ export interface PlacedChord {
 export interface NotationAlignment {
   tokens: NotationToken[];
   chords: PlacedChord[];
-  groups: NotationGroup[];
   /** Jumlah kolom tampilan, setelah tanda oktaf/ketukan dilipat. */
   columns: number;
 }
@@ -67,11 +54,21 @@ export function formatTransposeFormula(fromKey: string, toKey: string): string {
   }
 }
 
-interface GroupFrame {
-  kind: "slur" | "beam";
-  startRender: number;
-  from: number | null;
-  to: number | null;
+export function notationLineError(line: string): string | null {
+  const text = normalizeNotationChars(line.trim());
+  const notationChars = "0123456789#b'.,/-()[]| \t";
+  if (!/\d/.test(text) || [...text].some((char) => !notationChars.includes(char))) {
+    return null;
+  }
+
+  const parsed = tokenizeJianpuLine(text);
+  if (!parsed.valid) {
+    return (parsed.error ?? "Baris notasi tidak valid.").replace(
+      "Kelompok tidak tertutup",
+      "Kelompok belum ditutup",
+    );
+  }
+  return looksLikeNotationLine(text) ? null : "Baris ini tidak kenal pola not angka (0–7).";
 }
 
 function measureToken(
@@ -86,53 +83,27 @@ function measureToken(
   return { collapse, width: 1 + extra };
 }
 
-// Pesan kenapa baris notasi ini tidak bisa dirender, atau null bila barisnya
-// tidak kelihatan not angka (lirik biasa) atau memang valid.
-export function notationLineError(line: string): string | null {
-  if (!/\d/.test(line)) return null;
-  const text = normalizeNotationChars(line.trim());
-  // 1) Error parse per token nada (digit ditemukan tapi gagal diurai). Token
-  //    huruf (lirik seperti "hai") membuat baris diperlakukan sebagai lirik.
-  const tokenRe = /\S+/g;
-  let match: RegExpExecArray | null;
-  let sawDigitToken = false;
-  while ((match = tokenRe.exec(text)) !== null) {
-    const raw = match[0] as string;
-    const inner = raw.replace(/\(|\)|\[\[|\]\]/g, "");
-    if (!inner) continue;
-    if (!/\d/.test(inner)) {
-      if (/^[|.()[\]'',\/#b-]+$/.test(inner)) continue;
-      return null; // ada kata lirik → lirik biasa, bukan notasi gagal.
+function consumeGap(
+  lyricLine: string,
+  sourceToRender: number[],
+  from: number,
+  until: number,
+  renderCol: number,
+): number {
+  const pending: number[] = [];
+  let col = renderCol;
+  for (let i = from; i < until; i += 1) {
+    const ch = lyricLine[i] as string;
+    if (ch === " " || ch === "\t") {
+      sourceToRender[i] = col;
+      col += 1;
+      continue;
     }
-    sawDigitToken = true;
-    const parsed = parseJianpu(inner);
-    if (!parsed.valid) return parsed.error ?? "Baris notasi tidak valid.";
+    // Kurung beam/legato tidak punya lebar. Mereka menempel ke nada berikutnya.
+    pending.push(i);
   }
-  if (!sawDigitToken) return null;
-  // 2) Keseimbangan kurung slur/beam.
-  const openGroups: string[] = [];
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    if (ch === "(") openGroups.push("slur");
-    else if (ch === ")") {
-      if (openGroups.pop() !== "slur") {
-        return "Kurung slur tidak seimbang: ')' tanpa '(' lebih dulu.";
-      }
-    } else if (ch === "[" && text[i + 1] === "[") {
-      openGroups.push("beam");
-      i += 1;
-    } else if (ch === "]" && text[i + 1] === "]") {
-      if (openGroups.pop() !== "beam") {
-        return "Kurung beam tidak seimbang: ']]' tanpa '[[ lebih dulu.";
-      }
-      i += 1;
-    }
-  }
-  if (openGroups.length > 0) {
-    return `Kurung ${openGroups.join(", ")} belum ditutup.`;
-  }
-  if (looksLikeNotationLine(line)) return null;
-  return "Baris ini tidak kenal pola not angka (0–7).";
+  for (const index of pending) sourceToRender[index] = col;
+  return col;
 }
 
 // null = baris ini lirik biasa (atau kosong), bukan not angka.
@@ -141,134 +112,67 @@ export function alignChordsToNotation(
   lyricLine: string,
 ): NotationAlignment | null {
   if (!lyricLine.trim()) return null;
+
   const text = looksLikeNotationLine(lyricLine)
     ? normalizeNotationChars(lyricLine)
     : lyricLine;
+  const tokenized = tokenizeJianpuLine(text);
+  if (!tokenized.valid || !tokenized.spans.some((span) => span.kind === "note")) {
+    return null;
+  }
 
   const tokens: NotationToken[] = [];
-  const groups: NotationGroup[] = [];
-  const sourceToRender: number[] = [];
+  const sourceToRender: number[] = Array(text.length).fill(0);
   let renderCol = 0;
-  let sawNote = false;
-  const openGroups: GroupFrame[] = [];
-  let lastNote: { col: number; width: number } | null = null;
+  let cursor = 0;
 
-  // Selesaikan frame grup: butuh minimal satu nada. dipakai saat menutup "("
-  // atau "[["; frame sendiri sudah dikeluarkan dari openGroups.
-  const finishGroup = (frame: GroupFrame): boolean => {
-    if (frame.from === null || frame.to === null) return false;
-    groups.push({ kind: frame.kind, from: frame.from, to: frame.to });
-    return true;
-  };
+  for (const span of tokenized.spans) {
+    renderCol = consumeGap(text, sourceToRender, cursor, span.sourceCol, renderCol);
+    cursor = span.sourceCol;
 
-  for (let i = 0; i < text.length; ) {
-    const ch = text[i] as string;
-
-    if (ch === " " || ch === "\t") {
-      sourceToRender.push(renderCol);
-      renderCol += 1;
-      i += 1;
-      continue;
-    }
-    if (ch === "(" || ch === ")" || (ch === "[" && text[i + 1] === "[") ||
-      (ch === "]" && text[i + 1] === "]")) {
-      if (ch === "(") {
-        openGroups.push({ kind: "slur", startRender: renderCol, from: null, to: null });
-        sourceToRender.push(renderCol);
-        i += 1;
-        continue;
-      }
-      if (ch === ")") {
-        const frame = openGroups.pop();
-        if (!frame || frame.kind !== "slur" || !finishGroup(frame)) return null;
-        sourceToRender.push(lastNote ? lastNote.col : renderCol);
-        i += 1;
-        continue;
-      }
-      if (ch === "[") {
-        openGroups.push({ kind: "beam", startRender: renderCol, from: null, to: null });
-        sourceToRender.push(renderCol);
-        sourceToRender.push(renderCol);
-        i += 2;
-        continue;
-      }
-      const frame = openGroups.pop();
-      if (!frame || frame.kind !== "beam" || !finishGroup(frame)) return null;
-      sourceToRender.push(lastNote ? lastNote.col : renderCol);
-      sourceToRender.push(lastNote ? lastNote.col : renderCol);
-      i += 2;
-      continue;
-    }
-    if (ch === "|") {
+    if (span.kind === "bar") {
       tokens.push({
         kind: "bar",
         raw: "|",
-        sourceCol: i,
+        sourceCol: span.sourceCol,
         renderCol,
         renderWidth: 1,
         note: null,
+        beam: 0,
+        beamGroup: null,
+        slurGroup: null,
       });
-      sourceToRender.push(renderCol);
+      sourceToRender[span.sourceCol] = renderCol;
       renderCol += 1;
-      i += 1;
+      cursor = span.sourceCol + 1;
       continue;
     }
 
-    let end = i + 1;
-    while (
-      end < text.length &&
-      text[end] !== " " &&
-      text[end] !== "\t" &&
-      text[end] !== "|" &&
-      text[end] !== "(" &&
-      text[end] !== ")" &&
-      // Beam [[ ]] boleh menempel di belakang nada: "[[5 6]]" → "6" + "]]".
-      !(text[end] === "]" && text[end + 1] === "]")
-    ) {
-      end += 1;
-    }
-    const raw = text.slice(i, end);
-    const parsed = parseJianpu(raw);
-    const lineNotes = parsed.lines[0]?.notes;
-    if (
-      !parsed.valid ||
-      parsed.lines.length !== 1 ||
-      !lineNotes ||
-      lineNotes.length !== 1
-    ) {
-      return null;
-    }
-    const note = lineNotes[0] as JianpuNote;
-    const measured = measureToken(raw, note);
+    const note = span.note;
+    if (!note) return null;
+    const measured = measureToken(span.raw, note);
     if (!measured) return null;
 
-    sawNote = true;
     tokens.push({
       kind: "note",
-      raw,
-      sourceCol: i,
+      raw: span.raw,
+      sourceCol: span.sourceCol,
       renderCol,
       renderWidth: measured.width,
       note,
+      beam: span.beam,
+      beamGroup: span.beamGroup,
+      slurGroup: span.slurGroup,
     });
-    for (const frame of openGroups) {
-      if (frame.from === null) frame.from = renderCol;
-      frame.to = renderCol + measured.width - 1;
-    }
-    lastNote = { col: renderCol, width: measured.width };
-    for (let k = 0; k < raw.length; k += 1) {
+    for (let k = 0; k < span.raw.length; k += 1) {
       const col =
-        k < measured.collapse
-          ? renderCol
-          : renderCol + 1 + (k - measured.collapse);
-      sourceToRender.push(col);
+        k < measured.collapse ? renderCol : renderCol + 1 + (k - measured.collapse);
+      sourceToRender[span.sourceCol + k] = col;
     }
     renderCol += measured.width;
-    i = end;
+    cursor = span.sourceCol + span.raw.length;
   }
-
-  if (!sawNote) return null;
-  if (openGroups.length > 0) return null;
+  consumeGap(text, sourceToRender, cursor, text.length, renderCol);
 
   const endRender = renderCol;
   const chords: PlacedChord[] = [];
@@ -288,7 +192,23 @@ export function alignChordsToNotation(
     columns = Math.max(columns, chord.renderCol + Math.max(chord.token.length, 1));
   }
 
-  return { tokens, chords, groups, columns };
+  return { tokens, chords, columns };
+}
+
+/** True bila isi bagian hanya not angka (plus kunci, komentar, atau baris kosong). */
+export function contentIsNotationSection(content: string): boolean {
+  let notes = false;
+  let lyrics = false;
+  for (const line of content.split("\n")) {
+    if (!line.trim() || /^\s*#/.test(line) || /^\s*\{[^}]+\}\s*$/.test(line)) continue;
+    const layout = layoutChordLine(line);
+    if (layout.label) continue;
+    const lyric = layout.lyricLine.trim();
+    if (!lyric) continue;
+    if (alignChordsToNotation(layout.chordLine, layout.lyricLine)) notes = true;
+    else lyrics = true;
+  }
+  return notes && !lyrics;
 }
 
 export function contentHasNotation(chordPro: string): boolean {

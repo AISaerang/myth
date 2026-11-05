@@ -25,14 +25,14 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Satu kolom = 1ch font monospace staff. Semua glyph not angka (angka, titik
-   oktaf, kres/mol, garis ketukan, slur, beam, birama) dibentuk CSS. */
+/* Satu kolom = 1ch font staff (angka sama dengan baris lirik: text-sm / 1.5rem).
+   Baris nada lebih tinggi supaya titik oktaf, beam, dan garis ketukan muat
+   tanpa font khusus dan tanpa memotong di layar sempit. */
 .notation-staff {
   position: relative;
   display: inline-block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 1.75rem;
-  line-height: 1;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
   letter-spacing: 0;
   font-kerning: none;
   font-variant-ligatures: none;
@@ -41,49 +41,94 @@ body {
 
 .notation-staff .notation-chords {
   position: relative;
-  height: 1.35em;
+  height: 1.5rem;
 }
 
 .notation-staff .notation-notes {
   position: relative;
-  height: 2.4em;
+  height: 3.4rem;
 }
 
-.jianpu-dot {
-  display: block;
-  width: 0.12em;
-  height: 0.12em;
-  border-radius: 999px;
-  background: currentColor;
+.notation-staff .notation-chords > span {
+  top: calc((1.5rem - 1em) / 2);
+  line-height: 1;
 }
 
-/* Kurva slur menjulur di bawah angka-angka dalam grup ( ) . */
+.notation-staff .notation-cell {
+  top: 1.45rem;
+  line-height: 1;
+}
+
+.notation-beam {
+  position: absolute;
+  top: 0.62rem;
+  height: 0;
+  border-top: 2px solid currentColor;
+  pointer-events: none;
+}
+
+.notation-beam[data-beam="2"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 0;
+  left: 0;
+  border-top: 2px solid currentColor;
+}
+
 .notation-slur {
   position: absolute;
   top: auto;
-  bottom: 0.15em;
-  height: 0.34em;
-  border-bottom: 0.06em solid currentColor;
-  border-right: 0.03em solid transparent;
-  border-left: 0.03em solid transparent;
+  bottom: 0.55rem;
+  height: 0.34rem;
+  border-bottom: 2px solid currentColor;
+  border-right: 1px solid transparent;
+  border-left: 1px solid transparent;
   border-radius: 0 0 100% 100% / 0 0 100% 100%;
   pointer-events: none;
 }
 
-/* Garis beam di atas angka-angka dalam grup [[ ]] . */
-.notation-beam {
-  position: absolute;
-  top: 0.08em;
-  height: 0.1em;
-  border-top: 0.07em solid currentColor;
-  pointer-events: none;
+.jianpu-dot {
+  display: block;
+  width: 0.36em;
+  height: 0.36em;
+  min-width: 4px;
+  min-height: 4px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
-.notation-beam[data-lines="2"]::after {
-  content: "";
+/* Pita warna tegak lurus arah gradien. "to bottom right" menembus angka sebagai / (naik ke kanan). */
+.jianpu-accidental {
   position: absolute;
-  left: 0;
+  inset: -8% -5%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom right,
+    transparent 36%,
+    currentColor 43%,
+    currentColor 57%,
+    transparent 64%
+  );
+}
+
+.jianpu-accidental[data-accidental="flat"] {
+  background: linear-gradient(
+    to bottom left,
+    transparent 36%,
+    currentColor 43%,
+    currentColor 57%,
+    transparent 64%
+  );
+}
+
+.jianpu-underlines {
+  position: absolute;
+  top: calc(100% + 0.62rem);
   right: 0;
-  top: 0.16em;
-  border-top: 0.07em solid currentColor;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
