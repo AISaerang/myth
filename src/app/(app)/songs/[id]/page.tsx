@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArchiveSongButton, RestoreSongButton } from "@/components/SongArchiveButtons";
+import { BatchOrderBadge } from "@/components/BatchOrderBadge";
 import { Badge } from "@/components/ui/Badge";
+import { badgesForSong } from "@/lib/batch-badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
 import { canReadEventSong, isAdmin, isObserver } from "@/lib/permissions";
+import { listEventBatchCatalog } from "@server/services/batch-service";
 import { getSong } from "@server/services/song-service";
 import { getCurrentEvent } from "@server/services/event-service";
 import { getEventRole } from "@server/services/event-access";
@@ -75,8 +78,12 @@ export default async function SongDetailPage({
     legacySong?.eventId ??
     (await getCurrentEvent(user))?.id;
   if (!eventId) notFound();
-  const song = await getSong(id, eventId);
+  const [song, catalog] = await Promise.all([
+    getSong(id, eventId),
+    listEventBatchCatalog(eventId),
+  ]);
   if (!song) notFound();
+  const batchBadges = badgesForSong(song.id, catalog);
   const eventRole = await getEventRole(user, song.eventId);
   const admin = isAdmin(user);
   const observer = isObserver(user);
@@ -108,6 +115,14 @@ export default async function SongDetailPage({
           {song.title}
         </h1>
         <SongStatusBadge status={song.status} />
+        {batchBadges.map((badge) => (
+          <Link
+            key={badge.anchorId}
+            href={`/songs?eventId=${song.eventId}#${badge.anchorId}`}
+          >
+            <BatchOrderBadge badge={badge.badge} batchName={badge.batchName} />
+          </Link>
+        ))}
         {song.isPublished ? (
           <Badge tone="success">Publikasi</Badge>
         ) : (

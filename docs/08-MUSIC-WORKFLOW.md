@@ -43,6 +43,9 @@ Title, liturgical function, original reference, key, BPM, groove/feel, structure
 ## Batch plan
 Start with around two songs per batch; adjust by difficulty and schedule. Each batch has release date, target review, source reference, initial musical notes, and assigned musicians.
 
+## Badge batch (POV pemusik)
+On Lagu Saya and the song detail header, the number chip is the batch badge: the 1-based rank of `SongBatchItem.sortOrder` inside the active event's `SongBatch`. It matches the admin batch list (including unpublished items, so a hidden draft still occupies its number). It is not `EventSong.sortOrder` and not `SongStatusBadge`. The member and observer lists are grouped by batch (creation order, archived batches last) and then by that rank. A song in two batches appears in both, with each batch's own badge. Songs published but not in any batch stay at the end, under "Belum masuk batch". The list anchor is `#badge-{batchId}-{n}` on `/songs?eventId=…`.
+
 ## Assign sebatch
 Assignments stay per song (unique song+person pair with instrument part). The batch detail page offers a shortcut: pick several personnel (each with own part) plus checked songs, one submit. Existing pairs are skipped (reported per person), personnel must be active, and every created assignment is audited exactly like the manual flow. Fine corrections remain per song.
 

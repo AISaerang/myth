@@ -79,6 +79,9 @@ export async function listSongs(eventId: string) {
 }
 
 // Member event melihat semua lagu yang sudah dipublikasi di setlist itu.
+// Urutan badge (1…N) bukan orderBy di sini: itu peringkat
+// SongBatchItem.sortOrder per batch (lihat listEventBatchCatalog).
+// sortOrder EventSong hanya urutan setlist admin.
 export async function listPublishedSongsForMember(eventId: string) {
   const eventSongs = await prisma.eventSong.findMany({
     where: {

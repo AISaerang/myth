@@ -1,9 +1,43 @@
 import "server-only";
 import type { BatchStatus } from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
+import type { BatchCatalog } from "@/lib/batch-badge";
 import { canTransitionBatch } from "@/lib/batch-status";
 import { prisma } from "@/lib/db";
 import type { BatchInput } from "@/lib/validation/song";
+
+// Katalog badge untuk POV pemusik. Peringkat dihitung dari seluruh
+// SongBatchItem.sortOrder di batch (termasuk lagu yang belum publish),
+// supaya nomor 1…N sama dengan daftar admin — bukan EventSong.sortOrder.
+export async function listEventBatchCatalog(
+  eventId: string,
+): Promise<BatchCatalog[]> {
+  const batches = await prisma.songBatch.findMany({
+    where: { eventId },
+    include: {
+      items: {
+        select: {
+          songId: true,
+          sortOrder: true,
+          eventSong: { select: { isPublished: true } },
+        },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  return batches.map((batch) => ({
+    id: batch.id,
+    name: batch.name,
+    status: batch.status,
+    createdAt: batch.createdAt,
+    items: batch.items.map((item) => ({
+      songId: item.songId,
+      sortOrder: item.sortOrder,
+      isPublished: item.eventSong?.isPublished ?? false,
+    })),
+  }));
+}
 
 export async function listBatches(eventId: string) {
   const batches = await prisma.songBatch.findMany({
