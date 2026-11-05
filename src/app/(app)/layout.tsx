@@ -6,13 +6,15 @@ import { cookies } from "next/headers";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EventSwitcher } from "@/components/ui/EventSwitcher";
+import { UiModeToggle } from "@/components/ui/UiModeToggle";
 import { EventTypeBadge } from "@/components/ui/EventTypeBadge";
 import { ACTIVE_EVENT_COOKIE } from "@/lib/event-context";
-import { isAdmin, isObserver, roleLabel, type SessionUser } from "@/lib/permissions";
+import { canManageEvent, isAdmin, isObserver, roleLabel, type SessionUser } from "@/lib/permissions";
+import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
 import { requireFreshUser } from "@/lib/auth";
 import type { Event } from "@/generated/prisma/client";
 import { logoutAction } from "@server/actions/auth";
-import { listAccessibleEvents } from "@server/services/event-access";
+import { getEventRole, listAccessibleEvents } from "@server/services/event-access";
 
 async function getUserAccessibleEvents(user: SessionUser): Promise<Event[]> {
   "use cache: private";
@@ -29,10 +31,17 @@ export default async function AppLayout({
   const observer = isObserver(user);
   const events = await getUserAccessibleEvents(user);
   const hasEventAccess = admin || events.length > 0;
-  const selectedEventId = (await cookies()).get(ACTIVE_EVENT_COOKIE)?.value;
+  const cookieStore = await cookies();
+  const selectedEventId = cookieStore.get(ACTIVE_EVENT_COOKIE)?.value;
   const currentEvent =
     events.find((event) => event.id === selectedEventId) ??
     events.find((event) => event.eventStatus !== "CANCELLED");
+  const eventRole = currentEvent ? await getEventRole(user, currentEvent.id) : null;
+  const canToggleView = Boolean(currentEvent) && (admin || canManageEvent(eventRole));
+  const uiMode = currentEvent
+    ? uiModeForEvent(cookieStore.get(UI_MODE_COOKIE)?.value, currentEvent.id)
+    : "edit";
+  const preview = canToggleView && uiMode === "preview";
 
   return (
     <div className="flex flex-col gap-4">
@@ -65,10 +74,10 @@ export default async function AppLayout({
               href="/songs"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
-              {admin ? "Lagu" : observer ? "Lagu" : "Lagu Saya"}
+              {preview ? "Lagu Saya" : admin ? "Lagu" : observer ? "Lagu" : "Lagu Saya"}
             </Link>
           ) : null}
-          {hasEventAccess && (admin || observer) ? (
+          {hasEventAccess && (admin || observer) && !preview ? (
             <Link
               href="/batches"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -81,7 +90,7 @@ export default async function AppLayout({
               href="/tasks"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
-              {admin ? "Tasks" : observer ? "Tasks & Usulan" : "Task Saya"}
+              {preview ? "Task Saya" : admin ? "Tasks" : observer ? "Tasks & Usulan" : "Task Saya"}
             </Link>
           ) : null}
           {hasEventAccess ? (
@@ -100,7 +109,7 @@ export default async function AppLayout({
               Equipment
             </Link>
           ) : null}
-          {hasEventAccess && admin ? (
+          {hasEventAccess && admin && !preview ? (
             <Link
               href="/decisions"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -108,7 +117,7 @@ export default async function AppLayout({
               Keputusan
             </Link>
           ) : null}
-          {admin ? (
+          {admin && !preview ? (
             <Link
               href="/people"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -116,7 +125,7 @@ export default async function AppLayout({
               Personel &amp; Akses
             </Link>
           ) : null}
-          {admin ? (
+          {admin && !preview ? (
             <Link
               href="/broadcast"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -135,6 +144,10 @@ export default async function AppLayout({
               />
             </>
           ) : null}
+          {currentEvent && canToggleView ? (
+            <UiModeToggle eventId={currentEvent.id} mode={uiMode} />
+          ) : null}
+          {preview ? <Badge tone="warning">Pratinjau</Badge> : null}
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
             {user.displayName}
           </span>

@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { BatchOrderBadge } from "@/components/BatchOrderBadge";
 import { BatchSongGroups } from "./BatchSongGroups";
@@ -8,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EventTypeBadge } from "@/components/ui/EventTypeBadge";
 import { badgesForSong, groupSongsByBatchBadge } from "@/lib/batch-badge";
+import { UI_MODE_COOKIE, showMusicianSongView, uiModeForEvent } from "@/lib/ui-mode";
 import { requireFreshUser } from "@/lib/auth";
 import {
   canManageEvent,
@@ -98,7 +100,12 @@ async function SongsContent({
     Boolean(current?.accessClosedAt),
     isAdmin(user),
   );
-  if (!manager) {
+  const uiMode = uiModeForEvent(
+    (await cookies()).get(UI_MODE_COOKIE)?.value,
+    eventId,
+  );
+  const musicianView = showMusicianSongView(manager, uiMode);
+  if (musicianView) {
     const [songs, catalog] = await Promise.all([
       listPublishedSongsForMember(eventId),
       listEventBatchCatalog(eventId),
@@ -111,7 +118,9 @@ async function SongsContent({
           <EventTypeBadge type={current.eventType} />
         </div>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Nomor di kiri adalah badge batch (urutan lagu di dalam batch), bukan status latihan.
+          {manager
+            ? "Mode Preview: daftar publish dan badge batch seperti pemusik. Sesi dan hak akses tidak berubah."
+            : "Nomor di kiri adalah badge batch (urutan lagu di dalam batch), bukan status latihan."}
         </p>
         {songs.length === 0 ? (
           <EmptyState
