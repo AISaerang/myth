@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eventSongDisplayKey } from "@/lib/event-song";
+import { uiModeForEvent } from "@/lib/ui-mode";
 import {
   canManageAccounts,
   canManageEvent,
@@ -179,6 +180,17 @@ describe("permissions", () => {
     expect(canViewAllProgress(admin)).toBe(true);
     expect(canViewAllProgress(observer)).toBe(true);
     expect(canViewAllProgress(user)).toBe(false);
+  });
+
+  it("keeps Edit|Preview from changing canWriteEventData", () => {
+    expect(uiModeForEvent("event-a", "event-a")).toBe("preview");
+    expect(uiModeForEvent(undefined, "event-a")).toBe("edit");
+    const openEventAdmin = canWriteEventData("EVENT_ADMIN", false, false);
+    const closedEventAdmin = canWriteEventData("EVENT_ADMIN", true, false);
+    const member = canWriteEventData("MEMBER", false, false);
+    expect(openEventAdmin).toBe(true);
+    expect(closedEventAdmin).toBe(false);
+    expect(member).toBe(false);
   });
 
   it("lets USER and OBSERVER suggest, ADMIN uses the full task flow", () => {

@@ -252,11 +252,13 @@ async function getActiveEventFor(user, requestedId?) {
 ### 6.1 Two levels
 | Level | Who | Power |
 |---|---|---|
-| Global `ADMIN` (super admin) | Owner / MD (`aisaerang`) | All events; **only role that creates/resets/deactivates accounts** (Q4); create events; assign event admins; manage Pustaka Lagu. |
-| `EVENT_ADMIN` | e.g. admin GEHC | Full music/ops CRUD **in that event only**; add/remove/change role of **existing** accounts in that event (Q4). No account create/reset. Owner is currently EVENT_ADMIN of the GEHC event (Q1). |
+| Global `ADMIN` (super admin) | `User.role = ADMIN` (operational account `alvandi`, not a username check) | All events; **only role that creates/resets/deactivates accounts** (Q4); create events; assign event admins; manage Pustaka Lagu. |
+| `EVENT_ADMIN` | Membership on that event (operational account `aisaerang` is global `USER` + `EVENT_ADMIN` only where assigned) | Full music/ops CRUD **in that event only**; add/remove/change role of **existing** accounts in that event (Q4). No account create/reset. |
 | `MEMBER` | Pemusik | Same as current USER, scoped to the event. |
 | `OBSERVER` | Pantau | Same as current OBSERVER, scoped to the event. |
 | No membership | — | Event is invisible (404). With zero memberships: empty state only (Q7). |
+
+Correction 6 Nov 2026: Q1 named `aisaerang` as global ADMIN. That account identity is superseded. `alvandi` is the global ADMIN; `aisaerang` stays `USER` and receives `EVENT_ADMIN` only through event membership. Do not hardcode either username into a privilege check. Preview mode (docs/06) does not change this matrix.
 
 ### 6.2 Access matrix (per event)
 | Area | Global ADMIN | EVENT_ADMIN | MEMBER | OBSERVER | Not assigned |
