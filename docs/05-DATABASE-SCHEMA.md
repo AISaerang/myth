@@ -25,7 +25,7 @@ Song status: `DRAFT|SOURCE_SHARED|ARRANGEMENT_IN_PROGRESS|REFERENCE_READY|PRACTI
 
 ### SongBatch / SongBatchItem
 SongBatch: `id`, `eventId`, `name`, `description?`, `releaseAt?`, `targetReviewAt?`, `status` (`DRAFT|PUBLISHED|REVIEWING|COMPLETED|ARCHIVED`), `createdById`, timestamps.  
-SongBatchItem: `songBatchId`, `songId`, `sortOrder`; unique pair. Enforce one active batch per song if product rule requires it.
+SongBatchItem: `songBatchId`, `songId`, `sortOrder`; unique pair. The musician-facing batch badge is the 1-based rank of `SongBatchItem.sortOrder` inside that batch (1…N, same order as the admin batch list). It is not `EventSong.sortOrder` (setlist order) and not the song status badge. Anchor on the published list: `#badge-{batchId}-{n}`. Enforce one active batch per song if product rule requires it.
 
 ### SongAssignment
 `id`, `songId`, `personId`, `instrumentSkillId?`, `assignmentNote?`, `isPrimary`, timestamps. Define uniqueness according to assignment semantics.
