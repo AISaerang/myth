@@ -6,6 +6,10 @@ import type {
 } from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import {
+  planBulkAssignments,
+  type BulkAssignSong,
+} from "@/lib/bulk-assign";
 import { eventSongDisplayKey } from "@/lib/event-song";
 import type {
   ArrangementVersionInput,
@@ -515,6 +519,168 @@ export async function assignBatchMembers(
     });
   }
   return { ok: true, results };
+}
+
+export interface EventAssignablePerson {
+  id: string;
+  displayName: string;
+  skills: { id: string; name: string }[];
+}
+
+// Pemusik/penyanyi = Person aktif yang akunnya anggota event
+// (MEMBER atau EVENT_ADMIN). Pantau tidak ikut.
+export async function listEventAssignablePeople(
+  eventId: string,
+): Promise<EventAssignablePerson[]> {
+  const rows = await prisma.eventMembership.findMany({
+    where: {
+      eventId,
+      role: { in: ["MEMBER", "EVENT_ADMIN"] },
+      user: { isActive: true, person: { isActive: true } },
+    },
+    select: {
+      user: {
+        select: {
+          person: {
+            select: {
+              id: true,
+              displayName: true,
+              skills: {
+                select: {
+                  instrumentSkill: { select: { id: true, name: true } },
+                },
+                orderBy: { instrumentSkill: { name: "asc" } },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  return rows
+    .flatMap((row) => (row.user.person ? [row.user.person] : []))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, "id"))
+    .map((person) => ({
+      id: person.id,
+      displayName: person.displayName,
+      skills: person.skills.map((skill) => ({
+        id: skill.instrumentSkill.id,
+        name: skill.instrumentSkill.name,
+      })),
+    }));
+}
+
+export interface BulkAssignCounts {
+  created: number;
+  skipped: number;
+  errors: string[];
+}
+
+// Assign massal: beberapa anggota event × lagu event, satu batch, atau
+// lagu terpilih. Pasangan songId+personId yang sudah ada dilewati.
+export async function bulkAssignEventSongs(
+  actorUserId: string,
+  eventId: string,
+  personIds: string[],
+  target: "EVENT" | "BATCH" | "SONGS",
+  batchId: string | undefined,
+  songIds: string[] | undefined,
+): Promise<{ ok: true } & BulkAssignCounts | { ok: false; error: string }> {
+  const eventSongs = await prisma.eventSong.findMany({
+    where: { eventId, song: { archivedAt: null } },
+    select: { id: true, songId: true, song: { select: { title: true } } },
+  });
+  const bySongId = new Map(eventSongs.map((row) => [row.songId, row]));
+  let targetIds: string[] = [];
+  const missingErrors: string[] = [];
+  if (target === "EVENT") {
+    targetIds = eventSongs.map((row) => row.songId);
+  } else if (target === "BATCH") {
+    if (!batchId) return { ok: false, error: "Pilih batch." };
+    const batch = await prisma.songBatch.findUnique({
+      where: { id: batchId },
+      include: { items: { select: { songId: true } } },
+    });
+    if (!batch || batch.eventId !== eventId) {
+      return { ok: false, error: "Batch tidak ada di event ini." };
+    }
+    targetIds = batch.items.map((item) => item.songId).filter((id) => bySongId.has(id));
+  } else {
+    const requested = songIds ?? [];
+    targetIds = requested.filter((id) => bySongId.has(id));
+    if (requested.some((id) => !bySongId.has(id))) {
+      missingErrors.push("Sebagian lagu tidak ada di event ini dan dilewati.");
+    }
+  }
+  if (targetIds.length === 0) {
+    return { ok: false, error: "Tidak ada lagu target di event ini." };
+  }
+  const songs: BulkAssignSong[] = targetIds.map((songId) => {
+    const row = bySongId.get(songId)!;
+    return { songId, eventSongId: row.id, title: row.song.title };
+  });
+  const members = await listEventAssignablePeople(eventId);
+  const memberById = new Map(members.map((person) => [person.id, person]));
+  const people = personIds.map((personId) => {
+    const member = memberById.get(personId);
+    if (!member) {
+      return {
+        personId,
+        displayName: "Personel",
+        activeMember: false,
+        instrumentSkillId: null,
+      };
+    }
+    return {
+      personId,
+      displayName: member.displayName,
+      activeMember: true,
+      instrumentSkillId: member.skills[0]?.id ?? null,
+    };
+  });
+  const existing = await prisma.songAssignment.findMany({
+    where: {
+      songId: { in: targetIds },
+      personId: { in: personIds },
+    },
+    select: { songId: true, personId: true, eventSongId: true },
+  });
+  const plan = planBulkAssignments(people, songs, existing);
+  if (plan.toCreate.length > 0) {
+    try {
+      await prisma.songAssignment.createMany({
+        data: plan.toCreate.map((row) => ({
+          songId: row.songId,
+          eventSongId: row.eventSongId,
+          personId: row.personId,
+          instrumentSkillId: row.instrumentSkillId,
+          isPrimary: true,
+        })),
+      });
+    } catch (error) {
+      console.error("bulk-assign-failed", error);
+      return {
+        ok: false,
+        error: "Penugasan bentrok dengan data yang sudah ada. Muat ulang lalu coba lagi.",
+      };
+    }
+  }
+  for (const row of plan.toCreate) {
+    await writeAudit({
+      actorUserId,
+      action: AuditAction.ASSIGNMENT_CREATED,
+      entityType: "Song",
+      entityId: row.songId,
+      summary: `${row.displayName} ditugaskan ke "${row.title}" (sekaligus).`,
+      metadata: { song: row.title, person: row.displayName, via: "bulk" },
+    });
+  }
+  return {
+    ok: true,
+    created: plan.created,
+    skipped: plan.skipped,
+    errors: [...missingErrors, ...plan.errors],
+  };
 }
 
 export async function unassignPerson(
