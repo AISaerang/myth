@@ -8,6 +8,8 @@ import {
   formatNote,
   formatLine,
   keyToFormula,
+  looksLikeNotationLine,
+  normalizeNotationInput,
   toJianpuFontText,
 } from "@/lib/jianpu";
 
@@ -123,6 +125,27 @@ describe("JianpuASCII parser", () => {
     expect(notes[4].solfege).toBe(3);
   });
 
+  it("normalizes pasted unicode in notation lines without changing lyrics", () => {
+    const nbsp = "\u00a0";
+    const thin = "\u2009";
+    const input = [
+      "C   G",
+      `3 (2 3 2) 1${nbsp}2 (1 2 1)${nbsp}${nbsp}.5${nbsp}.6`,
+      `[Am]Bapa${nbsp}sentuh${thin}hatiku`,
+      "   ",
+    ].join("\n");
+    const normalized = normalizeNotationInput(input).split("\n");
+    expect(normalized[0]).toBe("C   G");
+    expect(normalized[1]).toBe("3 (2 3 2) 1 2 (1 2 1)  .5 .6");
+    expect(normalized[2]).toBe(`[Am]Bapa${nbsp}sentuh${thin}hatiku`);
+  });
+
+  it("normalizes smart apostrophes and fullwidth notation marks", () => {
+    expect(normalizeNotationInput("1\u2019 5\uff0c 5\u00b7")).toBe("1' 5, 5.");
+    expect(looksLikeNotationLine("(3 1 .5)")).toBe(true);
+    expect(looksLikeNotationLine("1 2 hai")).toBe(false);
+  });
+
   it("draws octave dots with CSS for comma and leading-dot forms", () => {
     const markup = renderToStaticMarkup(
       createElement(NotAngka, { value: "6, .7 ..1 1' 2''" }),
@@ -148,7 +171,7 @@ describe("JianpuASCII parser", () => {
     expect(markup).not.toContain(">#4<");
   });
 
-  it("draws one beam, two beams, and a slur above groups", () => {
+  it("draws one beam, two beams, and a slur below groups", () => {
     const markup = renderToStaticMarkup(
       createElement(NotAngka, { value: "[5 6] [[1 2 3 4]] (5 6)" }),
     );

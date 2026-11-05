@@ -5,6 +5,8 @@
 // transpose hanya terjadi saat tampil (latihan) atau saat normalisasi
 // input dari nada asal.
 
+import { looksLikeNotationLine } from "@/lib/jianpu";
+
 const SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 
@@ -32,6 +34,16 @@ export function noteIndex(note: string): number {
 function indexToNote(idx: number, useFlats: boolean): string {
   const names = useFlats ? FLAT : SHARP;
   return names[((idx % 12) + 12) % 12] as string;
+}
+
+function mapInlineChords(content: string, map: (token: string) => string): string {
+  return content.replace(
+    /\[\[[^[\]]*\]\]|\[([^\][]+)\]/g,
+    (match, token: string | undefined) => {
+      if (token === undefined) return match;
+      return `[${map(token)}]`;
+    },
+  );
 }
 
 interface ParsedChord {
@@ -127,12 +139,11 @@ export function transposeContent(
   useFlats = false,
 ): string {
   if (semitones % 12 === 0) return content;
-  return content.replace(/\[([^\]]+)\]/g, (_match, token: string) => {
+  return mapInlineChords(content, (token) => {
     try {
-      return `[${transposeChord(token.trim(), semitones, useFlats)}]`;
+      return transposeChord(token.trim(), semitones, useFlats);
     } catch {
-      // Token bukan chord valid: biarkan apa adanya, jangan rusak lirik.
-      return `[${token}]`;
+      return token;
     }
   });
 }
@@ -365,16 +376,41 @@ function parseOverUnderChordLine(line: string): ChordLineParse | null {
   return chords.length > 0 ? { chords, trailing } : null;
 }
 
+function snapNotationChordPos(lyric: string, col: number): number {
+  const boundaries = new Set<number>([0, lyric.length]);
+  for (const match of lyric.matchAll(/\S+/g)) {
+    boundaries.add(match.index);
+    boundaries.add(match.index + match[0].length);
+  }
+  if (col >= lyric.length || boundaries.has(col)) return col;
+  let best = col;
+  let bestDistance = Infinity;
+  for (const boundary of boundaries) {
+    const distance = Math.abs(boundary - col);
+    if (distance < bestDistance || (distance === bestDistance && boundary < best)) {
+      best = boundary;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
 // Sisipkan [chord] ke teks lirik sesuai kolom. Pemetaan kolom-eksak: chord
 // tetap di kolom tempat dia berada (termasuk di atas spasi). Kolom di luar
 // panjang baris lirik diwakili spasi di akhir baris, jadi kunci yang
 // diletakkan setelah lirik habis tetap melayang di tempat itu saat render.
-function mergeOverUnderLine(chords: OverUnderChord[], lyric: string): string {
+// Not angka disnap ke batas token agar chord tidak membelah nada/kelompok.
+function mergeOverUnderLine(
+  chords: OverUnderChord[],
+  lyric: string,
+  notation = false,
+): string {
   const byPos = new Map<number, string[]>();
   let lastPos = -1;
   for (const { token, col } of chords) {
     // Jaga urutan chord tetap naik bila kolomnya menimpa/mundur.
-    const pos = Math.max(col, lastPos);
+    const target = notation ? snapNotationChordPos(lyric, col) : col;
+    const pos = Math.max(target, lastPos);
     lastPos = pos;
     const existing = byPos.get(pos) ?? [];
     existing.push(token);
@@ -483,7 +519,9 @@ export function overUnderToChordPro(content: string): string {
       !LABEL_LINE_RE.test(next) &&
       !parseOverUnderChordLine(next)
     ) {
-      outLines.push(mergeOverUnderLine(chordLine.chords, next));
+      outLines.push(
+        mergeOverUnderLine(chordLine.chords, next, looksLikeNotationLine(next)),
+      );
       i++;
       continue;
     }

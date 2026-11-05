@@ -78,13 +78,13 @@ body {
 
 .notation-slur {
   position: absolute;
-  top: 0;
-  height: 0.7rem;
-  border-top: 2px solid currentColor;
-  border-right: 2px solid currentColor;
-  border-left: 2px solid currentColor;
-  border-bottom: 0;
-  border-radius: 999px 999px 0 0;
+  top: auto;
+  bottom: 0.55rem;
+  height: 0.34rem;
+  border-bottom: 2px solid currentColor;
+  border-right: 1px solid transparent;
+  border-left: 1px solid transparent;
+  border-radius: 0 0 100% 100% / 0 0 100% 100%;
   pointer-events: none;
 }
 

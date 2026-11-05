@@ -8,7 +8,7 @@
 //   ketukan per nada: / setengah, // seperempat (garis bawah)
 //   beam kelompok: [5 6] satu garis di atas, [[5 6 5 6]] dua garis di atas
 //   legato: (5 6) busur di atas kelompok
-//   panjang: - 
+//   panjang: -
 //   titik ritme: . di BELAKANG nada
 //   birama: | pemisah
 //   antar-nada: spasi
@@ -310,11 +310,68 @@ export function tokenizeJianpuLine(line: string): JianpuTokenizeResult {
   return { spans, valid: true };
 }
 
+const CHAR_MAP: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const ch of "\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000") {
+    map[ch] = " ";
+  }
+  for (const ch of "\uff0e\u00b7\u2022\u2024\u2219\ufe52") map[ch] = ".";
+  for (const ch of "\u2018\u2019\u201b\u2032\uff07\u02bc") map[ch] = "'";
+  for (const ch of "\uff0c\u3001") map[ch] = ",";
+  map["\uff08"] = "(";
+  map["\uff09"] = ")";
+  map["\uff5c"] = "|";
+  map["\uff3b"] = "[";
+  map["\uff3d"] = "]";
+  return map;
+})();
+
+export function normalizeNotationChars(text: string): string {
+  let normalized = "";
+  for (const ch of text) normalized += CHAR_MAP[ch] ?? ch;
+  return normalized;
+}
+
+const GROUP_CHARS_RE = /[()[\]]/g;
+const NOTATION_INNER_RE =
+  /^[.]{1,2}[#b]?[0-7]'{0,3},{0,2}[.]?(?:\/\/|\/)?-{0,8}[.]?$/;
+const NOTATION_INNER_PREFIX_RE =
+  /^[#b]?[0-7]'{0,3},{0,2}[.]?(?:\/\/|\/)?-{0,8}[.]?$/;
+
+export function looksLikeNotationLine(line: string): boolean {
+  if (!line.trim()) return false;
+  let sawNote = false;
+  for (const match of normalizeNotationChars(line.trim()).matchAll(/\S+/g)) {
+    const token = match[0] ?? "";
+    if (token === "|") continue;
+    const stripped = token.replace(GROUP_CHARS_RE, "");
+    if (!stripped) continue;
+    if (!NOTATION_INNER_RE.test(stripped) && !NOTATION_INNER_PREFIX_RE.test(stripped)) {
+      return false;
+    }
+    if (/[0-7]/.test(stripped)) sawNote = true;
+  }
+  return sawNote;
+}
+
+export function normalizeNotationInput(content: string): string {
+  if (!content) return content;
+  return content
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) =>
+      looksLikeNotationLine(line) ? normalizeNotationChars(line).trimEnd() : line,
+    )
+    .join("\n");
+}
+
 export function parseJianpu(input: string): JianpuParseResult {
   if (!input || input.trim() === "") {
     return { lines: [], valid: true };
   }
 
+  input = normalizeNotationChars(input);
   const tokenized = tokenizeJianpuLine(input);
   if (!tokenized.valid) {
     return { lines: [], valid: false, error: tokenized.error };
@@ -373,15 +430,21 @@ export function canonicalizeNotationText(text: string): string {
     .split("\n")
     .map((line) => {
       if (/^\s*#/.test(line) || /^\s*\{[^}]+\}\s*$/.test(line)) return line;
-      const parts = splitChordBrackets(line);
+      const normalizedLine = normalizeNotationChars(line);
+      const parts = splitChordBrackets(normalizedLine);
       const lyric = parts
         .filter((part) => part.kind === "text")
         .map((part) => part.value)
         .join("");
-      const tokenized = tokenizeJianpuLine(lyric);
+      const normalizedLyric = normalizeNotationChars(lyric);
+      const tokenized = tokenizeJianpuLine(normalizedLyric);
       if (!tokenized.valid || !tokenized.spans.some((span) => span.kind === "note")) return line;
       return parts
-        .map((part) => (part.kind === "chord" ? `[${part.value}]` : rewriteLeadingDots(part.value)))
+        .map((part) =>
+          part.kind === "chord"
+            ? `[${part.value}]`
+            : rewriteLeadingDots(normalizeNotationChars(part.value)),
+        )
         .join("");
     })
     .join("\n");

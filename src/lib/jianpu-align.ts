@@ -6,7 +6,12 @@
 // tetap di kolom yang sama dengan nadanya.
 
 import { layoutChordLine, semitonesBetween } from "@/lib/chords";
-import { tokenizeJianpuLine, type JianpuNote } from "@/lib/jianpu";
+import {
+  looksLikeNotationLine,
+  normalizeNotationChars,
+  tokenizeJianpuLine,
+  type JianpuNote,
+} from "@/lib/jianpu";
 
 export interface NotationToken {
   kind: "note" | "bar";
@@ -47,6 +52,23 @@ export function formatTransposeFormula(fromKey: string, toKey: string): string {
   } catch {
     return "";
   }
+}
+
+export function notationLineError(line: string): string | null {
+  const text = normalizeNotationChars(line.trim());
+  const notationChars = "0123456789#b'.,/-()[]| \t";
+  if (!/\d/.test(text) || [...text].some((char) => !notationChars.includes(char))) {
+    return null;
+  }
+
+  const parsed = tokenizeJianpuLine(text);
+  if (!parsed.valid) {
+    return (parsed.error ?? "Baris notasi tidak valid.").replace(
+      "Kelompok tidak tertutup",
+      "Kelompok belum ditutup",
+    );
+  }
+  return looksLikeNotationLine(text) ? null : "Baris ini tidak kenal pola not angka (0–7).";
 }
 
 function measureToken(
@@ -91,18 +113,21 @@ export function alignChordsToNotation(
 ): NotationAlignment | null {
   if (!lyricLine.trim()) return null;
 
-  const tokenized = tokenizeJianpuLine(lyricLine);
+  const text = looksLikeNotationLine(lyricLine)
+    ? normalizeNotationChars(lyricLine)
+    : lyricLine;
+  const tokenized = tokenizeJianpuLine(text);
   if (!tokenized.valid || !tokenized.spans.some((span) => span.kind === "note")) {
     return null;
   }
 
   const tokens: NotationToken[] = [];
-  const sourceToRender: number[] = Array(lyricLine.length).fill(0);
+  const sourceToRender: number[] = Array(text.length).fill(0);
   let renderCol = 0;
   let cursor = 0;
 
   for (const span of tokenized.spans) {
-    renderCol = consumeGap(lyricLine, sourceToRender, cursor, span.sourceCol, renderCol);
+    renderCol = consumeGap(text, sourceToRender, cursor, span.sourceCol, renderCol);
     cursor = span.sourceCol;
 
     if (span.kind === "bar") {
@@ -147,7 +172,7 @@ export function alignChordsToNotation(
     renderCol += measured.width;
     cursor = span.sourceCol + span.raw.length;
   }
-  consumeGap(lyricLine, sourceToRender, cursor, lyricLine.length, renderCol);
+  consumeGap(text, sourceToRender, cursor, text.length, renderCol);
 
   const endRender = renderCol;
   const chords: PlacedChord[] = [];
@@ -158,7 +183,7 @@ export function alignChordsToNotation(
     const mapped =
       sourceCol < sourceToRender.length
         ? (sourceToRender[sourceCol] as number)
-        : endRender + (sourceCol - lyricLine.length);
+        : endRender + (sourceCol - text.length);
     chords.push({ token: match[0] as string, sourceCol, renderCol: mapped });
   }
 

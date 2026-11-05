@@ -8,9 +8,11 @@ import {
   alignChordsToNotation,
   contentHasNotation,
   formatTransposeFormula,
+  notationLineError,
 } from "@/lib/jianpu-align";
 
 const INTRO_EDITOR = "C   G\n1' 2 3 4 5";
+const NBSP = "\u00a0";
 
 function alignEditor(editor: string) {
   const pro = overUnderToChordPro(editor);
@@ -19,6 +21,34 @@ function alignEditor(editor: string) {
   const aligned = alignChordsToNotation(layout.chordLine, layout.lyricLine);
   return { pro, layout, aligned };
 }
+
+describe("notation normalization and diagnostics", () => {
+  it("aligns pasted unicode notation and retains parser errors", () => {
+    const aligned = alignChordsToNotation("", `3 (2 3 2) 1${NBSP}2${NBSP}.5`);
+    expect(aligned?.tokens.filter((token) => token.kind === "note").map((token) => token.note?.solfege))
+      .toEqual([3, 2, 3, 2, 1, 2, 5]);
+    expect(aligned?.tokens.find((token) => token.raw === ".5")?.note?.octave).toBe(-1);
+    expect(notationLineError("(1 2")).toContain("belum ditutup");
+    expect(notationLineError("1 8 2")).toContain("Nada tidak valid");
+    expect(notationLineError("1 2 hai")).toBeNull();
+    expect(notationLineError("Bapa sentuh")).toBeNull();
+    expect(notationLineError("(1 2)")).toBeNull();
+
+    const markup = renderToStaticMarkup(
+      createElement(ChordViewer, { content: "{Intro}\n1 8 2", baseKey: "C" }),
+    );
+    expect(markup).toContain('data-notation-error=""');
+    expect(markup).toContain("Nada tidak valid");
+  });
+
+  it("renders a CSS slur below the notation notes", () => {
+    const css = readFileSync("src/app/globals.css", "utf8");
+    const slurCss = css.slice(css.indexOf(".notation-slur {"), css.indexOf(".jianpu-dot"));
+    expect(slurCss).toContain("bottom: 0.55rem");
+    expect(slurCss).toContain("border-bottom");
+    expect(slurCss).not.toContain("border-top");
+  });
+});
 
 describe("not angka column alignment", () => {
   it("keeps C over 1' and G over the same gap as the editor after the octave mark collapses", () => {
