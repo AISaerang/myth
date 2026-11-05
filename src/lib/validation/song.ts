@@ -172,6 +172,17 @@ export const batchAssignmentSchema = z
     },
   );
 
+// Label kosong mengeluarkan lagu dari koridor. Label sama (setelah
+// trim) di satu batch memakai medleyGroupId yang sama.
+export const medleyLabelSchema = z.object({
+  batchId: z.string().min(1, "Batch tidak valid."),
+  songId: z.string().min(1, "Lagu tidak valid."),
+  label: z
+    .string()
+    .trim()
+    .max(80, "Label medley maksimal 80 karakter."),
+});
+
 export const arrangementVersionSchema = z.object({
   songId: z.string().min(1, "Lagu tidak valid."),
   versionLabel: z

@@ -25,7 +25,9 @@ Song status: `DRAFT|SOURCE_SHARED|ARRANGEMENT_IN_PROGRESS|REFERENCE_READY|PRACTI
 
 ### SongBatch / SongBatchItem
 SongBatch: `id`, `eventId`, `name`, `description?`, `releaseAt?`, `targetReviewAt?`, `status` (`DRAFT|PUBLISHED|REVIEWING|COMPLETED|ARCHIVED`), `createdById`, timestamps.  
-SongBatchItem: `songBatchId`, `songId`, `sortOrder`; unique pair. The musician-facing batch badge is the 1-based rank of `SongBatchItem.sortOrder` inside that batch (1…N, same order as the admin batch list). It is not `EventSong.sortOrder` (setlist order) and not the song status badge. Anchor on the published list: `#badge-{batchId}-{n}`. Enforce one active batch per song if product rule requires it.
+SongBatchItem: `songBatchId`, `songId`, `sortOrder`, optional `medleyGroupId`, optional `medleyLabel`; unique pair `(songBatchId, songId)`. The musician-facing batch badge is the 1-based rank of `SongBatchItem.sortOrder` inside that batch (1…N, same order as the admin batch list). It is not `EventSong.sortOrder` (setlist order) and not the song status badge. Anchor on the published list: `#badge-{batchId}-{n}`.
+
+A medley corridor is the set of items in one batch that share `medleyGroupId`, ordered by `sortOrder`. `medleyLabel` is the display name; an empty label clears both fields. The corridor lives on the batch item (not `EventSong`) so “next song” follows the same badge order musicians see. The same label inside one batch reuses one `medleyGroupId`. Enforce one active batch per song if product rule requires it.
 
 ### SongAssignment
 `id`, `songId`, `personId`, `instrumentSkillId?`, `assignmentNote?`, `isPrimary`, timestamps. Define uniqueness according to assignment semantics.

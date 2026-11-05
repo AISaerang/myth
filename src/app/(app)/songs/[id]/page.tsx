@@ -7,7 +7,14 @@ import { badgesForSong } from "@/lib/batch-badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { canReadEventSong, isAdmin, isObserver } from "@/lib/permissions";
+import { resolveMedleyNav } from "@/lib/medley-nav";
+import {
+  canReadDrafts,
+  canReadEventSong,
+  canWriteEventData,
+  isAdmin,
+  isObserver,
+} from "@/lib/permissions";
 import { listEventBatchCatalog } from "@server/services/batch-service";
 import { getSong } from "@server/services/song-service";
 import { getCurrentEvent } from "@server/services/event-service";
@@ -21,6 +28,7 @@ import { listRehearsals } from "@server/services/rehearsal-service";
 import { prisma } from "@/lib/db";
 import { formatJakarta } from "@/lib/format";
 import { isTaskOverdue } from "@/lib/task-status";
+import { MedleyLabelForm } from "../../batches/MedleyLabelForm";
 import { SongForm } from "../SongForm";
 import { SongStatusBadge } from "../SongStatusBadge";
 import { MATERIAL_CATEGORY_LABEL } from "../material-labels";
@@ -87,6 +95,25 @@ export default async function SongDetailPage({
   const eventRole = await getEventRole(user, song.eventId);
   const admin = isAdmin(user);
   const observer = isObserver(user);
+  const eventAccess = await prisma.event.findUnique({
+    where: { id: song.eventId },
+    select: { accessClosedAt: true },
+  });
+  const canWrite = canWriteEventData(
+    eventRole,
+    Boolean(eventAccess?.accessClosedAt),
+    admin,
+  );
+  const medleyNav = resolveMedleyNav(song.id, catalog, {
+    publishedOnly: !(admin || canReadDrafts(eventRole)),
+  });
+  const medleyLabels = [
+    ...new Set(
+      batchBadges
+        .map((badge) => badge.medleyLabel)
+        .filter((label): label is string => Boolean(label)),
+    ),
+  ];
   if (
     !canReadEventSong(
       user,
@@ -116,13 +143,17 @@ export default async function SongDetailPage({
         </h1>
         <SongStatusBadge status={song.status} />
         {batchBadges.map((badge) => (
-          <Link
+          <BatchOrderBadge
             key={badge.anchorId}
-            href={`/songs?eventId=${song.eventId}#${badge.anchorId}`}
-          >
-            <BatchOrderBadge badge={badge.badge} batchName={badge.batchName} />
-          </Link>
+            badge={badge.badge}
+            batchName={badge.batchName}
+          />
         ))}
+        {medleyLabels.length > 0 ? (
+          <span className="text-sm text-zinc-500">
+            Medley: {medleyLabels.join(" · ")}
+          </span>
+        ) : null}
         {song.isPublished ? (
           <Badge tone="success">Publikasi</Badge>
         ) : (
@@ -130,6 +161,33 @@ export default async function SongDetailPage({
         )}
         {song.isFinalLocked ? <Badge tone="danger">Final terkunci</Badge> : null}
       </div>
+
+      {medleyNav.next.length > 0 || medleyNav.back ? (
+        <nav aria-label="Navigasi setlist" className="flex flex-col gap-2 text-sm">
+          {medleyNav.next.map((link) => (
+            <Link
+              key={`${link.batchId}-${link.songId}`}
+              href={`/songs/${link.songId}?eventId=${song.eventId}`}
+              className="font-medium underline"
+            >
+              Lagu berikutnya
+              {medleyNav.next.length > 1 ? ` (${link.batchName})` : ""}: {link.title}
+              <span className="block text-xs font-normal text-zinc-500">
+                {link.medleyLabel}
+              </span>
+            </Link>
+          ))}
+          {medleyNav.back ? (
+            <Link
+              href={`/songs?eventId=${song.eventId}#${medleyNav.back.anchorId}`}
+              className="font-medium underline"
+            >
+              Kembali ke badge {medleyNav.back.badge}
+              {medleyNav.back.batchName ? ` · ${medleyNav.back.batchName}` : ""}
+            </Link>
+          ) : null}
+        </nav>
+      ) : null}
 
       <Card title="Overview">
         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -171,6 +229,31 @@ export default async function SongDetailPage({
           </div>
         ) : null}
       </Card>
+
+      {canWrite && batchBadges.length > 0 ? (
+        <Card title="Medley">
+          <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+            Isi label yang sama pada lagu berurutan di satu batch untuk membuat koridor.
+            Di tengah medley, pemusik melihat lagu berikutnya. Kembali ke badge hanya
+            muncul di lagu terakhir medley atau lagu di luar medley.
+          </p>
+          <div className="flex flex-col gap-3">
+            {batchBadges.map((badge) => (
+              <div key={badge.batchId} className="flex flex-col gap-2">
+                <p className="text-sm font-medium">
+                  {badge.batchName} · badge {badge.badge}
+                </p>
+                <MedleyLabelForm
+                  batchId={badge.batchId}
+                  songId={song.id}
+                  songTitle={song.title}
+                  label={badge.medleyLabel}
+                />
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       {!admin && myAssignment ? (
         <Card title="Tugasmu">

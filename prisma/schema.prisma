@@ -369,8 +369,14 @@ model SongBatchItem {
   // transisi (nilai lama di-backfill oleh migrasi song_library).
   eventSongId String?
   eventSong   EventSong? @relation(fields: [eventSongId], references: [id], onDelete: SetNull)
+  // Koridor medley di dalam batch ini (docs/08). Lagu dengan
+  // medleyGroupId sama, diurut sortOrder, adalah satu koridor.
+  // Bukan EventSong.sortOrder: badge pemusik tetap peringkat item batch.
+  medleyGroupId String? @db.VarChar(64)
+  medleyLabel   String? @db.VarChar(80)
 
   @@id([songBatchId, songId])
+  @@index([medleyGroupId])
 }
 
 model SongAssignment {

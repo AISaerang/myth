@@ -5,8 +5,12 @@
 
 export interface BatchCatalogItem {
   songId: string;
+  title?: string;
   sortOrder: number;
   isPublished: boolean;
+  archived?: boolean;
+  medleyGroupId?: string | null;
+  medleyLabel?: string | null;
 }
 
 export interface RankedBatchItem extends BatchCatalogItem {
@@ -28,6 +32,8 @@ export interface BatchBadgeRef {
   sortOrder: number;
   badge: number;
   anchorId: string;
+  medleyGroupId: string | null;
+  medleyLabel: string | null;
 }
 
 export interface GroupedSongRow<T> {
@@ -35,6 +41,7 @@ export interface GroupedSongRow<T> {
   badge: number | null;
   anchorId: string | null;
   sortOrder: number | null;
+  medleyLabel: string | null;
 }
 
 export interface SongBadgeGroup<T> {
@@ -70,7 +77,7 @@ export function withBadges(batch: BatchCatalog): RankedBatchItem[] {
   });
 }
 
-function catalogOrder(catalog: readonly BatchCatalog[]): BatchCatalog[] {
+export function orderBatchCatalog(catalog: readonly BatchCatalog[]): BatchCatalog[] {
   return [...catalog].sort((a, b) => {
     const archivedA = a.status === "ARCHIVED" ? 1 : 0;
     const archivedB = b.status === "ARCHIVED" ? 1 : 0;
@@ -89,7 +96,7 @@ export function groupSongsByBatchBadge<T extends { id: string }>(
   const placed = new Set<string>();
   const groups: SongBadgeGroup<T>[] = [];
 
-  for (const batch of catalogOrder(catalog)) {
+  for (const batch of orderBatchCatalog(catalog)) {
     const ranked = { items: withBadges(batch) };
     const rows: GroupedSongRow<T>[] = [];
     const items = [...ranked.items].sort(
@@ -104,6 +111,7 @@ export function groupSongsByBatchBadge<T extends { id: string }>(
         badge: item.badge,
         anchorId: item.anchorId,
         sortOrder: item.sortOrder,
+        medleyLabel: item.medleyLabel ?? null,
       });
     }
     if (rows.length === 0) continue;
@@ -126,6 +134,7 @@ export function groupSongsByBatchBadge<T extends { id: string }>(
         badge: null,
         anchorId: null,
         sortOrder: null,
+        medleyLabel: null,
       })),
     });
   }
@@ -137,7 +146,7 @@ export function badgesForSong(
   catalog: readonly BatchCatalog[],
 ): BatchBadgeRef[] {
   const badges: BatchBadgeRef[] = [];
-  for (const batch of catalogOrder(catalog)) {
+  for (const batch of orderBatchCatalog(catalog)) {
     const item = withBadges(batch).find((row) => row.songId === songId);
     if (!item) continue;
     badges.push({
@@ -146,6 +155,8 @@ export function badgesForSong(
       sortOrder: item.sortOrder,
       badge: item.badge,
       anchorId: item.anchorId,
+      medleyGroupId: item.medleyGroupId ?? null,
+      medleyLabel: item.medleyLabel ?? null,
     });
   }
   return badges;
