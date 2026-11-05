@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EventTypeBadge } from "@/components/ui/EventTypeBadge";
-import { badgesForSong, groupSongsByBatchBadge } from "@/lib/batch-badge";
+import { badgesForSong, groupSongsByBatchBadge, withBadges } from "@/lib/batch-badge";
 import { UI_MODE_COOKIE, showMusicianSongView, uiModeForEvent } from "@/lib/ui-mode";
 import { requireFreshUser } from "@/lib/auth";
 import {
@@ -22,12 +22,14 @@ import { getEventRole } from "@server/services/event-access";
 import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import {
   listAvailableSongsForEvent,
+  listEventAssignablePeople,
   listPublishedSongsForMember,
   listPublishedSongsForObserver,
   listSongLibrary,
   listSongs,
 } from "@server/services/song-service";
 import { notFound } from "next/navigation";
+import { BulkAssignPanel } from "./BulkAssignPanel";
 import { EventPicker } from "./EventPicker";
 import { SongForm } from "./SongForm";
 import { SongLibraryPicker } from "./SongLibraryPicker";
@@ -133,10 +135,11 @@ async function SongsContent({
       </div>
     );
   }
-  const [songs, availableLibrarySongs, catalog] = await Promise.all([
+  const [songs, availableLibrarySongs, catalog, assignablePeople] = await Promise.all([
     listSongs(eventId),
     listAvailableSongsForEvent(eventId),
     listEventBatchCatalog(eventId),
+    listEventAssignablePeople(eventId),
   ]);
   const librarySongs = isAdmin(user) ? await listSongLibrary() : [];
   const activeEvent = events.find((e) => e.id === eventId);
@@ -162,6 +165,40 @@ async function SongsContent({
       {canWrite ? (
         <Card title="Tambah dari Pustaka Lagu">
           <SongLibraryPicker eventId={eventId} songs={availableLibrarySongs} />
+        </Card>
+      ) : null}
+      {canWrite ? (
+        <Card title="Tugaskan sekaligus">
+          <BulkAssignPanel
+            eventId={eventId}
+            people={assignablePeople.map((person) => ({
+              id: person.id,
+              displayName: person.displayName,
+              skills: person.skills.map((skill) => skill.name),
+            }))}
+            batches={catalog
+              .filter((batch) => batch.status !== "ARCHIVED")
+              .map((batch) => ({
+                id: batch.id,
+                name: batch.name,
+                songs: withBadges(batch)
+                  .filter((item) => songs.some((song) => song.id === item.songId))
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .map((item) => ({
+                    id: item.songId,
+                    title: item.title ?? songs.find((song) => song.id === item.songId)?.title ?? "Lagu",
+                    badge: item.badge,
+                  })),
+              }))}
+            songs={songs.map((song) => {
+              const badges = badgesForSong(song.id, catalog);
+              return {
+                id: song.id,
+                title: song.title,
+                badgeLabel: badges.map((badge) => `${badge.batchName} ${badge.badge}`).join(", "),
+              };
+            })}
+          />
         </Card>
       ) : null}
       {isAdmin(user) && librarySongs.length === 0 ? (

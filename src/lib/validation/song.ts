@@ -183,6 +183,35 @@ export const medleyLabelSchema = z.object({
     .max(80, "Label medley maksimal 80 karakter."),
 });
 
+// Tugaskan banyak pemusik/penyanyi ke semua lagu event, satu batch,
+// atau lagu yang dipilih. Personel dan lagu tidak boleh ganda.
+export const bulkAssignmentSchema = z
+  .object({
+    eventId: z.string().min(1, "Event tidak valid."),
+    personIds: z.array(z.string().min(1)).min(1, "Pilih minimal 1 personel."),
+    target: z.enum(["EVENT", "BATCH", "SONGS"], {
+      message: "Target lagu tidak valid.",
+    }),
+    batchId: z.string().min(1).optional(),
+    songIds: z.array(z.string().min(1)).optional(),
+  })
+  .refine((value) => new Set(value.personIds).size === value.personIds.length, {
+    message: "Personel tidak boleh ganda.",
+    path: ["personIds"],
+  })
+  .refine((value) => value.target !== "BATCH" || Boolean(value.batchId), {
+    message: "Pilih batch.",
+    path: ["batchId"],
+  })
+  .refine(
+    (value) => value.target !== "SONGS" || (value.songIds?.length ?? 0) > 0,
+    { message: "Pilih minimal 1 lagu.", path: ["songIds"] },
+  )
+  .refine(
+    (value) => !value.songIds || new Set(value.songIds).size === value.songIds.length,
+    { message: "Lagu tidak boleh ganda.", path: ["songIds"] },
+  );
+
 export const arrangementVersionSchema = z.object({
   songId: z.string().min(1, "Lagu tidak valid."),
   versionLabel: z

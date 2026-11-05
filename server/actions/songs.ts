@@ -15,6 +15,7 @@ import { firstIssueMessage } from "@/lib/validation/auth";
 import {
   arrangementVersionSchema,
   assignmentSchema,
+  bulkAssignmentSchema,
   materialSchema,
   songSchema,
   songUpdateSchema,
@@ -26,6 +27,7 @@ import {
   MATERIAL_SAVE_FAILED,
   archiveSong,
   assignPerson,
+  bulkAssignEventSongs,
   createSong,
   createVersion,
   deleteMaterial,
@@ -176,6 +178,49 @@ export async function assignPersonAction(
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(parsed.data.songId);
   return { ok: true };
+}
+
+export interface BulkAssignState extends ActionState {
+  created?: number;
+  skipped?: number;
+  errors?: string[];
+}
+
+export async function bulkAssignSongsAction(
+  _prev: BulkAssignState,
+  formData: FormData,
+): Promise<BulkAssignState> {
+  const user = await requireActionUser();
+  let payload: unknown = null;
+  try {
+    payload = JSON.parse(String(formData.get("payload") ?? "null"));
+  } catch {
+    return { ok: false, error: "Format data tidak valid." };
+  }
+  const parsed = bulkAssignmentSchema.safeParse({
+    eventId: formData.get("eventId"),
+    ...(typeof payload === "object" && payload !== null ? payload : {}),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  await requireEventManager(user, parsed.data.eventId);
+  const result = await bulkAssignEventSongs(
+    user.id,
+    parsed.data.eventId,
+    parsed.data.personIds,
+    parsed.data.target,
+    parsed.data.batchId,
+    parsed.data.songIds,
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateSongs();
+  return {
+    ok: true,
+    created: result.created,
+    skipped: result.skipped,
+    errors: result.errors,
+  };
 }
 
 export async function unassignPersonAction(
