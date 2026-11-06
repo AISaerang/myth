@@ -126,6 +126,7 @@ describe("note actions", () => {
       songId: "song_1",
       sectionId: undefined,
       parentId: undefined,
+      targetInstrumentSkillId: undefined,
       partLabel: undefined,
       body: "Verse: half-time groove",
     });
@@ -154,8 +155,38 @@ describe("note actions", () => {
     );
   });
 
+  it("forwards the selected instrument audience", async () => {
+    await createSongNoteAction(
+      { ok: false },
+      form({
+        ...createValues,
+        targetInstrumentSkillId: "skill_drums",
+      }),
+    );
+
+    expect(createSongNote).toHaveBeenCalledWith(
+      "user_1",
+      "Drummer",
+      expect.objectContaining({
+        targetInstrumentSkillId: "skill_drums",
+      }),
+    );
+  });
+
   it("refuses a member note on a draft song", async () => {
     prisma.eventSong.findUnique.mockResolvedValue({ isPublished: false });
+
+    await expect(
+      createSongNoteAction({ ok: false }, form(createValues)),
+    ).resolves.toEqual({
+      ok: false,
+      error: expect.stringMatching(/izin/i),
+    });
+    expect(createSongNote).not.toHaveBeenCalled();
+  });
+
+  it("keeps an event-level observer read-only", async () => {
+    getEventRole.mockResolvedValue("OBSERVER");
 
     await expect(
       createSongNoteAction({ ok: false }, form(createValues)),

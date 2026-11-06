@@ -51,7 +51,7 @@ Legacy `ChordChart` remains as fallback/history. Public display precedence: acti
 `id`, `songId`, `personId`, `status` (`NOT_STARTED|LEARNING|TRIED_WITH_REFERENCE|NEEDS_HELP|READY_FOR_REHEARSAL`), `note?`, `updatedById`, `updatedAt`; unique song/person.
 
 ### SongNote
-Catatan part per pemusik (POV) pada satu lagu di satu event. `id`, `eventSongId` (scope event; cascade), `songId` (cascade), `sectionId?` (ChartSection; set null saat bagian dihapus), `sectionLabel?` (snapshot), `parentId?` (balasan satu tingkat; cascade), `authorUserId` (plain, histori), `authorName` (snapshot), `partLabel?` (maks. 80), `body` (maks. 2000 saat validasi), `status` (`OPEN|RESOLVED`), `resolvedAt?`, `resolvedByUserId?`, `editedAt?`, timestamps. Hanya top-level yang dapat di-resolve. `OBSERVER` hanya membaca; MEMBER menulis di lagu publish; EVENT_ADMIN juga di draft; ADMIN selalu menulis kecuali dibatasi akses event untuk non-admin. Semua mutasi catatan divalidasi di server; penghapusan oleh admin atas catatan orang lain dicatat di audit log.
+Catatan part per pemusik (POV) pada satu lagu di satu event. `id`, `eventSongId` (scope event; cascade), `songId` (cascade), `sectionId?` (ChartSection; set null saat bagian dihapus), `sectionLabel?` (snapshot), `parentId?` (balasan satu tingkat; cascade), `authorUserId` (plain, histori), `authorName` (snapshot), `partLabel?` (POV penulis, maks. 80), `targetInstrumentSkillId?` (audiens; null = semua personel, selain itu skill yang memiliki assignment pada EventSong), `body` (maks. 2000 saat validasi), `status` (`OPEN|RESOLVED`), `resolvedAt?`, `resolvedByUserId?`, `editedAt?`, timestamps. Hanya top-level yang dapat di-resolve. Balasan mewarisi bagian dan audiens induk. MEMBER menulis di lagu publish; EVENT_ADMIN juga di draft; ADMIN selalu menulis kecuali dibatasi akses event untuk non-admin. Catatan bertarget dibatasi di service server kepada assignment cocok, penulis, dan admin event; OBSERVER hanya membaca catatan umum. Semua mutasi catatan divalidasi di server; penghapusan oleh admin atas catatan orang lain dicatat di audit log.
 
 ### Task
 `id`, `eventId`, `title`, `description?`, `status` (`TODO|IN_PROGRESS|BLOCKED|DONE|CANCELLED`), `priority` (`LOW|MEDIUM|HIGH|CRITICAL`), `dueAt?`, `assigneePersonId?`, `relatedSongId?`, `relatedRehearsalId?`, `createdById`, timestamps.
@@ -76,7 +76,7 @@ Event has songs, batches, tasks, rehearsals, equipment, decisions. Song has assi
 Use transactions for version activation; archive rather than delete referenced songs; preserve user history after deactivation; validate BPM/duration and date ranges; normalize usernames; restrict contact fields.
 
 ## Indexes
-Unique username; indexes for event/status/published songs, batch status, progress person/song, task status/due/assignee, rehearsal starts/status, equipment status, audit entity/date.
+Unique username; indexes for event/status/published songs, batch status, progress person/song, task status/due/assignee, rehearsal starts/status, equipment status, audit entity/date, and `SongNote(eventSongId, targetInstrumentSkillId)`.
 
 ## Authorization
 Admin can manage event records. User sees published/relevant data, assigned songs/tasks, and own progress. Observer (`OBSERVER`, label UI "Pantau") sees all published data and all personnel progress on published songs plus publish-scoped tasks, and may create suggestions (Task `TODO` without PIC, moderated by MD). Observer cannot see DRAFT songs, contacts, or manage anything. User cannot change other users' progress or roles. Enforce server-side.

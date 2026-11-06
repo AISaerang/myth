@@ -5,7 +5,7 @@
 
 **USER:** views relevant published/assigned songs and materials; updates own practice progress; views relevant tasks and rehearsals; may update own profile/password and send suggestions. Cannot create users, change roles, access settings, or modify another user's progress.
 
-**OBSERVER (label UI "Pantau"):** read-only monitor plus suggester. Views all *published* songs/materials, all personnel progress on published songs, publish-scoped tasks, batches, rehearsals, equipment, and team roster. May create suggestions (Task `TODO` without PIC, min. 10-char description, moderated by MD) and revise own suggestions while still `TODO`. Cannot see DRAFT songs, contacts, invite links, or audit; cannot mutate anything else. Enforced server-side (publish filter in services, `requireActionAdmin` on all other mutations).
+**OBSERVER (label UI "Pantau"):** read-only monitor plus suggester. Views all *published* songs/materials, all personnel progress on published songs, general song notes, publish-scoped tasks, batches, rehearsals, equipment, and team roster. Instrument-targeted song notes are hidden. May create suggestions (Task `TODO` without PIC, min. 10-char description, moderated by MD) and revise own suggestions while still `TODO`. Cannot see DRAFT songs, contacts, invite links, or audit; cannot mutate anything else. Enforced server-side (publish/audience filters in services, `requireActionAdmin` on all other mutations).
 
 ## Manual accounts
 - No public registration.
@@ -60,6 +60,7 @@ For each server request: validate session; active account; role; event scope; ow
 | Event | Read/write | Published read | Published read |
 | Songs/materials | CRUD/publish/lock | Read published + all progress | Read relevant published/assigned |
 | Practice progress | Read all/admin correction audited | Read all (published) | Own only |
+| Song notes | All audiences | General notes only | General + matching assigned instrument + own targeted notes |
 | Suggestions (Task TODO) | Triage all | Create own, revise while TODO | Create own, revise while TODO |
 | People/accounts | CRUD/reset/deactivate | Limited team info | Limited team info |
 | Tasks | CRUD/assign | Read publish-scoped | Relevant; update assigned if enabled |

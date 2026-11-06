@@ -162,6 +162,7 @@ model InstrumentSkill {
 
   people PersonSkill[]
   assignments SongAssignment[]
+  targetedNotes SongNote[] @relation("SongNoteTargetSkill")
 }
 
 model PersonSkill {
@@ -571,6 +572,11 @@ model SongNote {
   authorName   String
   // Part/instrumen dari POV penulis, cth. "Drum", "Keyboard", "Gitar".
   partLabel String?  @db.VarChar(80)
+  // Null = berlaku untuk semua personel; terisi = khusus skill pada
+  // assignment lagu-event ini. Restrict mencegah penghapusan skill
+  // mengubah catatan target menjadi catatan umum.
+  targetInstrumentSkillId String?
+  targetInstrumentSkill InstrumentSkill? @relation("SongNoteTargetSkill", fields: [targetInstrumentSkillId], references: [id], onDelete: Restrict)
   body      String   @db.Text
   status    NoteStatus @default(OPEN)
   resolvedAt DateTime?
@@ -583,6 +589,7 @@ model SongNote {
   @@index([songId, status])
   @@index([sectionId])
   @@index([parentId])
+  @@index([eventSongId, targetInstrumentSkillId])
 }
 
 enum PracticeStatus {

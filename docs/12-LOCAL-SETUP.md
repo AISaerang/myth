@@ -47,7 +47,12 @@ untuk master bagian, aransemen, dan item aransemen lagu).
 Setelah migration, chart lama bisa diimpor bertahap (idempoten; lagu yang sudah
 punya bagian/aransemen dilewati). Review hasilnya di `/songs/[id]/chart`:
 
-```powershell
+```
+
+Migration `20261106120000_song_note_audience` menambah target instrumen
+opsional pada catatan lagu secara additive. Untuk DB bersama/produksi,
+terapkan lewat prosedur `prisma migrate deploy` di atas setelah review dan
+backup; jangan menjalankan SQL migration secara manual.powershell
 npm.cmd run import:charts -- --dry-run  # daftar lagu yang akan diimpor
 npm.cmd run import:charts               # import + aransemen aktif
 ```

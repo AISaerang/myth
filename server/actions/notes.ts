@@ -8,7 +8,6 @@ import {
   canManageSongNotes,
   canModifySongNote,
   canWriteSongNotes,
-  isAdmin,
 } from "@/lib/permissions";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
@@ -90,6 +89,8 @@ export async function createSongNoteAction(
     songId: formData.get("songId"),
     sectionId: formData.get("sectionId") || undefined,
     parentId: formData.get("parentId") || undefined,
+    targetInstrumentSkillId:
+      formData.get("targetInstrumentSkillId") || undefined,
     partLabel: formData.get("partLabel") || undefined,
     body: formData.get("body"),
   });
@@ -172,7 +173,7 @@ export async function deleteSongNoteAction(
       noteId,
     );
     if (!result.ok) return { ok: false, error: result.error };
-    if (isAdmin(user) && note.authorUserId !== user.id) {
+    if (canManageSongNotes(user, role) && note.authorUserId !== user.id) {
       await writeAudit({
         actorUserId: user.id,
         action: AuditAction.NOTE_DELETED,

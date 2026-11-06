@@ -120,7 +120,7 @@ export function canWriteSongNotes(
   accessClosed: boolean,
   isPublished: boolean,
 ): boolean {
-  if (isObserver(actor)) return false;
+  if (isObserver(actor) || eventRole === "OBSERVER") return false;
   if (isAdmin(actor)) return true;
   if (!eventRole || accessClosed) return false;
   return isPublished || canReadDrafts(eventRole);
@@ -130,7 +130,7 @@ export function canManageSongNotes(
   actor: SessionUser,
   eventRole: EventRole | null,
 ): boolean {
-  if (isObserver(actor)) return false;
+  if (isObserver(actor) || eventRole === "OBSERVER") return false;
   return isAdmin(actor) || canManageEvent(eventRole);
 }
 
@@ -141,6 +141,6 @@ export function canModifySongNote(
   authorUserId: string,
   eventRole: EventRole | null = null,
 ): boolean {
-  if (isObserver(actor)) return false;
+  if (isObserver(actor) || eventRole === "OBSERVER") return false;
   return canManageSongNotes(actor, eventRole) || actor.id === authorUserId;
 }

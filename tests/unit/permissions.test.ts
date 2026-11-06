@@ -215,6 +215,7 @@ describe("permissions", () => {
 
     it("keeps OBSERVER read-only even on published songs", () => {
       expect(canWriteSongNotes(observer, "OBSERVER", false, true)).toBe(false);
+      expect(canWriteSongNotes(user, "OBSERVER", false, true)).toBe(false);
     });
 
     it("lets global admin write even when event access is closed", () => {

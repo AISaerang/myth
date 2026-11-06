@@ -5,6 +5,7 @@ import type {
   SongNoteInput,
   SongNoteUpdateInput,
 } from "@/lib/validation/note";
+import type { EventRole } from "@/generated/prisma/client";
 
 type Result =
   | { ok: true; id: string }
@@ -12,19 +13,58 @@ type Result =
 
 type SimpleResult = { ok: true } | { ok: false; error: string };
 
+export interface SongNoteReadScope {
+  userId: string;
+  eventRole: EventRole | null;
+  globalAdmin: boolean;
+  observer: boolean;
+  assignedInstrumentSkillIds: string[];
+}
+
 // Satu query per lagu-event; balasan dikelompokkan di memori. Volume
 // catatan per lagu kecil, jadi tidak perlu query rekursif.
 export async function listSongNotes(
   eventSongId: string,
+  scope: SongNoteReadScope,
 ): Promise<SongNoteView[]> {
+  const isObserver =
+    !scope.globalAdmin &&
+    (scope.observer || scope.eventRole === "OBSERVER");
+  const canSeeAllTargets =
+    scope.globalAdmin || (!isObserver && scope.eventRole === "EVENT_ADMIN");
+  const audienceFilter = canSeeAllTargets
+    ? {}
+    : isObserver
+      ? { targetInstrumentSkillId: null }
+      : {
+          OR: [
+            { targetInstrumentSkillId: null },
+            ...(scope.assignedInstrumentSkillIds.length > 0
+              ? [{
+                  targetInstrumentSkillId: {
+                    in: scope.assignedInstrumentSkillIds,
+                  },
+                }]
+              : []),
+            { authorUserId: scope.userId },
+          ],
+        };
   const rows = await prisma.songNote.findMany({
-    where: { eventSongId },
+    where: { eventSongId, ...audienceFilter },
     orderBy: { createdAt: "asc" },
+    include: {
+      targetInstrumentSkill: { select: { name: true } },
+    },
   });
   const byId = new Map<string, SongNoteView>();
   const roots: SongNoteView[] = [];
   for (const row of rows) {
-    byId.set(row.id, { ...row, replies: [] });
+    const { targetInstrumentSkill, ...note } = row;
+    byId.set(row.id, {
+      ...note,
+      targetInstrumentSkillName: targetInstrumentSkill?.name ?? null,
+      replies: [],
+    });
   }
   for (const row of rows) {
     const view = byId.get(row.id);
@@ -42,22 +82,6 @@ export async function listSongNotes(
   return roots;
 }
 
-export async function countOpenNotesBySectionLabel(
-  eventSongId: string,
-): Promise<Record<string, number>> {
-  const rows = await prisma.songNote.findMany({
-    where: { eventSongId, status: "OPEN", parentId: null, sectionLabel: { not: null } },
-    select: { sectionLabel: true },
-  });
-  const counts: Record<string, number> = {};
-  for (const row of rows) {
-    const label = row.sectionLabel?.trim();
-    if (!label) continue;
-    counts[label] = (counts[label] ?? 0) + 1;
-  }
-  return counts;
-}
-
 export async function createSongNote(
   authorUserId: string,
   authorName: string,
@@ -65,14 +89,28 @@ export async function createSongNote(
 ): Promise<Result> {
   const eventSong = await prisma.eventSong.findUnique({
     where: { id: input.eventSongId },
-    select: { id: true, songId: true },
+    select: {
+      id: true,
+      songId: true,
+      assignments: {
+        where: { instrumentSkillId: { not: null } },
+        select: { instrumentSkillId: true },
+      },
+    },
   });
   if (!eventSong || eventSong.songId !== input.songId) {
     return { ok: false, error: "Lagu event tidak ditemukan." };
   }
 
   let parent:
-    | { id: string; eventSongId: string; parentId: string | null; sectionId: string | null; sectionLabel: string | null }
+    | {
+        id: string;
+        eventSongId: string;
+        parentId: string | null;
+        sectionId: string | null;
+        sectionLabel: string | null;
+        targetInstrumentSkillId: string | null;
+      }
     | null = null;
   if (input.parentId) {
     parent = await prisma.songNote.findUnique({
@@ -83,6 +121,7 @@ export async function createSongNote(
         parentId: true,
         sectionId: true,
         sectionLabel: true,
+        targetInstrumentSkillId: true,
       },
     });
     if (!parent || parent.eventSongId !== input.eventSongId) {
@@ -91,6 +130,29 @@ export async function createSongNote(
     if (parent.parentId) {
       return { ok: false, error: "Balasan hanya satu tingkat." };
     }
+    if (
+      input.targetInstrumentSkillId &&
+      input.targetInstrumentSkillId !== parent.targetInstrumentSkillId
+    ) {
+      return { ok: false, error: "Balasan mengikuti target audiens catatan induk." };
+    }
+  }
+  const targetInstrumentSkillId =
+    parent?.targetInstrumentSkillId ??
+    input.targetInstrumentSkillId ??
+    null;
+  if (
+    !parent &&
+    targetInstrumentSkillId &&
+    !eventSong.assignments.some(
+      (assignment) =>
+        assignment.instrumentSkillId === targetInstrumentSkillId,
+    )
+  ) {
+    return {
+      ok: false,
+      error: "Target instrumen harus memiliki assignment pada lagu ini.",
+    };
   }
 
   let sectionId: string | null = parent?.sectionId ?? null;
@@ -117,6 +179,7 @@ export async function createSongNote(
       authorUserId,
       authorName,
       partLabel: input.partLabel || null,
+      targetInstrumentSkillId,
       body: input.body,
     },
     select: { id: true },

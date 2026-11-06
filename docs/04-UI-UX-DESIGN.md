@@ -39,7 +39,7 @@ Song detail:
 3. Assigned personnel/instruments.
 4. Materials and active version.
 5. Practice progress.
-6. Catatan Part: kartu per bagian lagu dengan filter status/bagian/part, balasan, edit/hapus milik sendiri, tombol tandai selesai, dan badge jumlah catatan terbuka di heading bagian chart.
+6. Catatan Part: daftar lengkap dengan filter status/bagian/POV penulis; catatan section umum tampil di sisi lirik pada desktop dan ditumpuk setelah chart di mobile. Catatan bertarget tampil sebagai callout ringkas di atas section. Composer berada di disclosure per-section agar chart tetap ringkas; semua catatan juga tersedia dalam daftar, dengan balasan, edit/hapus sesuai izin, dan status selesai.
 7. Version history.
 8. Tasks/issues.
 9. Decision notes.
