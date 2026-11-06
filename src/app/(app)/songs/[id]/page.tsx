@@ -15,6 +15,7 @@ import {
   canReadDrafts,
   canReadEventSong,
   canWriteEventData,
+  canWriteSongNotes,
   isAdmin,
   isObserver,
 } from "@/lib/permissions";
@@ -25,7 +26,14 @@ import { getEventRole } from "@server/services/event-access";
 import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-service";
 import { getMyProgress, getSongProgress } from "@server/services/progress-service";
 import { listChordCharts } from "@server/services/chord-service";
-import { getActiveArrangementContent } from "@server/services/chart-arrangement-service";
+import {
+  getActiveArrangementContent,
+  listChartSections,
+} from "@server/services/chart-arrangement-service";
+import {
+  countOpenNotesBySectionLabel,
+  listSongNotes,
+} from "@server/services/note-service";
 import { listSongTasks } from "@server/services/task-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
 import { prisma } from "@/lib/db";
@@ -41,6 +49,7 @@ import {
 } from "./ProgressForms";
 import { CreateSuggestionForm } from "../../tasks/TaskForms";
 import { ChordChartSection } from "./ChordChartSection";
+import { SongNotes } from "./SongNotes";
 import {
   OverdueBadge,
   PracticeStatusBadge,
@@ -143,6 +152,24 @@ export default async function SongDetailPage({
       ? song.assignments.find((a) => a.personId === person.id)
       : undefined;
   }
+
+  const [songNotes, noteCounts, chartSections, skillRows] = await Promise.all([
+    listSongNotes(song.eventSongId),
+    countOpenNotesBySectionLabel(song.eventSongId),
+    listChartSections(song.id),
+    prisma.instrumentSkill.findMany({
+      select: { name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  const canWriteNotes =
+    !previewing &&
+    canWriteSongNotes(
+      user,
+      eventRole,
+      Boolean(eventAccess?.accessClosedAt),
+      song.isPublished,
+    );
 
   return (
     <div className="flex flex-col gap-4">
@@ -295,6 +322,23 @@ export default async function SongDetailPage({
       <SongChordChart
         songId={song.id}
         eventId={song.eventId}
+        admin={showAdminChrome}
+        noteCountsBySection={noteCounts}
+      />
+
+      <SongNotes
+        songId={song.id}
+        eventSongId={song.eventSongId}
+        notes={songNotes}
+        sections={chartSections.map((section) => ({
+          id: section.id,
+          label: section.label,
+          type: section.type,
+        }))}
+        partOptions={skillRows.map((row) => row.name)}
+        defaultPart={myAssignment?.instrumentSkill?.name ?? null}
+        canWrite={canWriteNotes}
+        currentUserId={user.id}
         admin={showAdminChrome}
       />
 
@@ -501,10 +545,12 @@ async function SongChordChart({
   songId,
   eventId,
   admin,
+  noteCountsBySection,
 }: {
   songId: string;
   eventId: string;
   admin: boolean;
+  noteCountsBySection: Record<string, number>;
 }) {
   const [charts, arrangement] = await Promise.all([
     listChordCharts(songId),
@@ -517,6 +563,7 @@ async function SongChordChart({
       admin={admin}
       charts={charts}
       arrangement={arrangement}
+      noteCountsBySection={noteCountsBySection}
     />
   );
 }

@@ -41,6 +41,14 @@
 9. Rehearsal menghasilkan catatan/task.
 10. Versi final dikunci setelah review.
 
+## Catatan part (POV pemusik)
+1. Pemusik membuka lagu yang sudah publish di event-nya.
+2. Pilih bagian lagu (Intro/Verse/Chorus/dll) atau biarkan "Lagu (umum)".
+3. Isi part/instrumen (default dari assignment, misalnya Drum/Keyboard/Gitar) dan catatan teknisnya — pola ritme, layer, fingering, power chord, dan sebagainya.
+4. Catatan tampil untuk semua personel event; pemusik lain atau MD dapat membalas.
+5. Penulis atau MD menandai selesai; catatan selesai tetap tersedia lewat filter "Selesai".
+6. Pemantau (`OBSERVER`) hanya membaca. Admin dapat menghapus catatan personel lain dan tindakan itu masuk audit log.
+
 ## Batch release
 1. Pilih sekitar 2 lagu yang siap dipelajari.
 2. Tetapkan release date dan target review.

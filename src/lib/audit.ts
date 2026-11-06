@@ -53,6 +53,7 @@ export const AuditAction = {
   CHART_ARRANGEMENT_DELETED: "CHART_ARRANGEMENT_DELETED",
   CHART_LEGACY_IMPORTED: "CHART_LEGACY_IMPORTED",
   CHART_LYRICS_IMPORTED: "CHART_LYRICS_IMPORTED",
+  NOTE_DELETED: "NOTE_DELETED",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

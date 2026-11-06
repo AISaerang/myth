@@ -303,6 +303,7 @@ model Song {
   chartSections ChartSection[]
   chartArrangements ChartArrangement[]
   eventSongs  EventSong[]
+  notes       SongNote[]
 
   @@index([eventId, status])
   @@index([eventId, isPublished])
@@ -334,6 +335,7 @@ model EventSong {
   progress    PracticeProgress[]
   batchItems  SongBatchItem[]
   rehearsalItems RehearsalSong[]
+  partNotes   SongNote[]
 
   @@unique([eventId, songId])
   @@index([eventId, sortOrder])
@@ -502,6 +504,7 @@ model ChartSection {
   updatedAt   DateTime         @updatedAt
 
   items ChartArrangementItem[]
+  notes SongNote[]
 
   @@unique([songId, label])
   @@index([songId, sortOrder])
@@ -537,6 +540,49 @@ model ChartArrangementItem {
 
   @@unique([arrangementId, sortOrder])
   @@index([arrangementId, sortOrder])
+}
+
+// Catatan per pemusik (POV part) pada satu lagu di satu event, mirip
+// komentar Microsoft Word: menempel ke bagian chart, punya balasan,
+// dan bisa ditandai selesai. eventSongId yang menentukan isolasi POV
+// per event; songId disimpan agar query/riwayat lagu tetap mudah.
+enum NoteStatus {
+  OPEN
+  RESOLVED
+}
+
+model SongNote {
+  id        String    @id @default(cuid())
+  eventSongId String
+  eventSong EventSong @relation(fields: [eventSongId], references: [id], onDelete: Cascade)
+  songId    String
+  song      Song      @relation(fields: [songId], references: [id], onDelete: Cascade)
+  // Jangkar bagian master lagu. Null = catatan level lagu. sectionLabel
+  // disimpan sebagai snapshot agar catatan tetap terbaca bila bagian dihapus.
+  sectionId String?
+  section   ChartSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  sectionLabel String?
+  // Balasan satu tingkat. Menghapus induk menghapus seluruh balasan.
+  parentId String?
+  parent   SongNote?  @relation("SongNoteReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  SongNote[] @relation("SongNoteReplies")
+  // Plain user id (no FK) + snapshot nama: histori tetap utuh saat akun berubah.
+  authorUserId String
+  authorName   String
+  // Part/instrumen dari POV penulis, cth. "Drum", "Keyboard", "Gitar".
+  partLabel String?  @db.VarChar(80)
+  body      String   @db.Text
+  status    NoteStatus @default(OPEN)
+  resolvedAt DateTime?
+  resolvedByUserId String?
+  editedAt  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventSongId, status, createdAt])
+  @@index([songId, status])
+  @@index([sectionId])
+  @@index([parentId])
 }
 
 enum PracticeStatus {

@@ -50,6 +50,9 @@ Legacy `ChordChart` remains as fallback/history. Public display precedence: acti
 ### PracticeProgress
 `id`, `songId`, `personId`, `status` (`NOT_STARTED|LEARNING|TRIED_WITH_REFERENCE|NEEDS_HELP|READY_FOR_REHEARSAL`), `note?`, `updatedById`, `updatedAt`; unique song/person.
 
+### SongNote
+Catatan part per pemusik (POV) pada satu lagu di satu event. `id`, `eventSongId` (scope event; cascade), `songId` (cascade), `sectionId?` (ChartSection; set null saat bagian dihapus), `sectionLabel?` (snapshot), `parentId?` (balasan satu tingkat; cascade), `authorUserId` (plain, histori), `authorName` (snapshot), `partLabel?` (maks. 80), `body` (maks. 2000 saat validasi), `status` (`OPEN|RESOLVED`), `resolvedAt?`, `resolvedByUserId?`, `editedAt?`, timestamps. Hanya top-level yang dapat di-resolve. `OBSERVER` hanya membaca; MEMBER menulis di lagu publish; EVENT_ADMIN juga di draft; ADMIN selalu menulis kecuali dibatasi akses event untuk non-admin. Semua mutasi catatan divalidasi di server; penghapusan oleh admin atas catatan orang lain dicatat di audit log.
+
 ### Task
 `id`, `eventId`, `title`, `description?`, `status` (`TODO|IN_PROGRESS|BLOCKED|DONE|CANCELLED`), `priority` (`LOW|MEDIUM|HIGH|CRITICAL`), `dueAt?`, `assigneePersonId?`, `relatedSongId?`, `relatedRehearsalId?`, `createdById`, timestamps.
 

@@ -37,12 +37,14 @@ export function ChordChartSection({
   admin,
   charts,
   arrangement,
+  noteCountsBySection,
 }: {
   songId: string;
   eventId: string;
   admin: boolean;
   charts: ChartView[];
   arrangement: { name: string; content: string } | null;
+  noteCountsBySection?: Record<string, number>;
 }) {
   const active = charts.find((c) => c.isActive) ?? null;
   const history = charts.filter((c) => !c.isActive);
@@ -72,7 +74,11 @@ export function ChordChartSection({
               {arrangement.name}
             </span>
           </p>
-          <ChordViewer content={arrangement.content} baseKey="C" />
+          <ChordViewer
+            content={arrangement.content}
+            baseKey="C"
+            noteCountsByLabel={noteCountsBySection}
+          />
         </div>
       ) : active ? (
         <div className="flex flex-col gap-2">

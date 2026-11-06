@@ -21,6 +21,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - An Intro of three chord+notation lines, the last with `Csus4` and trailing `| |`, renders every line at the lyric size (`text-sm` / `leading-6`) in Lirik+Chord, Lirik saja, and Chord saja; transpose changes chords only.
 - Not angka parser accepts comma and leading-dot lower octaves, chromatic prefixes, beam groups `[ ]` / `[[ ]]`, and slurs `( )`. CSS markup draws octave dots, a slash or backslash through the digit, and beams/slurs above the group. Chords stay on the same column. A notation section labeled `Bagian 1` displays Intro. `canonicalizeNotationText` rewrites `.6` to `6,` and leaves lyric lines alone. `planNotationNormalization` prints a per-song diff and is a no-op when nothing changed.
 - Adding a rehearsal recording stores the song page's event id. Omitting the event id stores `null` (library), never the string `library`. A database or authorization failure on that action returns a form error instead of throwing.
+- Catatan part: body 2–2000 karakter, part maks. 80, balasan wajib punya induk top-level di event yang sama, dan bagian harus milik lagu yang sama. MEMBER hanya menulis di lagu publish; EVENT_ADMIN di draft; OBSERVER read-only; ADMIN menulis walau akses event ditutup. Hanya penulis/admin yang boleh edit/hapus/resolve; hapus oleh admin atas catatan orang lain menulis audit log.
 - Final lock requires intentional authorized action.
 - Overdue task and equipment blocker aggregation.
 - Cancelled rehearsal excluded from upcoming list.
