@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { parseLegacyChart } from "@/lib/chart-arrangement";
+import type { SongNoteTargetOption, SongNoteView } from "@/lib/song-note";
 import { formatJakarta } from "@/lib/format";
 import {
   deleteChordChartAction,
@@ -16,7 +18,16 @@ import {
 } from "@server/actions/chords";
 import type { ActionState } from "@server/actions/auth";
 import { ChordOverUnderEditor } from "./ChordOverUnderEditor";
-import { ChordViewer } from "./ChordViewer";
+import {
+  ChordViewer,
+  type ChartDisplaySection,
+  type SectionNoteAnnotations,
+} from "./ChordViewer";
+import {
+  SectionGeneralNotePanel,
+  SectionTargetNoteCallout,
+  type NoteSectionOption,
+} from "./SongNotes";
 
 const inputClass =
   "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900";
@@ -34,20 +45,77 @@ export interface ChartView {
 export function ChordChartSection({
   songId,
   eventId,
+  eventSongId,
   admin,
   charts,
   arrangement,
-  noteCountsBySection,
+  sections,
+  notes,
+  noteTargetOptions,
+  canWriteNotes,
+  canModerateNotes,
+  currentUserId,
+  defaultPart,
 }: {
   songId: string;
   eventId: string;
+  eventSongId: string;
   admin: boolean;
   charts: ChartView[];
-  arrangement: { name: string; content: string } | null;
-  noteCountsBySection?: Record<string, number>;
+  arrangement: {
+    name: string;
+    content: string;
+    sections: ChartDisplaySection[];
+  } | null;
+  sections: NoteSectionOption[];
+  notes: SongNoteView[];
+  noteTargetOptions: SongNoteTargetOption[];
+  canWriteNotes: boolean;
+  canModerateNotes: boolean;
+  currentUserId: string;
+  defaultPart: string | null;
 }) {
   const active = charts.find((c) => c.isActive) ?? null;
   const history = charts.filter((c) => !c.isActive);
+  const displaySections =
+    arrangement?.sections ??
+    (active
+      ? parseLegacyChart(active.content).map((section, index) => {
+          const matchingSection = sections.find(
+            (item) =>
+              item.label.trim().toLocaleLowerCase("id") ===
+              section.label.trim().toLocaleLowerCase("id"),
+          );
+          return {
+            id: matchingSection?.id ?? `${active.id}-section-${index}`,
+            label: section.label,
+            content: section.content,
+          };
+        })
+      : []);
+  const getSectionAnnotations = (
+    sectionId: string,
+  ): SectionNoteAnnotations | undefined => {
+    const section = sections.find((item) => item.id === sectionId);
+    if (!section) return undefined;
+    const sectionNotes = notes.filter((note) => note.sectionId === sectionId);
+    const props = {
+      songId,
+      eventSongId,
+      sectionId,
+      notes: sectionNotes,
+      sections,
+      targetOptions: noteTargetOptions,
+      defaultPart,
+      canWrite: canWriteNotes,
+      canModerate: canModerateNotes,
+      currentUserId,
+    };
+    return {
+      targeted: <SectionTargetNoteCallout {...props} />,
+      general: <SectionGeneralNotePanel {...props} />,
+    };
+  };
 
   const legacyAdmin = (
     <LegacyChartAdmin songId={songId} active={active} history={history} />
@@ -77,7 +145,8 @@ export function ChordChartSection({
           <ChordViewer
             content={arrangement.content}
             baseKey="C"
-            noteCountsByLabel={noteCountsBySection}
+            sections={displaySections}
+            getSectionAnnotations={getSectionAnnotations}
           />
         </div>
       ) : active ? (
@@ -87,7 +156,12 @@ export function ChordChartSection({
             {active.originalKey ? ` (dari ${active.originalKey})` : ""}
             {active.label ? ` · ${active.label}` : ""}
           </p>
-          <ChordViewer content={active.content} baseKey={active.baseKey} />
+          <ChordViewer
+            content={active.content}
+            baseKey={active.baseKey}
+            sections={displaySections}
+            getSectionAnnotations={getSectionAnnotations}
+          />
         </div>
       ) : (
         <EmptyState

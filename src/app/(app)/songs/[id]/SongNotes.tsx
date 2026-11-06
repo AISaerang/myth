@@ -17,6 +17,7 @@ import { formatJakarta } from "@/lib/format";
 import {
   NOTE_STATUS_LABEL,
   NO_SECTION_LABEL,
+  type SongNoteTargetOption,
   type SongNoteView,
 } from "@/lib/song-note";
 import type { ActionState } from "@server/actions/auth";
@@ -50,7 +51,7 @@ export function SongNotes({
   defaultPart,
   canWrite,
   currentUserId,
-  admin,
+  canModerate,
 }: {
   songId: string;
   eventSongId: string;
@@ -60,7 +61,7 @@ export function SongNotes({
   defaultPart: string | null;
   canWrite: boolean;
   currentUserId: string;
-  admin: boolean;
+  canModerate: boolean;
 }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
   const [sectionFilter, setSectionFilter] = useState("all");
@@ -112,134 +113,138 @@ export function SongNotes({
 
   return (
     <Card title={`Catatan Part (${openCount} terbuka)`}>
-      <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-        Catatan per bagian lagu dari POV pemusik — misalnya pola ritme drum,
-        layer keyboard, atau fingering gitar. Semua personel event bisa membaca;
-        penulis dan MD bisa menandai selesai.
-      </p>
-
-      <datalist id="song-note-parts">
-        {parts.map((part) => (
-          <option key={part} value={part} />
-        ))}
-      </datalist>
-
-      {canWrite ? (
-        <NoteComposer
-          songId={songId}
-          eventSongId={eventSongId}
-          sections={sections}
-          defaultPart={defaultPart}
-        />
-      ) : (
-        <p className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-          Mode baca. Membuat catatan tersedia untuk personel event pada lagu
-          yang sudah dipublish.
-        </p>
-      )}
-
-      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          Status
-          <select
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value as StatusFilter)
-            }
-            className={inputClass}
-          >
-            <option value="open">Terbuka</option>
-            <option value="resolved">Selesai</option>
-            <option value="all">Semua</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          Bagian
-          <select
-            value={sectionFilter}
-            onChange={(event) => setSectionFilter(event.target.value)}
-            className={inputClass}
-          >
-            <option value="all">Semua bagian</option>
-            {sectionOptions.map((section) => (
-              <option key={section.id} value={section.id}>
-                {section.label}
-              </option>
-            ))}
-            <option value="__none__">{NO_SECTION_LABEL}</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          Part
-          <select
-            value={partFilter}
-            onChange={(event) => setPartFilter(event.target.value)}
-            className={inputClass}
-          >
-            <option value="all">Semua part</option>
+      <details>
+        <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
+          Semua catatan dan filter
+        </summary>
+        <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
+          <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+            Catatan tanpa section juga dikelola di sini. Akses catatan target
+            dibatasi pada instrumen yang ditugaskan di lagu-event ini.
+          </p>
+          <datalist id="song-note-parts">
             {parts.map((part) => (
-              <option key={part} value={part}>
-                {part}
-              </option>
+              <option key={part} value={part} />
             ))}
-          </select>
-        </label>
-      </div>
-
-      {visible.length === 0 ? (
-        <EmptyState
-          title={
-            notes.length === 0
-              ? "Belum ada catatan part"
-              : "Tidak ada catatan yang cocok dengan filter"
-          }
-          description={
-            notes.length === 0 && canWrite
-              ? "Mulai dari bagian yang sedang kamu latih — tulis pola atau arahan part-mu."
-              : undefined
-          }
-        />
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {visible.map((note) => {
-            const canModify =
-              canWrite && (admin || note.authorUserId === currentUserId);
-            return (
-              <li key={note.id} id={`note-${note.id}`}>
-                <NoteCard
-                  note={note}
-                  songId={songId}
-                  eventSongId={eventSongId}
-                  sections={sections}
-                  canWrite={canWrite}
-                  canModify={canModify}
-                  canReply={canWrite && note.status === "OPEN"}
-                  admin={admin}
-                  currentUserId={currentUserId}
-                  replying={replyingTo === note.id}
-                  editing={editingId === note.id}
-                  onReply={() => {
-                    setEditingId(null);
-                    setReplyingTo((current) =>
-                      current === note.id ? null : note.id,
-                    );
-                  }}
-                  onEdit={() => {
-                    setReplyingTo(null);
-                    setEditingId((current) =>
-                      current === note.id ? null : note.id,
-                    );
-                  }}
-                  onDone={() => {
-                    setReplyingTo(null);
-                    setEditingId(null);
-                  }}
-                />
-              </li>
-            );
-          })}
-        </ul>
-      )}
+          </datalist>
+          {canWrite ? (
+            <details className="mb-4 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+              <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium">
+                Tambah catatan umum untuk lagu
+              </summary>
+              <NoteComposer
+                songId={songId}
+                eventSongId={eventSongId}
+                defaultPart={defaultPart}
+                targetOptions={[]}
+                sectionId=""
+              />
+            </details>
+          ) : null}
+          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Status
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as StatusFilter)
+                }
+                className={inputClass}
+              >
+                <option value="open">Terbuka</option>
+                <option value="resolved">Selesai</option>
+                <option value="all">Semua</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Bagian
+              <select
+                value={sectionFilter}
+                onChange={(event) => setSectionFilter(event.target.value)}
+                className={inputClass}
+              >
+                <option value="all">Semua bagian</option>
+                {sectionOptions.map((section) => (
+                  <option key={section.id} value={section.id}>
+                    {section.label}
+                  </option>
+                ))}
+                <option value="__none__">{NO_SECTION_LABEL}</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Part penulis
+              <select
+                value={partFilter}
+                onChange={(event) => setPartFilter(event.target.value)}
+                className={inputClass}
+              >
+                <option value="all">Semua part</option>
+                {parts.map((part) => (
+                  <option key={part} value={part}>
+                    {part}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {visible.length === 0 ? (
+            <EmptyState
+              title={
+                notes.length === 0
+                  ? "Belum ada catatan part"
+                  : "Tidak ada catatan yang cocok dengan filter"
+              }
+              description={
+                notes.length === 0 && canWrite
+                  ? "Gunakan tombol catatan pada section untuk memberi konteks."
+                  : undefined
+              }
+            />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {visible.map((note) => {
+                const canModify =
+                  canWrite &&
+                  (canModerate || note.authorUserId === currentUserId);
+                return (
+                  <li key={note.id} id={`note-${note.id}`}>
+                    <NoteCard
+                      note={note}
+                      songId={songId}
+                      eventSongId={eventSongId}
+                      sections={sections}
+                      canWrite={canWrite}
+                      canModify={canModify}
+                      canReply={canWrite && note.status === "OPEN"}
+                      canModerate={canModerate}
+                      currentUserId={currentUserId}
+                      replying={replyingTo === note.id}
+                      editing={editingId === note.id}
+                      onReply={() => {
+                        setEditingId(null);
+                        setReplyingTo((current) =>
+                          current === note.id ? null : note.id,
+                        );
+                      }}
+                      onEdit={() => {
+                        setReplyingTo(null);
+                        setEditingId((current) =>
+                          current === note.id ? null : note.id,
+                        );
+                      }}
+                      onDone={() => {
+                        setReplyingTo(null);
+                        setEditingId(null);
+                      }}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </details>
     </Card>
   );
 }
@@ -247,13 +252,17 @@ export function SongNotes({
 function NoteComposer({
   songId,
   eventSongId,
-  sections,
   defaultPart,
+  sectionId,
+  targetOptions,
+  requireTarget = false,
 }: {
   songId: string;
   eventSongId: string;
-  sections: NoteSectionOption[];
   defaultPart: string | null;
+  sectionId: string;
+  targetOptions: SongNoteTargetOption[];
+  requireTarget?: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
@@ -273,20 +282,32 @@ function NoteComposer({
     >
       <input type="hidden" name="songId" value={songId} />
       <input type="hidden" name="eventSongId" value={eventSongId} />
+      <input type="hidden" name="sectionId" value={sectionId} />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Bagian lagu
-          <select name="sectionId" defaultValue="" className={inputClass}>
-            <option value="">{NO_SECTION_LABEL}</option>
-            {sections.map((section) => (
-              <option key={section.id} value={section.id}>
-                {section.label}
+        {targetOptions.length > 0 ? (
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Audiens
+            <select
+              name="targetInstrumentSkillId"
+              defaultValue=""
+              required={requireTarget}
+              className={inputClass}
+            >
+              <option value="">
+                {requireTarget ? "Pilih instrumen / role" : "Semua personel"}
               </option>
-            ))}
-          </select>
-        </label>
+              {targetOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <input type="hidden" name="targetInstrumentSkillId" value="" />
+        )}
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Part / instrumen
+          POV part penulis
           <input
             name="partLabel"
             list="song-note-parts"
@@ -322,6 +343,258 @@ function NoteComposer({
   );
 }
 
+type SectionAnnotationProps = {
+  songId: string;
+  eventSongId: string;
+  sectionId: string;
+  notes: SongNoteView[];
+  sections: NoteSectionOption[];
+  targetOptions: SongNoteTargetOption[];
+  defaultPart: string | null;
+  canWrite: boolean;
+  canModerate: boolean;
+  currentUserId: string;
+};
+
+export function SectionTargetNoteCallout({
+  songId,
+  eventSongId,
+  sectionId,
+  notes,
+  sections,
+  targetOptions,
+  defaultPart,
+  canWrite,
+  canModerate,
+  currentUserId,
+}: SectionAnnotationProps) {
+  const targeted = notes.filter(
+    (note) =>
+      !note.parentId &&
+      note.status === "OPEN" &&
+      note.targetInstrumentSkillId,
+  );
+  if (targeted.length === 0 && (!canWrite || targetOptions.length === 0)) {
+    return null;
+  }
+  const composer = canWrite && targetOptions.length > 0 ? (
+    <details className="mt-1 border-t border-sky-200 pt-1 dark:border-sky-900">
+      <summary className="min-h-11 cursor-pointer px-2 py-2 text-sm font-medium">
+        Tambah catatan instrumen
+      </summary>
+      <NoteComposer
+        songId={songId}
+        eventSongId={eventSongId}
+        defaultPart={defaultPart}
+        sectionId={sectionId}
+        targetOptions={targetOptions}
+        requireTarget
+      />
+    </details>
+  ) : null;
+  if (targeted.length === 0) {
+    return (
+      <details
+        data-targeted-section-notes=""
+        className="rounded-lg border border-sky-200 px-2 dark:border-sky-900"
+      >
+        <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium">
+          Catatan per instrumen
+        </summary>
+        {composer}
+      </details>
+    );
+  }
+  return (
+    <div
+      data-targeted-section-notes=""
+      className="rounded-lg border border-sky-300 bg-sky-50/70 p-2 dark:border-sky-900 dark:bg-sky-950/30"
+    >
+      <ul className="flex flex-col gap-2">
+        {targeted.map((note) => (
+          <li key={note.id}>
+            <details>
+              <summary className="min-h-11 cursor-pointer rounded-md px-2 py-2 text-sm">
+                <span className="font-semibold">
+                  {note.targetInstrumentSkillName ?? "Instrumen"}
+                </span>
+                {note.partLabel ? ` · dari ${note.partLabel}` : ""}
+                {` — ${note.body.slice(0, 100)}${note.body.length > 100 ? "…" : ""}`}
+              </summary>
+              <InlineNoteThread
+                note={note}
+                songId={songId}
+                eventSongId={eventSongId}
+                sections={sections}
+                canWrite={canWrite}
+                canModerate={canModerate}
+                currentUserId={currentUserId}
+              />
+            </details>
+          </li>
+        ))}
+      </ul>
+      {composer}
+    </div>
+  );
+}
+
+export function SectionGeneralNotePanel({
+  songId,
+  eventSongId,
+  sectionId,
+  notes,
+  sections,
+  defaultPart,
+  canWrite,
+  canModerate,
+  currentUserId,
+}: SectionAnnotationProps) {
+  const general = notes.filter(
+    (note) =>
+      !note.parentId &&
+      note.status === "OPEN" &&
+      !note.targetInstrumentSkillId,
+  );
+  if (general.length === 0 && !canWrite) return null;
+  const composer = canWrite ? (
+    <details className="mt-2 border-t border-zinc-200 pt-1 dark:border-zinc-800">
+      <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium">
+        Tambah catatan umum
+      </summary>
+      <NoteComposer
+        songId={songId}
+        eventSongId={eventSongId}
+        defaultPart={defaultPart}
+        sectionId={sectionId}
+        targetOptions={[]}
+      />
+    </details>
+  ) : null;
+  if (general.length === 0) {
+    return (
+      <details
+        data-general-section-notes=""
+        aria-label="Catatan untuk semua personel"
+        className="min-w-0 rounded-lg border border-zinc-300 px-3 dark:border-zinc-700"
+      >
+        <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">
+          Semua personel
+        </summary>
+        {composer}
+      </details>
+    );
+  }
+  return (
+    <aside
+      data-general-section-notes=""
+      aria-label="Catatan untuk semua personel"
+      className="min-w-0 rounded-lg border border-zinc-300 bg-white p-3 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+    >
+      <h4 className="font-semibold">Semua personel</h4>
+      <ul className="mt-2 flex flex-col gap-2">
+          {general.slice(0, 3).map((note) => (
+            <li key={note.id}>
+              <details>
+                <summary className="min-h-11 cursor-pointer rounded-md bg-zinc-50 px-2 py-2 dark:bg-zinc-900">
+                  <span className="font-medium">{note.authorName}</span>
+                  {note.partLabel ? ` · ${note.partLabel}` : ""}
+                  <span className="mt-1 block line-clamp-2 text-zinc-700 dark:text-zinc-300">
+                    {note.body}
+                  </span>
+                </summary>
+                <InlineNoteThread
+                  note={note}
+                  songId={songId}
+                  eventSongId={eventSongId}
+                  sections={sections}
+                  canWrite={canWrite}
+                  canModerate={canModerate}
+                  currentUserId={currentUserId}
+                />
+              </details>
+            </li>
+          ))}
+          {general.length > 3 ? (
+            <li>
+              <details>
+                <summary className="min-h-11 cursor-pointer px-2 py-2 text-xs underline">
+                  Tampilkan {general.length - 3} catatan lainnya
+                </summary>
+                <ul className="flex flex-col gap-2">
+                  {general.slice(3).map((note) => (
+                    <li key={note.id}>
+                      <InlineNoteThread
+                        note={note}
+                        songId={songId}
+                        eventSongId={eventSongId}
+                        sections={sections}
+                        canWrite={canWrite}
+                        canModerate={canModerate}
+                        currentUserId={currentUserId}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </li>
+          ) : null}
+      </ul>
+      {composer}
+    </aside>
+  );
+}
+
+function InlineNoteThread({
+  note,
+  songId,
+  eventSongId,
+  sections,
+  canWrite,
+  canModerate,
+  currentUserId,
+}: {
+  note: SongNoteView;
+  songId: string;
+  eventSongId: string;
+  sections: NoteSectionOption[];
+  canWrite: boolean;
+  canModerate: boolean;
+  currentUserId: string;
+}) {
+  const [replying, setReplying] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const canModify =
+    canWrite && (canModerate || note.authorUserId === currentUserId);
+  return (
+    <NoteCard
+      note={note}
+      songId={songId}
+      eventSongId={eventSongId}
+      sections={sections}
+      canWrite={canWrite}
+      canModify={canModify}
+      canReply={canWrite && note.status === "OPEN"}
+      canModerate={canModerate}
+      currentUserId={currentUserId}
+      replying={replying}
+      editing={editing}
+      onReply={() => {
+        setEditing(false);
+        setReplying((value) => !value);
+      }}
+      onEdit={() => {
+        setReplying(false);
+        setEditing((value) => !value);
+      }}
+      onDone={() => {
+        setReplying(false);
+        setEditing(false);
+      }}
+    />
+  );
+}
+
 function NoteCard({
   note,
   songId,
@@ -330,7 +603,7 @@ function NoteCard({
   canWrite,
   canModify,
   canReply,
-  admin,
+  canModerate,
   currentUserId,
   replying,
   editing,
@@ -345,7 +618,7 @@ function NoteCard({
   canWrite: boolean;
   canModify: boolean;
   canReply: boolean;
-  admin: boolean;
+  canModerate: boolean;
   currentUserId: string;
   replying: boolean;
   editing: boolean;
@@ -359,6 +632,9 @@ function NoteCard({
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold">{note.authorName}</span>
         {note.partLabel ? <Badge tone="neutral">{note.partLabel}</Badge> : null}
+        {note.targetInstrumentSkillName ? (
+          <Badge tone="neutral">Untuk {note.targetInstrumentSkillName}</Badge>
+        ) : null}
         <Badge tone={note.status === "RESOLVED" ? "success" : "warning"}>
           {NOTE_STATUS_LABEL[note.status]}
         </Badge>
@@ -389,7 +665,7 @@ function NoteCard({
               <DeleteButton
                 noteId={note.id}
                 songId={songId}
-                isAdmin={admin && !isOwn}
+                isAdmin={canModerate && !isOwn}
               />
             </>
           ) : null}
@@ -409,7 +685,8 @@ function NoteCard({
         <ul className="mt-3 flex flex-col gap-2 border-l-2 border-zinc-200 pl-3 dark:border-zinc-800">
           {note.replies.map((reply) => {
             const replyCanModify =
-              canWrite && (admin || reply.authorUserId === currentUserId);
+                canWrite &&
+                (canModerate || reply.authorUserId === currentUserId);
             return (
               <li key={reply.id}>
                 <div className="flex flex-wrap items-center gap-2">
@@ -432,7 +709,9 @@ function NoteCard({
                     reply={reply}
                     songId={songId}
                     sections={sections}
-                    isAdmin={admin && reply.authorUserId !== currentUserId}
+                    isAdmin={
+                      canModerate && reply.authorUserId !== currentUserId
+                    }
                   />
                 ) : null}
               </li>
@@ -447,6 +726,7 @@ function NoteCard({
           eventSongId={eventSongId}
           parentId={note.id}
           defaultPart={note.partLabel}
+          targetInstrumentSkillId={note.targetInstrumentSkillId}
           onDone={onDone}
         />
       ) : null}
@@ -496,12 +776,14 @@ function ReplyForm({
   eventSongId,
   parentId,
   defaultPart,
+  targetInstrumentSkillId,
   onDone,
 }: {
   songId: string;
   eventSongId: string;
   parentId: string;
   defaultPart: string | null;
+  targetInstrumentSkillId: string | null;
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
@@ -520,6 +802,13 @@ function ReplyForm({
       <input type="hidden" name="songId" value={songId} />
       <input type="hidden" name="eventSongId" value={eventSongId} />
       <input type="hidden" name="parentId" value={parentId} />
+      {targetInstrumentSkillId ? (
+        <input
+          type="hidden"
+          name="targetInstrumentSkillId"
+          value={targetInstrumentSkillId}
+        />
+      ) : null}
       <label className="flex flex-col gap-1 text-sm font-medium">
         Balasan
         <textarea

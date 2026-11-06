@@ -12,6 +12,7 @@ import { resolveMedleyNav } from "@/lib/medley-nav";
 import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
 import {
   canManageEvent,
+  canManageSongNotes,
   canReadDrafts,
   canReadEventSong,
   canWriteEventData,
@@ -31,7 +32,6 @@ import {
   listChartSections,
 } from "@server/services/chart-arrangement-service";
 import {
-  countOpenNotesBySectionLabel,
   listSongNotes,
 } from "@server/services/note-service";
 import { listSongTasks } from "@server/services/task-service";
@@ -153,15 +153,37 @@ export default async function SongDetailPage({
       : undefined;
   }
 
-  const [songNotes, noteCounts, chartSections, skillRows] = await Promise.all([
-    listSongNotes(song.eventSongId),
-    countOpenNotesBySectionLabel(song.eventSongId),
+  const assignedInstrumentSkillIds =
+    myAssignment?.instrumentSkillId
+      ? [myAssignment.instrumentSkillId]
+      : [];
+  const [songNotes, chartSections, skillRows] = await Promise.all([
+    listSongNotes(song.eventSongId, {
+      userId: user.id,
+      eventRole,
+      globalAdmin: admin,
+      observer,
+      assignedInstrumentSkillIds,
+    }),
     listChartSections(song.id),
     prisma.instrumentSkill.findMany({
       select: { name: true },
       orderBy: { name: "asc" },
     }),
   ]);
+  const noteTargetOptions = [
+    ...new Map(
+      song.assignments
+        .filter((assignment) => assignment.instrumentSkill)
+        .map((assignment) => [
+          assignment.instrumentSkill!.id,
+          {
+            id: assignment.instrumentSkill!.id,
+            name: assignment.instrumentSkill!.name,
+          },
+        ]),
+    ).values(),
+  ];
   const canWriteNotes =
     !previewing &&
     canWriteSongNotes(
@@ -322,8 +344,21 @@ export default async function SongDetailPage({
       <SongChordChart
         songId={song.id}
         eventId={song.eventId}
+        eventSongId={song.eventSongId}
         admin={showAdminChrome}
-        noteCountsBySection={noteCounts}
+        sections={chartSections.map((section) => ({
+          id: section.id,
+          label: section.label,
+          type: section.type,
+        }))}
+        notes={songNotes}
+        noteTargetOptions={noteTargetOptions}
+        canWriteNotes={canWriteNotes}
+        canModerateNotes={
+          !previewing && canManageSongNotes(user, eventRole)
+        }
+        currentUserId={user.id}
+        defaultPart={myAssignment?.instrumentSkill?.name ?? null}
       />
 
       <SongNotes
@@ -339,7 +374,7 @@ export default async function SongDetailPage({
         defaultPart={myAssignment?.instrumentSkill?.name ?? null}
         canWrite={canWriteNotes}
         currentUserId={user.id}
-        admin={showAdminChrome}
+        canModerate={!previewing && canManageSongNotes(user, eventRole)}
       />
 
       <Card title="Materi aktif">
@@ -544,13 +579,31 @@ export default async function SongDetailPage({
 async function SongChordChart({
   songId,
   eventId,
+  eventSongId,
   admin,
-  noteCountsBySection,
+  sections,
+  notes,
+  noteTargetOptions,
+  canWriteNotes,
+  canModerateNotes,
+  currentUserId,
+  defaultPart,
 }: {
   songId: string;
   eventId: string;
+  eventSongId: string;
   admin: boolean;
-  noteCountsBySection: Record<string, number>;
+  sections: {
+    id: string;
+    label: string;
+    type: string;
+  }[];
+  notes: Awaited<ReturnType<typeof listSongNotes>>;
+  noteTargetOptions: { id: string; name: string }[];
+  canWriteNotes: boolean;
+  canModerateNotes: boolean;
+  currentUserId: string;
+  defaultPart: string | null;
 }) {
   const [charts, arrangement] = await Promise.all([
     listChordCharts(songId),
@@ -560,10 +613,17 @@ async function SongChordChart({
     <ChordChartSection
       songId={songId}
       eventId={eventId}
+      eventSongId={eventSongId}
       admin={admin}
       charts={charts}
       arrangement={arrangement}
-      noteCountsBySection={noteCountsBySection}
+      sections={sections}
+      notes={notes}
+      noteTargetOptions={noteTargetOptions}
+      canWriteNotes={canWriteNotes}
+      canModerateNotes={canModerateNotes}
+      currentUserId={currentUserId}
+      defaultPart={defaultPart}
     />
   );
 }

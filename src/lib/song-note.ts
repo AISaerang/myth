@@ -10,6 +10,8 @@ export interface SongNoteView {
   authorUserId: string;
   authorName: string;
   partLabel: string | null;
+  targetInstrumentSkillId: string | null;
+  targetInstrumentSkillName: string | null;
   body: string;
   status: SongNoteStatus;
   resolvedAt: Date | null;
@@ -25,3 +27,8 @@ export const NOTE_STATUS_LABEL: Record<SongNoteStatus, string> = {
 
 // Catatan tanpa bagian tetap punya label yang ramah di UI.
 export const NO_SECTION_LABEL = "Lagu (umum)";
+
+export interface SongNoteTargetOption {
+  id: string;
+  name: string;
+}

@@ -2,6 +2,7 @@ import "server-only";
 import { AuditAction, writeAudit } from "@/lib/audit";
 import {
   composeArrangementContent,
+  displaySectionLabel,
   makeUniqueSectionLabel,
   parseLegacyChart,
 } from "@/lib/chart-arrangement";
@@ -55,7 +56,15 @@ export async function getChartArrangementContext(songId: string) {
 
 export async function getActiveArrangementContent(
   songId: string,
-): Promise<{ name: string; content: string } | null> {
+): Promise<{
+  name: string;
+  content: string;
+  sections: {
+    id: string;
+    label: string;
+    content: string;
+  }[];
+} | null> {
   const active = await prisma.chartArrangement.findFirst({
     where: { songId, isActive: true },
     include: {
@@ -68,7 +77,17 @@ export async function getActiveArrangementContent(
   if (!active || active.items.length === 0) return null;
   const content = composeArrangementContent(active.items);
   if (!content) return null;
-  return { name: active.name, content };
+  const sections = active.items
+    .map(({ section, labelOverride }) => ({
+      id: section.id,
+      label: displaySectionLabel(labelOverride?.trim() || section.label, {
+        type: section.type,
+        content: section.content,
+      }),
+      content: section.content.trim(),
+    }))
+    .filter((section) => Boolean(section.content));
+  return { name: active.name, content, sections };
 }
 
 export async function createChartSection(

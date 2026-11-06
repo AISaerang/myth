@@ -19,6 +19,8 @@ export const songNoteSchema = z.object({
   sectionId: z.string().min(1).optional(),
   // Hanya balasan satu tingkat; server memastikan induknya top-level.
   parentId: z.string().min(1).optional(),
+  // Null/absent = catatan umum; target hanya dapat dipilih dari assignment lagu.
+  targetInstrumentSkillId: z.string().min(1).optional(),
   partLabel: partLabelSchema,
   body: bodySchema,
 });

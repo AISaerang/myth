@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { KeyTransposeBar } from "@/components/KeyTransposeBar";
 import { NotationLine } from "@/components/NotAngka";
@@ -19,6 +20,17 @@ import {
 } from "@/lib/jianpu-align";
 
 type ViewMode = "both" | "lyrics" | "chords";
+
+export interface ChartDisplaySection {
+  id: string;
+  label: string;
+  content: string;
+}
+
+export interface SectionNoteAnnotations {
+  targeted: ReactNode;
+  general: ReactNode;
+}
 
 const MODES: { value: ViewMode; label: string }[] = [
   { value: "both", label: "Lirik + Chord" },
@@ -50,7 +62,6 @@ function renderChart(
   content: string,
   mode: ViewMode,
   key: string,
-  noteCountsByLabel?: Record<string, number>,
 ) {
   const lines = content.split("\n");
   return lines.map((line, index) => {
@@ -70,8 +81,6 @@ function renderChart(
     }
 
     const shownLabel = sectionLabelAt(lines, index);
-    const noteCount = shownLabel ? noteCountsByLabel?.[shownLabel] : undefined;
-
     if (mode === "chords") {
       if (shownLabel) {
         return (
@@ -80,7 +89,7 @@ function renderChart(
             data-section-label={shownLabel}
             className="overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap"
           >
-            {`— ${shownLabel}${noteCount ? ` · ${noteCount} catatan` : ""} —`}
+            {`— ${shownLabel} —`}
           </pre>
         );
       }
@@ -109,11 +118,6 @@ function renderChart(
           }`}
         >
           {shown}
-          {noteCount ? (
-            <span className="ml-2 font-normal normal-case text-zinc-500">
-              · {noteCount} catatan
-            </span>
-          ) : null}
         </div>
       );
     }
@@ -191,15 +195,13 @@ export function ChartBody({
   content,
   mode = "both",
   renderKey,
-  noteCountsByLabel,
 }: {
   content: string;
   mode?: ViewMode;
   renderKey: string;
-  noteCountsByLabel?: Record<string, number>;
 }) {
   return (
-    <>{renderChart(content, mode, renderKey, noteCountsByLabel)}</>
+    <>{renderChart(content, mode, renderKey)}</>
   );
 }
 
@@ -207,12 +209,16 @@ export function ChordViewer({
   content,
   baseKey,
   initialOffset = 0,
-  noteCountsByLabel,
+  sections,
+  getSectionAnnotations,
 }: {
   content: string;
   baseKey: string;
   initialOffset?: number;
-  noteCountsByLabel?: Record<string, number>;
+  sections?: ChartDisplaySection[];
+  getSectionAnnotations?: (
+    sectionId: string,
+  ) => SectionNoteAnnotations | undefined;
 }) {
   const [offset, setOffset] = useState(initialOffset);
   const [useFlats, setUseFlats] = useState(false);
@@ -266,12 +272,49 @@ export function ChordViewer({
         ))}
       </div>
       <div data-chart-body="" className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
-        <ChartBody
-          content={transposed}
-          mode={mode}
-          renderKey={`${offset}-${useFlats}-${mode}`}
-          noteCountsByLabel={noteCountsByLabel}
-        />
+        {sections ? (
+          <div className="flex flex-col gap-5">
+            {sections.map((section, index) => {
+              const annotations = getSectionAnnotations?.(section.id);
+              return (
+                <section
+                  key={`${section.id}-${index}`}
+                  data-chart-section={section.id}
+                  className="min-w-0 border-b border-zinc-200 pb-4 last:border-b-0 last:pb-0 dark:border-zinc-800"
+                >
+                  <div className="mb-2 flex min-w-0 flex-col gap-2">
+                    <h3 className="text-xs font-semibold tracking-wide text-zinc-500">
+                      {section.label}
+                    </h3>
+                    {annotations?.targeted}
+                  </div>
+                  <div
+                    className={`grid min-w-0 grid-cols-1 gap-3 ${
+                      annotations?.general
+                        ? "lg:grid-cols-[minmax(0,1fr)_16rem]"
+                        : ""
+                    }`}
+                  >
+                    <div className="min-w-0 overflow-x-auto">
+                      {renderChart(
+                        transposeContent(section.content, offset, useFlats),
+                        mode,
+                        `${offset}-${useFlats}-${mode}-${section.id}-${index}`,
+                      )}
+                    </div>
+                    {annotations?.general}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        ) : (
+          <ChartBody
+            content={transposed}
+            mode={mode}
+            renderKey={`${offset}-${useFlats}-${mode}`}
+          />
+        )}
       </div>
     </div>
   );

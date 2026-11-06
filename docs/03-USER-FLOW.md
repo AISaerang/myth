@@ -44,10 +44,11 @@
 ## Catatan part (POV pemusik)
 1. Pemusik membuka lagu yang sudah publish di event-nya.
 2. Pilih bagian lagu (Intro/Verse/Chorus/dll) atau biarkan "Lagu (umum)".
-3. Isi part/instrumen (default dari assignment, misalnya Drum/Keyboard/Gitar) dan catatan teknisnya — pola ritme, layer, fingering, power chord, dan sebagainya.
-4. Catatan tampil untuk semua personel event; pemusik lain atau MD dapat membalas.
-5. Penulis atau MD menandai selesai; catatan selesai tetap tersedia lewat filter "Selesai".
-6. Pemantau (`OBSERVER`) hanya membaca. Admin dapat menghapus catatan personel lain dan tindakan itu masuk audit log.
+3. Isi POV part penulis (default dari assignment, misalnya Drum/Keyboard/Gitar) dan catatan teknisnya — pola ritme, layer, fingering, power chord, dan sebagainya.
+4. Pilih audiens: semua personel atau instrumen/role musikal yang memiliki assignment pada lagu-event ini. Catatan bertarget hanya terlihat bagi assignment yang cocok, penulisnya, dan admin event.
+5. Catatan section umum tampil di samping lirik pada desktop dan di bawah chart pada mobile; catatan bertarget tampil sebagai callout ringkas di atas isi section. Thread yang sama tetap dapat dibuka dan dikelola dari daftar semua catatan.
+6. Balasan mewarisi audiens induk. Penulis atau admin menandai selesai; catatan selesai tetap tersedia lewat filter "Selesai".
+7. Pemantau (`OBSERVER`) hanya membaca catatan umum. Admin dapat menghapus catatan personel lain dan tindakan itu masuk audit log.
 
 ## Batch release
 1. Pilih sekitar 2 lagu yang siap dipelajari.
