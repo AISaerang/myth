@@ -37,6 +37,9 @@ Kategori: Original, Arrangement Reference, Part Guide, Chord Chart, Lyrics, Clic
 ### Practice progress
 Status: `NOT_STARTED`, `LEARNING`, `TRIED_WITH_REFERENCE`, `NEEDS_HELP`, `READY_FOR_REHEARSAL`. User hanya mengubah progres sendiri; admin melihat semua.
 
+### Catatan part (song notes)
+Catatan per pemusik dari POV part masing-masing pada satu lagu di satu event, mirip komentar Microsoft Word. Catatan dapat menempel ke bagian chart (Intro/Verse/Chorus/dll) atau level lagu, punya part/instrumen, balasan satu tingkat, serta status `OPEN`/`RESOLVED`. Semua personel event membaca catatan pada lagu yang boleh mereka lihat; `OBSERVER` hanya membaca. Penulis dan admin dapat mengubah/menandai selesai; admin dapat menghapus catatan personel lain (dicatat di audit log).
+
 ### Tasks/issues
 Judul, deskripsi, PIC, due date, prioritas, status, relasi lagu/rehearsal/equipment. Status: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `CANCELLED`. Blocker harus punya owner dan tindak lanjut. Usulan dari USER/OBSERVER dibuat sebagai task `TODO` tanpa PIC (prioritas `MEDIUM`, deskripsi min. 10 karakter, lagu terkait wajib publish) dan dimoderasi MD; pemilik boleh revisi selama masih `TODO`.
 

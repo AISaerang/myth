@@ -46,7 +46,12 @@ function sectionLabelAt(lines: string[], index: number): string | null {
   return displaySectionLabel(layout.label, { content: body.join("\n") });
 }
 
-function renderChart(content: string, mode: ViewMode, key: string) {
+function renderChart(
+  content: string,
+  mode: ViewMode,
+  key: string,
+  noteCountsByLabel?: Record<string, number>,
+) {
   const lines = content.split("\n");
   return lines.map((line, index) => {
     const lineKey = `${key}-${index}`;
@@ -65,6 +70,7 @@ function renderChart(content: string, mode: ViewMode, key: string) {
     }
 
     const shownLabel = sectionLabelAt(lines, index);
+    const noteCount = shownLabel ? noteCountsByLabel?.[shownLabel] : undefined;
 
     if (mode === "chords") {
       if (shownLabel) {
@@ -74,7 +80,7 @@ function renderChart(content: string, mode: ViewMode, key: string) {
             data-section-label={shownLabel}
             className="overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap"
           >
-            {`— ${shownLabel} —`}
+            {`— ${shownLabel}${noteCount ? ` · ${noteCount} catatan` : ""} —`}
           </pre>
         );
       }
@@ -103,6 +109,11 @@ function renderChart(content: string, mode: ViewMode, key: string) {
           }`}
         >
           {shown}
+          {noteCount ? (
+            <span className="ml-2 font-normal normal-case text-zinc-500">
+              · {noteCount} catatan
+            </span>
+          ) : null}
         </div>
       );
     }
@@ -180,22 +191,28 @@ export function ChartBody({
   content,
   mode = "both",
   renderKey,
+  noteCountsByLabel,
 }: {
   content: string;
   mode?: ViewMode;
   renderKey: string;
+  noteCountsByLabel?: Record<string, number>;
 }) {
-  return <>{renderChart(content, mode, renderKey)}</>;
+  return (
+    <>{renderChart(content, mode, renderKey, noteCountsByLabel)}</>
+  );
 }
 
 export function ChordViewer({
   content,
   baseKey,
   initialOffset = 0,
+  noteCountsByLabel,
 }: {
   content: string;
   baseKey: string;
   initialOffset?: number;
+  noteCountsByLabel?: Record<string, number>;
 }) {
   const [offset, setOffset] = useState(initialOffset);
   const [useFlats, setUseFlats] = useState(false);
@@ -253,6 +270,7 @@ export function ChordViewer({
           content={transposed}
           mode={mode}
           renderKey={`${offset}-${useFlats}-${mode}`}
+          noteCountsByLabel={noteCountsByLabel}
         />
       </div>
     </div>

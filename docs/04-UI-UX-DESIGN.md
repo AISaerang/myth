@@ -39,9 +39,10 @@ Song detail:
 3. Assigned personnel/instruments.
 4. Materials and active version.
 5. Practice progress.
-6. Version history.
-7. Tasks/issues.
-8. Decision notes.
+6. Catatan Part: kartu per bagian lagu dengan filter status/bagian/part, balasan, edit/hapus milik sendiri, tombol tandai selesai, dan badge jumlah catatan terbuka di heading bagian chart.
+7. Version history.
+8. Tasks/issues.
+9. Decision notes.
 
 Materi aktif harus mudah dikenali; versi lama ditandai superseded/archive.
 

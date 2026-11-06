@@ -9,9 +9,11 @@ import {
   canReadDrafts,
   canWriteEventData,
   canReadEventSong,
+  canModifySongNote,
   canSuggest,
   canUpdateProgress,
   canViewAllProgress,
+  canWriteSongNotes,
   isAdmin,
   isObserver,
   roleLabel,
@@ -197,5 +199,38 @@ describe("permissions", () => {
     expect(canSuggest(user)).toBe(true);
     expect(canSuggest(observer)).toBe(true);
     expect(canSuggest(admin)).toBe(false);
+  });
+
+  describe("song part notes", () => {
+    it("lets members write on published songs only", () => {
+      expect(canWriteSongNotes(user, "MEMBER", false, true)).toBe(true);
+      expect(canWriteSongNotes(user, "MEMBER", false, false)).toBe(false);
+      expect(canWriteSongNotes(user, null, false, true)).toBe(false);
+    });
+
+    it("lets event admins write drafts, but not when access is closed", () => {
+      expect(canWriteSongNotes(user, "EVENT_ADMIN", false, false)).toBe(true);
+      expect(canWriteSongNotes(user, "EVENT_ADMIN", true, true)).toBe(false);
+    });
+
+    it("keeps OBSERVER read-only even on published songs", () => {
+      expect(canWriteSongNotes(observer, "OBSERVER", false, true)).toBe(false);
+    });
+
+    it("lets global admin write even when event access is closed", () => {
+      expect(canWriteSongNotes(admin, "EVENT_ADMIN", true, false)).toBe(true);
+    });
+
+    it("lets authors and admins modify a note, but not other members", () => {
+      expect(canModifySongNote(user, "user-1")).toBe(true);
+      expect(canModifySongNote(user, "user-2")).toBe(false);
+      expect(canModifySongNote(admin, "user-2")).toBe(true);
+      expect(canModifySongNote(observer, "obs-1")).toBe(false);
+    });
+
+    it("lets event admins moderate notes within their event", () => {
+      expect(canModifySongNote(user, "user-2", "EVENT_ADMIN")).toBe(true);
+      expect(canModifySongNote(user, "user-2", "MEMBER")).toBe(false);
+    });
   });
 });

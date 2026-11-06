@@ -109,3 +109,38 @@ export function canUpdateProgress(
   if (actor.role === "OBSERVER") return false;
   return actor.id === targetUserId || actor.role === "ADMIN";
 }
+
+// Catatan part (mirip komentar Word) pada lagu di satu event.
+// OBSERVER hanya membaca; MEMBER boleh menulis di lagu Publish;
+// EVENT_ADMIN juga boleh di draft; ADMIN selalu boleh (termasuk event
+// yang aksesnya sudah ditutup). Akses event tetap dicek di action.
+export function canWriteSongNotes(
+  actor: SessionUser,
+  eventRole: EventRole | null,
+  accessClosed: boolean,
+  isPublished: boolean,
+): boolean {
+  if (isObserver(actor)) return false;
+  if (isAdmin(actor)) return true;
+  if (!eventRole || accessClosed) return false;
+  return isPublished || canReadDrafts(eventRole);
+}
+
+export function canManageSongNotes(
+  actor: SessionUser,
+  eventRole: EventRole | null,
+): boolean {
+  if (isObserver(actor)) return false;
+  return isAdmin(actor) || canManageEvent(eventRole);
+}
+
+// Pemilik catatan boleh mengubah/menandai selesai; ADMIN memoderasi
+// semua catatan (hapus selalu diaudit).
+export function canModifySongNote(
+  actor: SessionUser,
+  authorUserId: string,
+  eventRole: EventRole | null = null,
+): boolean {
+  if (isObserver(actor)) return false;
+  return canManageSongNotes(actor, eventRole) || actor.id === authorUserId;
+}
