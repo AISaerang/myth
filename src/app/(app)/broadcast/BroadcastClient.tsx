@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { buildDirectMessage } from "@/lib/broadcast-messages";
+import { DEFAULT_TEMP_PASSWORD_HELPER } from "@/lib/password-policy";
 import { createInviteAction } from "@server/actions/invites";
 import type { BroadcastRecipient } from "@server/services/broadcast-service";
 
@@ -45,9 +46,11 @@ export function GroupMessageCard({ message }: { message: string }) {
 export function DirectMessageCard({
   recipient,
   appUrl,
+  defaultPassword,
 }: {
   recipient: BroadcastRecipient;
   appUrl: string;
+  defaultPassword: string;
 }) {
   const initial = buildDirectMessage({
     displayName: recipient.displayName,
@@ -57,6 +60,7 @@ export function DirectMessageCard({
     assignmentCount: recipient.assignmentCount,
     isAdmin: recipient.role === "ADMIN",
     isObserver: recipient.role === "OBSERVER",
+    passwordPlaceholder: defaultPassword,
   });
   const [message, setMessage] = useState(initial);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -111,12 +115,9 @@ export function DirectMessageCard({
           </Button>
         </div>
         {inviteError ? <Alert tone="danger">{inviteError}</Alert> : null}
-        {message.includes("[PASSWORD SEMENTARA]") ? (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Ganti [PASSWORD SEMENTARA] dengan password sekali-tampil dari
-            halaman Personel &amp; Akses (saat buat/reset akun).
-          </p>
-        ) : null}
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          {DEFAULT_TEMP_PASSWORD_HELPER}
+        </p>
       </div>
     </Card>
   );

@@ -5,10 +5,17 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PasswordField } from "@/components/ui/PasswordField";
-import { PASSWORD_MAX_LENGTH } from "@/lib/password-policy";
+import {
+  DEFAULT_TEMP_PASSWORD_HELPER,
+  PASSWORD_MAX_LENGTH,
+} from "@/lib/password-policy";
 import { createUserAction } from "@server/actions/admin-users";
 
-export function CreateUserForm() {
+export function CreateUserForm({
+  defaultPassword,
+}: {
+  defaultPassword: string;
+}) {
   const [state, formAction, pending] = useActionState(createUserAction, {
     ok: false,
   });
@@ -74,7 +81,8 @@ export function CreateUserForm() {
           label="Password sementara (opsional)"
           autoComplete="new-password"
           maxLength={PASSWORD_MAX_LENGTH}
-          helper="Kosongkan untuk membuat password acak. Jika diisi, password ini yang dipakai (minimal 1 karakter) dan user wajib menggantinya saat login pertama."
+          defaultValue={defaultPassword}
+          helper={`${DEFAULT_TEMP_PASSWORD_HELPER} Kosongkan untuk password acak.`}
         />
         {!state.ok && state.error ? (
           <Alert tone="danger">{state.error}</Alert>

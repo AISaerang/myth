@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAdminUser } from "@/lib/auth";
+import { defaultTempPassword } from "@/lib/default-temp-password";
 import { formatJakarta } from "@/lib/format";
 import { roleLabel } from "@/lib/permissions";
 import { listUsers } from "@server/services/user-service";
@@ -16,13 +17,14 @@ import {
 export default async function PeoplePage() {
   const admin = await requireAdminUser();
   const users = await listUsers();
+  const defaultPassword = defaultTempPassword();
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
         Personel &amp; Akses
       </h1>
-      <CreateUserForm />
+      <CreateUserForm defaultPassword={defaultPassword} />
       <Card title={`Terdaftar (${users.length})`}>
         {users.length === 0 ? (
           <EmptyState title="Belum ada akun" />
@@ -66,6 +68,7 @@ export default async function PeoplePage() {
                     <ResetPasswordForm
                       userId={u.id}
                       username={u.username}
+                      defaultPassword={defaultPassword}
                     />
                     <InviteLinkForm userId={u.id} username={u.username} />
                     <ActiveToggleForm

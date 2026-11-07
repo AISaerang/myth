@@ -13,6 +13,7 @@ interface PasswordFieldProps {
   helper?: string;
   disabled?: boolean;
   placeholder?: string;
+  defaultValue?: string;
 }
 
 // Show/hide control for every password input. The button is type="button"
@@ -29,6 +30,7 @@ export function PasswordField({
   helper,
   disabled,
   placeholder,
+  defaultValue,
 }: PasswordFieldProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
@@ -51,6 +53,7 @@ export function PasswordField({
           maxLength={maxLength}
           disabled={disabled}
           placeholder={placeholder}
+          defaultValue={defaultValue}
           aria-describedby={helperId}
           autoCapitalize="off"
           autoCorrect="off"

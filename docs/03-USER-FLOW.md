@@ -10,7 +10,7 @@
 ## Admin membuat akun
 1. Buka People & Access → Tambah personel.
 2. Isi display name, username, role, skill/instrumen, asal jemaat opsional.
-3. Admin mengisi password sementara, atau mengosongkan field agar sistem menghasilkan password acak. Reset memakai aturan yang sama.
+3. Field password sementara sudah terisi `DEFAULT_TEMP_PASSWORD` (fallback `1234567890ais`). Admin boleh mengubahnya, atau mengosongkannya agar sistem menghasilkan password acak. Reset memakai aturan yang sama.
 4. Simpan hash saja; `mustChangePassword=true`, termasuk password yang diketik admin.
 5. Tampilkan password sementara satu kali.
 6. Admin mengirimkan melalui kanal privat, bukan grup.

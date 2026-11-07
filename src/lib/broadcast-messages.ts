@@ -2,6 +2,8 @@
 // Pure functions: every personal detail comes from arguments so the
 // templates are unit-testable without a database.
 
+import { FALLBACK_TEMP_PASSWORD } from "@/lib/password-policy";
+
 export type BroadcastVariant = "band" | "singer" | "coordinator";
 
 const BAND_SKILLS = new Set([
@@ -63,7 +65,7 @@ const VARIANT_PARAGRAPH: Record<BroadcastVariant, string> = {
 export function buildDirectMessage(input: DirectMessageInput): string {
   const variant = resolveBroadcastVariant(input.skills);
   const inviteLink = input.inviteLinkPlaceholder ?? "[LINK UNDANGAN]";
-  const password = input.passwordPlaceholder ?? "[PASSWORD SEMENTARA]";
+  const password = input.passwordPlaceholder ?? FALLBACK_TEMP_PASSWORD;
   const lines = [
     `Shalom ${FIRST_NAME(input.displayName)}! 🙏 Ini admin tim musik, mau kasih akses portal tim kita: *Music Youth Team Hub* 🎶`,
     "",
