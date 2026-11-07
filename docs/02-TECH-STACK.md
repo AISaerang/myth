@@ -54,7 +54,7 @@ Write: session → input validation → authorization + record ownership check �
 
 ## Environment
 `.env.example` boleh berisi placeholder saja:
-`DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD`, optional Google OAuth vars. Jangan commit `.env.local`.
+`DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `DEFAULT_TEMP_PASSWORD`, `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD`, optional Google OAuth vars. Jangan commit `.env.local`.
 
 ## Security
 Cookie HttpOnly/Secure di production/SameSite sesuai kebutuhan; login error generik; throttling login bila tersedia; Argon2id atau bcrypt; tidak ada secret di client bundle/log. Bootstrap admin harus idempotent dan dinonaktifkan setelah digunakan.

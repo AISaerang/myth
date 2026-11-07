@@ -5,7 +5,10 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { PasswordField } from "@/components/ui/PasswordField";
 import type { Role } from "@/generated/prisma/client";
-import { PASSWORD_MAX_LENGTH } from "@/lib/password-policy";
+import {
+  DEFAULT_TEMP_PASSWORD_HELPER,
+  PASSWORD_MAX_LENGTH,
+} from "@/lib/password-policy";
 import {
   resetUserPasswordAction,
   setUserActiveAction,
@@ -20,10 +23,12 @@ function HiddenUserId({ userId }: { userId: string }) {
 export function ResetPasswordForm({
   userId,
   username,
+  defaultPassword,
   disabled,
 }: {
   userId: string;
   username: string;
+  defaultPassword: string;
   disabled?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -45,8 +50,9 @@ export function ResetPasswordForm({
           label={`Password baru untuk ${username} (opsional)`}
           autoComplete="new-password"
           maxLength={PASSWORD_MAX_LENGTH}
+          defaultValue={defaultPassword}
           disabled={disabled}
-          helper="Kosongkan untuk password acak. User tetap wajib menggantinya saat login berikutnya."
+          helper={`${DEFAULT_TEMP_PASSWORD_HELPER} Kosongkan untuk password acak.`}
         />
         <div>
           <Button type="submit" variant="secondary" size="sm" disabled={disabled || pending}>

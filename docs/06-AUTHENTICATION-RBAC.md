@@ -10,14 +10,14 @@
 ## Manual accounts
 - No public registration.
 - Admin creates username and person record.
-- Generate a strong unique temporary password, or let the admin type one (for example a shared temporary value). Blank means generate.
+- Create and reset forms start filled with `DEFAULT_TEMP_PASSWORD` (fallback `1234567890ais`). The admin can edit it. Blank still generates a unique password.
 - Store only a one-way hash (Argon2id or bcrypt).
 - Set `mustChangePassword=true`.
 - If shown to admin, temporary password is shown once only.
 - Admin sends it through a private channel, not group chat.
 - Admin can reset password but cannot view an existing password.
 
-Example username `AISaerang` is fine if unique. Do not use a guessable production password like `MusicDirector`. Use a unique temporary password and force a change on first login.
+Example username `AISaerang` is fine if unique. The shared onboarding password is temporary only: `mustChangePassword` stays true for admin-set, default, and generated passwords. Do not reuse it as a lasting password.
 
 ## Personal invite links (magic link)
 - Admin issues one link per user from `/people` ("Buat link undangan"); shown once, shared via private channel.
@@ -25,14 +25,14 @@ Example username `AISaerang` is fine if unique. Do not use a guessable productio
 - The `/masuk/[token]` page never consumes the token on GET (chat-link previews must not burn it); redemption happens via POST, then a standard opaque session cookie is set.
 - Only the SHA-256 hash is stored (`LoginToken`); redemption is atomic (`usedAt`), throttled 5x/10 min per IP, and audited (`INVITE_CREATED`/`INVITE_REDEEMED`). Inactive accounts cannot redeem.
 - First-use links land on mandatory password setup when `mustChangePassword` is set, so username+password remains as fallback login.
-- The admin `/broadcast` page composes copy-ready WhatsApp onboarding texts from live data (group message + per-person DM with role variant, skill list, assignment count); invite links are generated per person on demand.
+- The admin `/broadcast` page composes copy-ready WhatsApp onboarding texts from live data (group message + per-person DM with role variant, skill list, assignment count). Each DM is prefilled with the same default temporary password and still has its own invite-link placeholder; "Buat link undangan" inserts that person's unique link.
 
 ## Bootstrap admin
 Use environment variables or a secure one-time admin command. It must be idempotent, hash the password immediately, never log it, and be disabled/removed after setup. Never hardcode production credentials in source, seed data, docs, or OpenCode prompts.
 
 ## Password/session
 - New and changed passwords (change-password, admin create, admin reset): minimum 1 character (reject empty only), maximum 256. Allow paste/password managers.
-- Admin may type an explicit temporary password or leave the field blank to auto-generate one. `mustChangePassword` stays true either way. The plaintext is shown once and is never stored or written to the audit log (audit records only `passwordSource`: `admin` or `generated`).
+- Admin create/reset fields and the broadcast DM start with `DEFAULT_TEMP_PASSWORD` (fallback `1234567890ais`). The admin may replace that value or clear the field to auto-generate one. `mustChangePassword` stays true either way. The plaintext is shown once and is never stored or written to the audit log (audit records only `passwordSource`: `admin` or `generated`).
 - Every password input has a show/hide toggle (`aria-label` "Tampilkan password" / "Sembunyikan password", `type="button"`).
 - Bootstrap admin stays at 12 characters (script check, outside this schema).
 - No plaintext storage/logging.

@@ -24,6 +24,7 @@ Isi minimum untuk development:
 | `DATABASE_URL` | `mysql://USER:PASSWORD@HOST:4000/music_team_hub?sslaccept=strict` | Koneksi TiDB Cloud (TLS) |
 | `AUTH_SECRET` | string acak panjang | Session auth |
 | `APP_URL` | `http://localhost:3000` (prod: `https://myth-yg.vercel.app`) | Base URL aplikasi |
+| `DEFAULT_TEMP_PASSWORD` | `1234567890ais` | Password sementara bawaan di form buat/reset akun dan pesan undangan. Kosong = fallback yang sama. User wajib menggantinya saat login pertama. |
 
 Catatan: file `.env` (bukan `.env.local`) juga dibaca tooling Prisma
 pada Phase 0 ini. Keduanya di-ignore Git; yang boleh di-commit hanya
