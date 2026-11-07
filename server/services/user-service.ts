@@ -99,11 +99,27 @@ export interface CreateUserInput {
   username: string; // already normalized by Zod transform
   displayName: string;
   role: Role;
+  // Explicit temporary password. Omitted or empty → generate one.
+  password?: string;
+}
+
+function resolveTemporaryPassword(explicit?: string): {
+  temporaryPassword: string;
+  passwordSource: "admin" | "generated";
+} {
+  if (explicit && explicit.length > 0) {
+    return { temporaryPassword: explicit, passwordSource: "admin" };
+  }
+  return {
+    temporaryPassword: generateTemporaryPassword(),
+    passwordSource: "generated",
+  };
 }
 
 // Creates a user with a one-time temporary password. The plaintext is
 // returned ONCE so the admin can share it privately; only the hash
-// is stored.
+// is stored. An admin-typed password follows the same rule and still
+// sets mustChangePassword.
 export async function createUserWithTemporaryPassword(
   actorUserId: string,
   input: CreateUserInput,
@@ -117,7 +133,9 @@ export async function createUserWithTemporaryPassword(
   if (existing) {
     return { ok: false, error: "Username sudah dipakai." };
   }
-  const temporaryPassword = generateTemporaryPassword();
+  const { temporaryPassword, passwordSource } = resolveTemporaryPassword(
+    input.password,
+  );
   const user = await prisma.user.create({
     data: {
       username: input.username,
@@ -135,7 +153,11 @@ export async function createUserWithTemporaryPassword(
     entityType: "User",
     entityId: user.id,
     summary: `Akun ${user.username} (${user.role}) dibuat.`,
-    metadata: { username: user.username, role: user.role },
+    metadata: {
+      username: user.username,
+      role: user.role,
+      passwordSource,
+    },
   });
   // Setiap login identity mendapat operational identity (docs/05).
   const { ensurePersonForUser } = await import("./personnel-service");
@@ -148,6 +170,7 @@ export async function createUserWithTemporaryPassword(
 export async function resetUserPassword(
   actorUserId: string,
   targetUserId: string,
+  explicitPassword?: string,
 ): Promise<
   | { ok: true; username: string; temporaryPassword: string }
   | { ok: false; error: string }
@@ -156,7 +179,8 @@ export async function resetUserPassword(
     where: { id: targetUserId },
   });
   if (!target) return { ok: false, error: "Akun tidak ditemukan." };
-  const temporaryPassword = generateTemporaryPassword();
+  const { temporaryPassword, passwordSource } =
+    resolveTemporaryPassword(explicitPassword);
   await prisma.user.update({
     where: { id: targetUserId },
     data: {
@@ -172,7 +196,7 @@ export async function resetUserPassword(
     entityType: "User",
     entityId: targetUserId,
     summary: `Password ${target.username} di-reset; sesi lama dicabut.`,
-    metadata: { username: target.username },
+    metadata: { username: target.username, passwordSource },
   });
   return { ok: true, username: target.username, temporaryPassword };
 }

@@ -10,9 +10,9 @@
 ## Admin membuat akun
 1. Buka People & Access → Tambah personel.
 2. Isi display name, username, role, skill/instrumen, asal jemaat opsional.
-3. Sistem menghasilkan temporary password kuat atau admin menjalankan reset aman.
-4. Simpan hash saja; `mustChangePassword=true`.
-5. Tampilkan password sementara satu kali bila sistem yang membuatnya.
+3. Admin mengisi password sementara, atau mengosongkan field agar sistem menghasilkan password acak. Reset memakai aturan yang sama.
+4. Simpan hash saja; `mustChangePassword=true`, termasuk password yang diketik admin.
+5. Tampilkan password sementara satu kali.
 6. Admin mengirimkan melalui kanal privat, bukan grup.
 7. User login dan mengganti password.
 

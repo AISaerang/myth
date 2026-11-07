@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from "@/lib/password-policy";
 import { normalizeUsername } from "@/lib/username";
 
 // Username rules shared by login and account management:
@@ -14,13 +18,20 @@ export const usernameSchema = z
   )
   .transform((v) => normalizeUsername(v));
 
+// New and changed passwords (change-password, admin create, admin reset):
+// reject empty only. Bootstrap admin stays at 12 characters in its script,
+// outside this schema. See docs/06-AUTHENTICATION-RBAC.md.
 export const passwordSchema = z
   .string()
-  // TEMPORARY onboarding relaxation (was min 12): personil boleh memakai
-  // password pendek saat fase onboarding. WAJIB revert ke min 12 setelah
-  // badge "Password sementara" hilang semua di /people.
-  .min(1, "Password wajib diisi.")
-  .max(256, "Password maksimal 256 karakter.");
+  .min(PASSWORD_MIN_LENGTH, "Password wajib diisi.")
+  .max(PASSWORD_MAX_LENGTH, "Password maksimal 256 karakter.");
+
+// Blank admin field means "generate a temporary password". A non-empty
+// value is the password that will be hashed.
+export function optionalAdminPassword(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  return value;
+}
 
 export const loginSchema = z.object({
   username: usernameSchema,
@@ -67,6 +78,7 @@ export const createUserSchema = z.object({
     .min(2, "Nama tampilan minimal 2 karakter.")
     .max(100, "Nama tampilan maksimal 100 karakter."),
   role: roleSchema,
+  password: passwordSchema.optional(),
 });
 
 export const updateUserSchema = z.object({

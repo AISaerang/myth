@@ -3,6 +3,8 @@ import {
   changePasswordSchema,
   createUserSchema,
   loginSchema,
+  optionalAdminPassword,
+  passwordSchema,
 } from "@/lib/validation/auth";
 
 describe("auth validation", () => {
@@ -23,7 +25,7 @@ describe("auth validation", () => {
     expect(parsed.success).toBe(false);
   });
 
-  it("requires matching, different, non-empty new passwords (TEMPORARY: no minimum length during onboarding)", () => {
+  it("requires matching, different, non-empty new passwords (minimum 1 character)", () => {
     expect(
       changePasswordSchema.safeParse({
         currentPassword: "lama-sementara-1",
@@ -51,6 +53,17 @@ describe("auth validation", () => {
       confirmPassword: "pendek",
     });
     expect(ok.success).toBe(true);
+    expect(
+      changePasswordSchema.safeParse({
+        currentPassword: "x",
+        newPassword: "y",
+        confirmPassword: "y",
+      }).success,
+    ).toBe(true);
+    expect(passwordSchema.safeParse("").success).toBe(false);
+    expect(passwordSchema.safeParse("a").success).toBe(true);
+    expect(passwordSchema.safeParse("1234567890ais").success).toBe(true);
+    expect(passwordSchema.safeParse("x".repeat(257)).success).toBe(false);
   });
 
   it("restricts new account roles to ADMIN|USER|OBSERVER", () => {
@@ -68,6 +81,53 @@ describe("auth validation", () => {
     });
     expect(ok.success).toBe(true);
     if (ok.success) expect(ok.data.username).toBe("pemain1");
+  });
+
+  it("accepts an explicit admin password and treats a blank field as generate", () => {
+    const explicit = createUserSchema.safeParse({
+      username: "pemain2",
+      displayName: "Pemain 2",
+      role: "USER",
+      password: "1234567890ais",
+    });
+    expect(explicit.success).toBe(true);
+    if (explicit.success) expect(explicit.data.password).toBe("1234567890ais");
+
+    const oneChar = createUserSchema.safeParse({
+      username: "pemain3",
+      displayName: "Pemain 3",
+      role: "USER",
+      password: "1",
+    });
+    expect(oneChar.success).toBe(true);
+
+    const generated = createUserSchema.safeParse({
+      username: "pemain4",
+      displayName: "Pemain 4",
+      role: "USER",
+      password: optionalAdminPassword(""),
+    });
+    expect(generated.success).toBe(true);
+    if (generated.success) expect(generated.data.password).toBeUndefined();
+
+    expect(optionalAdminPassword(null)).toBeUndefined();
+    expect(optionalAdminPassword("1234567890ais")).toBe("1234567890ais");
+    expect(
+      createUserSchema.safeParse({
+        username: "pemain5",
+        displayName: "Pemain 5",
+        role: "USER",
+        password: "",
+      }).success,
+    ).toBe(false);
+    expect(
+      createUserSchema.safeParse({
+        username: "pemain6",
+        displayName: "Pemain 6",
+        role: "USER",
+        password: "x".repeat(257),
+      }).success,
+    ).toBe(false);
   });
 
   it("accepts OBSERVER as a read-only monitor role", () => {
