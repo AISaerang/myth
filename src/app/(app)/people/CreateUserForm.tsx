@@ -4,6 +4,8 @@ import { useActionState, useEffect, useRef } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { PasswordField } from "@/components/ui/PasswordField";
+import { PASSWORD_MAX_LENGTH } from "@/lib/password-policy";
 import { createUserAction } from "@server/actions/admin-users";
 
 export function CreateUserForm() {
@@ -66,6 +68,14 @@ export function CreateUserForm() {
             <option value="ADMIN">ADMIN — pengelola/MD</option>
           </select>
         </div>
+        <PasswordField
+          id="temporaryPassword"
+          name="password"
+          label="Password sementara (opsional)"
+          autoComplete="new-password"
+          maxLength={PASSWORD_MAX_LENGTH}
+          helper="Kosongkan untuk membuat password acak. Jika diisi, password ini yang dipakai (minimal 1 karakter) dan user wajib menggantinya saat login pertama."
+        />
         {!state.ok && state.error ? (
           <Alert tone="danger">{state.error}</Alert>
         ) : null}

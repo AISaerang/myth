@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { PasswordField } from "@/components/ui/PasswordField";
 import type { Role } from "@/generated/prisma/client";
+import { PASSWORD_MAX_LENGTH } from "@/lib/password-policy";
 import {
   resetUserPasswordAction,
   setUserActiveAction,
@@ -28,13 +30,29 @@ export function ResetPasswordForm({
     resetUserPasswordAction,
     { ok: false },
   );
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state.ok) formRef.current?.reset();
+  }, [state]);
+
   return (
-    <div className="flex flex-col gap-2">
-      <form action={formAction}>
+    <div className="flex w-full flex-col gap-2 sm:max-w-xs">
+      <form ref={formRef} action={formAction} className="flex flex-col gap-2">
         <HiddenUserId userId={userId} />
-        <Button type="submit" variant="secondary" size="sm" disabled={disabled || pending}>
-          {pending ? "Mereset…" : "Reset password"}
-        </Button>
+        <PasswordField
+          name="password"
+          label={`Password baru untuk ${username} (opsional)`}
+          autoComplete="new-password"
+          maxLength={PASSWORD_MAX_LENGTH}
+          disabled={disabled}
+          helper="Kosongkan untuk password acak. User tetap wajib menggantinya saat login berikutnya."
+        />
+        <div>
+          <Button type="submit" variant="secondary" size="sm" disabled={disabled || pending}>
+            {pending ? "Mereset…" : "Reset password"}
+          </Button>
+        </div>
       </form>
       {!state.ok && state.error ? (
         <Alert tone="danger">{state.error}</Alert>
@@ -44,6 +62,7 @@ export function ResetPasswordForm({
           <p className="select-all rounded bg-white/60 px-2 py-1 font-mono text-sm font-semibold dark:bg-black/40">
             {state.temporaryPassword}
           </p>
+          <p className="mt-2">User wajib menggantinya saat login berikutnya.</p>
         </Alert>
       ) : null}
     </div>

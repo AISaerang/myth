@@ -10,7 +10,7 @@
 ## Manual accounts
 - No public registration.
 - Admin creates username and person record.
-- Generate a strong unique temporary password.
+- Generate a strong unique temporary password, or let the admin type one (for example a shared temporary value). Blank means generate.
 - Store only a one-way hash (Argon2id or bcrypt).
 - Set `mustChangePassword=true`.
 - If shown to admin, temporary password is shown once only.
@@ -31,11 +31,10 @@ Example username `AISaerang` is fine if unique. Do not use a guessable productio
 Use environment variables or a secure one-time admin command. It must be idempotent, hash the password immediately, never log it, and be disabled/removed after setup. Never hardcode production credentials in source, seed data, docs, or OpenCode prompts.
 
 ## Password/session
-- Normal minimum 12 characters; allow paste/password managers.
-- ⚠️ TEMPORARY onboarding relaxation: minimum removed (any non-empty
-  password accepted) so personnel can start easily. MUST revert to 12
-  once every account clears `mustChangePassword` (check `/people`
-  badges). Bootstrap admin stays at 12.
+- New and changed passwords (change-password, admin create, admin reset): minimum 1 character (reject empty only), maximum 256. Allow paste/password managers.
+- Admin may type an explicit temporary password or leave the field blank to auto-generate one. `mustChangePassword` stays true either way. The plaintext is shown once and is never stored or written to the audit log (audit records only `passwordSource`: `admin` or `generated`).
+- Every password input has a show/hide toggle (`aria-label` "Tampilkan password" / "Sembunyikan password", `type="button"`).
+- Bootstrap admin stays at 12 characters (script check, outside this schema).
 - No plaintext storage/logging.
 - Login errors are generic.
 - Cookies HttpOnly, Secure in production, SameSite appropriate.

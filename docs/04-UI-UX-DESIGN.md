@@ -67,7 +67,7 @@ Tipe, tanggal/jam, lokasi/link, agenda, lagu, attendance, catatan, keputusan, ac
 Checklist mobile: item, kategori, PIC, sumber/pemilik, status, due date, notes. Filter belum dicek, butuh konfirmasi, blocked, tested.
 
 ## People & Access
-Tambah/edit personel, username, role, skill, assignment, deactivate, reset password. Password sementara hanya terlihat sekali; admin tidak dapat melihat password lama.
+Tambah/edit personel, username, role, skill, assignment, deactivate, reset password. Saat buat akun atau reset, admin boleh mengisi password sementara atau mengosongkannya agar sistem menghasilkan password acak. Password sementara hanya terlihat sekali; admin tidak dapat melihat password lama. Setiap input password (login, ganti password, buat/reset akun) punya tombol tampilkan/sembunyikan. Password baru minimal 1 karakter (kosong ditolak).
 
 ## Design system
 Gunakan Button, Input, Select, Badge, Card, Dialog, Tabs, Table, Alert, Toast, Skeleton, Empty State. Status: green ready/done; amber in progress/review; red blocked/overdue; gray draft/not checked. Pastikan kontras baik, focus state terlihat, target sentuh cukup besar.

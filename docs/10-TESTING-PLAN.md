@@ -5,6 +5,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 
 ## Unit tests
 - Username normalization/uniqueness.
+- New/changed passwords reject only empty input (minimum 1, maximum 256). Admin create accepts an explicit password such as `1234567890ais`, and a blank password field is omitted so the server generates one. `mustChangePassword` stays set for both.
 - Inactive account rejection.
 - Temporary password forces change.
 - Role/ownership permission helpers.
