@@ -197,6 +197,29 @@ describe("note actions", () => {
     expect(createSongNote).not.toHaveBeenCalled();
   });
 
+  it("lets an event admin add a general note on an unpublished song", async () => {
+    getEventRole.mockResolvedValue("EVENT_ADMIN");
+    prisma.eventSong.findUnique.mockResolvedValue({ isPublished: false });
+
+    const result = await createSongNoteAction(
+      { ok: false },
+      form({ ...createValues, sectionId: "sec_verse" }),
+    );
+
+    expect(result).toEqual({ ok: true });
+    expect(createSongNote).toHaveBeenCalledWith(
+      "user_1",
+      "Drummer",
+      expect.objectContaining({
+        eventSongId: "es_1",
+        songId: "song_1",
+        sectionId: "sec_verse",
+        targetInstrumentSkillId: undefined,
+        body: "Verse: half-time groove",
+      }),
+    );
+  });
+
   it("refuses a note when event access is closed for an event admin", async () => {
     requireActionUser.mockResolvedValue({ ...member, role: "ADMIN" });
     // Global admin is allowed even when closed; simulate a non-admin

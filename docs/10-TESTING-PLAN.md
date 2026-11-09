@@ -38,6 +38,8 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Rehearsal/attendance persists.
 - Admin imports a legacy chart, reviews sections, saves an arrangement, activates it, and the song page renders the active arrangement instead of the legacy chart.
 - MEMBER, OBSERVER, and an EVENT_ADMIN of another event cannot create/edit sections, arrangements, chords, or song metadata. An EVENT_ADMIN of the song's event can while access is open, including when the song is also used by another event. Omitting eventId is global ADMIN only. A closed event blocks the event admin. Archive/restore stays global ADMIN. The audit actor is the signed-in user.
+- Proxy: `GET /songs/[id]/chart?eventId=` is allowed for an EVENT_ADMIN of that open event when the song is on the setlist (including an arrangement query). MEMBER, OBSERVER, a non-member, a closed event, a song that is not on the setlist, and a missing eventId are the plain-text 404. Global ADMIN skips the filter. `GET /event/[id]` follows event membership instead of rejecting every non-admin.
+- Catatan umum di chart ("Semua personel" / "Tambah catatan umum") tampil saat `canWriteSongNotes` benar. EVENT_ADMIN event terbuka boleh menyimpan catatan umum tanpa target, termasuk pada lagu draft. MEMBER tetap hanya di lagu publish. OBSERVER dan event tertutup tidak menulis.
 - Audit log records role change, reset, final lock, chart section/arrangement changes, and legacy import.
 
 ## E2E critical flows

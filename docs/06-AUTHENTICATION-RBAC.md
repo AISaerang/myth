@@ -54,9 +54,13 @@ An `EVENT_ADMIN` may edit songs on the setlist of an event they manage, while th
 
 The request must include that event's `eventId`, and the song must have an `EventSong` row there. Omitting `eventId` is the Pustaka Lagu path and stays global-admin-only.
 
+`src/proxy.ts` runs before the chart page. `GET /songs/[id]/chart` from a non-admin is allowed only when `decideSongEdit` would allow that event: open event, `EVENT_ADMIN`, song on the setlist, `eventId` present. `MEMBER`, `OBSERVER`, a different event, a closed event, a song that is not on the setlist, and a request without `eventId` get the plain-text 404. Global `ADMIN` is not filtered here. Arrangement redirects keep `eventId` on the chart URL. `GET /event/[id]` uses the same membership check as the other event routes instead of rejecting every non-admin.
+
 Chord charts, chart sections, chart arrangements, arrangement versions, and library song fields (title, artist, `Song.key`, tempo, reference URL) live on the shared `Song`. Editing them from one event changes the same record for every event that uses the song. The chart editor and the song form say so when the song is in more than one event. Event-only fields stay on `EventSong`: display key (`eventKey`), liturgical function, arrangement notes, status, publish, and final lock. Event materials (`SongMaterial.eventId`) and assignments follow the event. Library materials (`eventId` null), creating a new library song, archiving/restoring a song, the Pustaka Lagu page, accounts, invites, and personnel account tools stay global `ADMIN`.
 
 Audit rows keep the signed-in actor's user id. Preview mode hides the forms; it does not grant or remove the server check.
+
+Catatan umum ("Semua personel" → "Tambah catatan umum" di chart lagu) memakai `canWriteSongNotes`, bukan `isAdmin`. `EVENT_ADMIN` event yang terbuka boleh menambah catatan umum pada lagu di setlist itu, termasuk saat lagu masih draft. `MEMBER` tetap hanya di lagu publish. `OBSERVER` tetap hanya membaca. Event tertutup menolak `EVENT_ADMIN`. Tidak ada rute proxy khusus untuk catatan; mutasi lewat server action dengan `eventSongId`.
 
 ## Authorization checklist
 For each server request: validate session; active account; role; event scope; ownership/assignment; schema; then mutate. Log sensitive actions. Hidden UI is not authorization.
