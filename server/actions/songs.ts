@@ -382,7 +382,11 @@ export async function setMaterialActiveAction(
   const songId = String(formData.get("songId") ?? "");
   const isActive = formData.get("isActive") === "true";
   if (!materialId) return { ok: false, error: "Materi tidak valid." };
-  await requireMaterialManager(admin, materialId);
+  await requireMaterialManager(
+    admin,
+    materialId,
+    optionalEventId(formData.get("eventId")),
+  );
   const result = await setMaterialActive(admin.id, materialId, isActive);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(songId || undefined);
@@ -397,7 +401,11 @@ export async function deleteMaterialAction(
   const materialId = String(formData.get("materialId") ?? "");
   const songId = String(formData.get("songId") ?? "");
   if (!materialId) return { ok: false, error: "Materi tidak valid." };
-  await requireMaterialManager(admin, materialId);
+  await requireMaterialManager(
+    admin,
+    materialId,
+    optionalEventId(formData.get("eventId")),
+  );
   const result = await deleteMaterial(materialId);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(songId || undefined);

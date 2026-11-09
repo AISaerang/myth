@@ -238,15 +238,23 @@ export async function requireGlobalAdmin(user: SessionUser): Promise<void> {
 export async function requireMaterialManager(
   user: SessionUser,
   materialId: string,
+  eventId?: string | null,
 ): Promise<void> {
   const material = await prisma.songMaterial.findUnique({
     where: { id: materialId },
-    select: { eventId: true },
+    select: { eventId: true, songId: true },
   });
   if (!material) throw new Error("Not found");
-  if (!material.eventId) {
+  if (material.eventId) {
+    await requireEventManager(user, material.eventId);
+    return;
+  }
+  // Library material on a setlist song: EVENT_ADMIN of the open event in
+  // context may manage it. Without eventId, only global ADMIN (Pustaka).
+  const scopedEventId = eventId?.trim() || "";
+  if (!scopedEventId) {
     await requireGlobalAdmin(user);
     return;
   }
-  await requireEventManager(user, material.eventId);
+  await requireEventManagerForSong(user, material.songId, scopedEventId);
 }

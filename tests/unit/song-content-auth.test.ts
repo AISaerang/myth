@@ -10,13 +10,17 @@ const { getEventRole, prisma } = vi.hoisted(() => ({
     chartSection: { findUnique: vi.fn() },
     chartArrangement: { findUnique: vi.fn() },
     arrangementVersion: { findUnique: vi.fn() },
+    songMaterial: { findUnique: vi.fn() },
   },
 }));
 
 vi.mock("@/lib/db", () => ({ prisma }));
 vi.mock("@server/services/event-access", () => ({ getEventRole }));
 
-import { requireSongContentEditor } from "@server/actions/event-authorization";
+import {
+  requireMaterialManager,
+  requireSongContentEditor,
+} from "@server/actions/event-authorization";
 import type { SessionUser } from "@/lib/permissions";
 
 const eventAdmin: SessionUser = {
@@ -154,5 +158,54 @@ describe("requireSongContentEditor", () => {
         id: "section-1",
       }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("requireMaterialManager for setlist songs", () => {
+  beforeEach(() => {
+    getEventRole.mockReset();
+    for (const model of Object.values(prisma)) {
+      model.findUnique.mockReset();
+    }
+  });
+
+  it("lets an EVENT_ADMIN manage a library material on their open event", async () => {
+    prisma.songMaterial.findUnique.mockResolvedValue({
+      eventId: null,
+      songId: "song-1",
+    });
+    prisma.eventSong.findUnique.mockResolvedValue({ id: "es-1" });
+    prisma.event.findUnique.mockResolvedValue({ accessClosedAt: null });
+    getEventRole.mockResolvedValue("EVENT_ADMIN");
+
+    await expect(
+      requireMaterialManager(eventAdmin, "mat-1", "gehc"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("rejects a member, a closed event, and a missing event context", async () => {
+    prisma.songMaterial.findUnique.mockResolvedValue({
+      eventId: null,
+      songId: "song-1",
+    });
+    prisma.eventSong.findUnique.mockResolvedValue({ id: "es-1" });
+    prisma.event.findUnique.mockResolvedValue({ accessClosedAt: null });
+    getEventRole.mockResolvedValue("MEMBER");
+
+    await expect(
+      requireMaterialManager(member, "mat-1", "gehc"),
+    ).rejects.toThrow("Forbidden");
+
+    getEventRole.mockResolvedValue("EVENT_ADMIN");
+    prisma.event.findUnique.mockResolvedValue({
+      accessClosedAt: new Date("2026-11-09T00:00:00Z"),
+    });
+    await expect(
+      requireMaterialManager(eventAdmin, "mat-1", "gehc"),
+    ).rejects.toThrow("Forbidden");
+
+    await expect(
+      requireMaterialManager(eventAdmin, "mat-1", null),
+    ).rejects.toThrow("Forbidden");
   });
 });

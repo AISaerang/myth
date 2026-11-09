@@ -368,10 +368,12 @@ export function MaterialForm({
 
 export function MaterialActions({
   songId,
+  eventId,
   materialId,
   isActive,
 }: {
   songId: string;
+  eventId: string;
   materialId: string;
   isActive: boolean;
 }) {
@@ -387,6 +389,7 @@ export function MaterialActions({
       <form action={toggleAction}>
         <input type="hidden" name="materialId" value={materialId} />
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <input type="hidden" name="isActive" value={String(!isActive)} />
         <Button type="submit" variant="secondary" size="sm" disabled={togglePending}>
           {isActive ? "Nonaktifkan" : "Aktifkan"}
@@ -395,6 +398,7 @@ export function MaterialActions({
       <form action={delAction}>
         <input type="hidden" name="materialId" value={materialId} />
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <Button type="submit" variant="danger" size="sm" disabled={delPending}>
           Hapus
         </Button>

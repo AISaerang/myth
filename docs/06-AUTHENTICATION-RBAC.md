@@ -60,7 +60,7 @@ Chord charts, chart sections, chart arrangements, arrangement versions, and libr
 
 Audit rows keep the signed-in actor's user id. Preview mode hides the forms; it does not grant or remove the server check.
 
-Catatan umum ("Semua personel" → "Tambah catatan umum" di chart lagu) memakai `canWriteSongNotes`, bukan `isAdmin`. `EVENT_ADMIN` event yang terbuka boleh menambah catatan umum pada lagu di setlist itu, termasuk saat lagu masih draft. `MEMBER` tetap hanya di lagu publish. `OBSERVER` tetap hanya membaca. Event tertutup menolak `EVENT_ADMIN`. Tidak ada rute proxy khusus untuk catatan; mutasi lewat server action dengan `eventSongId`.
+Catatan umum ("Semua personel" → "Tambah catatan umum") dan catatan per instrumen di halaman lagu tampil untuk `EVENT_ADMIN` event yang terbuka pada mode Edit, termasuk bila id bagian chart bukan master `ChartSection`. Panel itu tidak memakai `isAdmin`. `MEMBER` tetap hanya menulis di lagu publish dan tidak mendapat kotak editor tambahan di atas chart. `OBSERVER` tetap hanya membaca. Materi pustaka (`eventId` null) pada lagu di setlist boleh diaktifkan/dihapus oleh `EVENT_ADMIN` event konteks; tanpa `eventId` tetap admin global. Arsip lagu dan buat lagu pustaka tetap admin global.
 
 ## Authorization checklist
 For each server request: validate session; active account; role; event scope; ownership/assignment; schema; then mutate. Log sensitive actions. Hidden UI is not authorization.
