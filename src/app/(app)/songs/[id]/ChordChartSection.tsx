@@ -93,23 +93,39 @@ export function ChordChartSection({
           };
         })
       : []);
+  const noteProps = {
+    songId,
+    eventSongId,
+    sections,
+    targetOptions: noteTargetOptions,
+    defaultPart,
+    canWrite: canWriteNotes,
+    canModerate: canModerateNotes,
+    currentUserId,
+  };
   const getSectionAnnotations = (
     sectionId: string,
   ): SectionNoteAnnotations | undefined => {
+    // A legacy chart can invent a section id that is not a master
+    // ChartSection. Still show the general-note box; only a real section
+    // id is stored on the note.
     const section = sections.find((item) => item.id === sectionId);
-    if (!section) return undefined;
-    const sectionNotes = notes.filter((note) => note.sectionId === sectionId);
+    if (!section) {
+      // Legacy ids are not master sections. Event editors still get the
+      // general-note box; members keep the previous "no panel" result.
+      if (!canModerateNotes) return undefined;
+      return {
+        targeted: null,
+        general: (
+          <SectionGeneralNotePanel {...noteProps} sectionId="" notes={[]} />
+        ),
+      };
+    }
+    const sectionNotes = notes.filter((note) => note.sectionId === section.id);
     const props = {
-      songId,
-      eventSongId,
-      sectionId,
+      ...noteProps,
+      sectionId: section.id,
       notes: sectionNotes,
-      sections,
-      targetOptions: noteTargetOptions,
-      defaultPart,
-      canWrite: canWriteNotes,
-      canModerate: canModerateNotes,
-      currentUserId,
     };
     return {
       targeted: <SectionTargetNoteCallout {...props} />,
@@ -136,6 +152,23 @@ export function ChordChartSection({
           >
             Kelola bagian & aransemen
           </Link>
+        </div>
+      ) : null}
+
+      {canModerateNotes ? (
+        <div className="mb-4 flex flex-col gap-3">
+          <SectionGeneralNotePanel
+            {...noteProps}
+            sectionId=""
+            notes={notes.filter((note) => !note.sectionId)}
+          />
+          {noteTargetOptions.length > 0 ? (
+            <SectionTargetNoteCallout
+              {...noteProps}
+              sectionId=""
+              notes={notes.filter((note) => !note.sectionId)}
+            />
+          ) : null}
         </div>
       ) : null}
 

@@ -198,8 +198,9 @@ export default async function SongDetailPage({
   const songEventId = song.eventId;
   function canManageThisMaterial(materialEventId: string | null): boolean {
     if (!canEditSong) return false;
-    if (materialEventId === songEventId) return true;
-    return admin && materialEventId == null;
+    // Event materials and library materials shown on this setlist song.
+    // Archive of the library song itself stays global-admin only.
+    return materialEventId === songEventId || materialEventId == null;
   }
 
   return (
@@ -419,6 +420,7 @@ export default async function SongDetailPage({
                     <div className="mt-2">
                       <MaterialActions
                         songId={song.id}
+                        eventId={song.eventId}
                         materialId={m.id}
                         isActive={m.isActive}
                       />
@@ -496,6 +498,7 @@ export default async function SongDetailPage({
                         <div className="mt-2">
                           <MaterialActions
                             songId={song.id}
+                            eventId={song.eventId}
                             materialId={m.id}
                             isActive={m.isActive}
                           />
