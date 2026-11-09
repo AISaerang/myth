@@ -118,7 +118,12 @@ export function ChordChartSection({
   };
 
   const legacyAdmin = (
-    <LegacyChartAdmin songId={songId} active={active} history={history} />
+    <LegacyChartAdmin
+      songId={songId}
+      eventId={eventId}
+      active={active}
+      history={history}
+    />
   );
 
   return (
@@ -195,19 +200,23 @@ export function ChordChartSection({
 
 function LegacyChartAdmin({
   songId,
+  eventId,
   active,
   history,
 }: {
   songId: string;
+  eventId: string;
   active: ChartView | null;
   history: ChartView[];
 }) {
   return (
     <>
-      {active ? <ChartEditPanel songId={songId} chart={active} /> : null}
+      {active ? (
+        <ChartEditPanel songId={songId} eventId={eventId} chart={active} />
+      ) : null}
       <div className="mt-4 flex flex-col gap-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
         <p className="text-sm font-medium">Tambah versi baru</p>
-        <ChartInputForm songId={songId} />
+        <ChartInputForm songId={songId} eventId={eventId} />
         {history.length > 0 ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium">Riwayat (nonaktif)</p>
@@ -226,7 +235,11 @@ function LegacyChartAdmin({
                   </span>
                   <span className="flex items-center gap-2">
                     <Badge tone="neutral">Arsip</Badge>
-                    <ChartRowActions songId={songId} chartId={c.id} />
+                    <ChartRowActions
+                      songId={songId}
+                      eventId={eventId}
+                      chartId={c.id}
+                    />
                   </span>
                 </li>
               ))}
@@ -240,9 +253,11 @@ function LegacyChartAdmin({
 
 function ChartEditPanel({
   songId,
+  eventId,
   chart,
 }: {
   songId: string;
+  eventId: string;
   chart: ChartView;
 }) {
   const [editing, setEditing] = useState(false);
@@ -258,16 +273,20 @@ function ChartEditPanel({
           {editing ? "Tutup editor" : "Edit chart aktif"}
         </Button>
       </div>
-      {editing ? <ChartEditForm songId={songId} chart={chart} /> : null}
+      {editing ? (
+        <ChartEditForm songId={songId} eventId={eventId} chart={chart} />
+      ) : null}
     </div>
   );
 }
 
 function ChartEditForm({
   songId,
+  eventId,
   chart,
 }: {
   songId: string;
+  eventId: string;
   chart: ChartView;
 }) {
   const [state, formAction, pending] = useActionState(updateChordChartAction, {
@@ -277,6 +296,7 @@ function ChartEditForm({
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="songId" value={songId} />
+      <input type="hidden" name="eventId" value={eventId} />
       <input type="hidden" name="chartId" value={chart.id} />
       <div className="flex flex-col gap-1">
         <label
@@ -325,7 +345,13 @@ function ChartEditForm({
   );
 }
 
-function ChartInputForm({ songId }: { songId: string }) {
+function ChartInputForm({
+  songId,
+  eventId,
+}: {
+  songId: string;
+  eventId: string;
+}) {
   const formRef = useRef<HTMLFormElement>(null);
   const [content, setContent] = useState("");
   const [originalKey, setOriginalKey] = useState("");
@@ -349,6 +375,7 @@ function ChartInputForm({ songId }: { songId: string }) {
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="songId" value={songId} />
+      <input type="hidden" name="eventId" value={eventId} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="chart-key" className="text-sm font-medium">
@@ -416,9 +443,11 @@ function ChartInputForm({ songId }: { songId: string }) {
 
 function ChartRowActions({
   songId,
+  eventId,
   chartId,
 }: {
   songId: string;
+  eventId: string;
   chartId: string;
 }) {
   const [actState, actAction, actPending] = useActionState(
@@ -434,6 +463,7 @@ function ChartRowActions({
       <form action={actAction}>
         <input type="hidden" name="chartId" value={chartId} />
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <Button type="submit" variant="secondary" size="sm" disabled={actPending}>
           Aktifkan
         </Button>
@@ -441,6 +471,7 @@ function ChartRowActions({
       <form action={delAction}>
         <input type="hidden" name="chartId" value={chartId} />
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
           <Button type="submit" variant="danger" size="sm" disabled={delPending}>
             Hapus versi chart ini
           </Button>

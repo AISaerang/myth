@@ -21,7 +21,7 @@ import {
   isObserver,
 } from "@/lib/permissions";
 import { listEventBatchCatalog } from "@server/services/batch-service";
-import { getSong } from "@server/services/song-service";
+import { getSong, listEventAssignablePeople } from "@server/services/song-service";
 import { getCurrentEvent } from "@server/services/event-service";
 import { getEventRole } from "@server/services/event-access";
 import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-service";
@@ -120,7 +120,7 @@ export default async function SongDetailPage({
     uiModeForEvent((await cookies()).get(UI_MODE_COOKIE)?.value, song.eventId) ===
       "preview" &&
     (admin || canManageEvent(eventRole));
-  const showAdminChrome = admin && !previewing;
+  const canEditSong = canWrite && !previewing;
   const medleyNav = resolveMedleyNav(song.id, catalog, {
     publishedOnly: previewing || !(admin || canReadDrafts(eventRole)),
   });
@@ -144,7 +144,7 @@ export default async function SongDetailPage({
   }
   if (previewing && !song.isPublished) notFound();
   let myAssignment: (typeof song.assignments)[number] | undefined;
-  if (!showAdminChrome && !observer) {
+  if (!canEditSong && !observer) {
     const person = await prisma.person.findUnique({
       where: { userId: user.id },
     });
@@ -192,6 +192,15 @@ export default async function SongDetailPage({
       Boolean(eventAccess?.accessClosedAt),
       song.isPublished,
     );
+  const sharedEventCount = canEditSong
+    ? await prisma.eventSong.count({ where: { songId: song.id } })
+    : 0;
+  const songEventId = song.eventId;
+  function canManageThisMaterial(materialEventId: string | null): boolean {
+    if (!canEditSong) return false;
+    if (materialEventId === songEventId) return true;
+    return admin && materialEventId == null;
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -313,7 +322,7 @@ export default async function SongDetailPage({
         </Card>
       ) : null}
 
-      {!showAdminChrome && myAssignment ? (
+      {!canEditSong && myAssignment ? (
         <Card title="Tugasmu">
           <p className="text-sm">
             {myAssignment.instrumentSkill
@@ -324,11 +333,11 @@ export default async function SongDetailPage({
         </Card>
       ) : null}
 
-      {showAdminChrome || observer || myAssignment ? (
+      {canEditSong || observer || myAssignment ? (
         <SongProgress
           songId={song.id}
           eventSongId={song.eventSongId}
-          admin={showAdminChrome}
+          admin={canEditSong}
           observer={observer && !previewing}
           userId={user.id}
         />
@@ -345,7 +354,7 @@ export default async function SongDetailPage({
         songId={song.id}
         eventId={song.eventId}
         eventSongId={song.eventSongId}
-        admin={showAdminChrome}
+        admin={canEditSong}
         sections={chartSections.map((section) => ({
           id: section.id,
           label: section.label,
@@ -406,7 +415,7 @@ export default async function SongDetailPage({
                   {m.description ? (
                     <p className="text-zinc-600 dark:text-zinc-400">{m.description}</p>
                   ) : null}
-                  {showAdminChrome ? (
+                  {canManageThisMaterial(m.eventId) ? (
                     <div className="mt-2">
                       <MaterialActions
                         songId={song.id}
@@ -421,12 +430,13 @@ export default async function SongDetailPage({
         )}
       </Card>
 
-      {showAdminChrome ? (
+      {canEditSong ? (
         <>
           <SongForm
             mode="edit"
             eventId={song.eventId}
             songId={song.id}
+            sharedEventCount={sharedEventCount}
             defaults={{
               title: song.title,
               artistOrAuthor: song.artistOrAuthor,
@@ -455,6 +465,7 @@ export default async function SongDetailPage({
             songId={song.id}
             eventId={song.eventId}
             assignments={song.assignments}
+            globalDirectory={admin}
           />
           <Card title="Tambah materi">
             <MaterialForm
@@ -481,26 +492,30 @@ export default async function SongDetailPage({
                         {MATERIAL_CATEGORY_LABEL[m.category]}
                         {m.versionLabel ? ` · ${m.versionLabel}` : ""}
                       </p>
-                      <div className="mt-2">
-                        <MaterialActions
-                          songId={song.id}
-                          materialId={m.id}
-                          isActive={m.isActive}
-                        />
-                      </div>
+                      {canManageThisMaterial(m.eventId) ? (
+                        <div className="mt-2">
+                          <MaterialActions
+                            songId={song.id}
+                            materialId={m.id}
+                            isActive={m.isActive}
+                          />
+                        </div>
+                      ) : null}
                     </li>
                   ))}
               </ul>
             </Card>
           ) : null}
           <Card title="Buat versi aransemen">
-            <VersionForm songId={song.id} />
+            <VersionForm songId={song.id} eventId={song.eventId} />
           </Card>
-          {song.archivedAt ? (
-            <RestoreSongButton songId={song.id} eventId={song.eventId} />
-          ) : (
-            <ArchiveSongButton songId={song.id} eventId={song.eventId} />
-          )}
+          {admin ? (
+            song.archivedAt ? (
+              <RestoreSongButton songId={song.id} eventId={song.eventId} />
+            ) : (
+              <ArchiveSongButton songId={song.id} eventId={song.eventId} />
+            )
+          ) : null}
         </>
       ) : null}
 
@@ -546,10 +561,11 @@ export default async function SongDetailPage({
                     </a>
                   </p>
                 ) : null}
-                {showAdminChrome ? (
+                {canEditSong ? (
                   <div className="mt-2">
                     <VersionActions
                       songId={song.id}
+                      eventId={song.eventId}
                       eventSongId={song.eventSongId}
                       versionId={v.id}
                       isActive={v.isActive}
@@ -565,7 +581,7 @@ export default async function SongDetailPage({
 
       <SongTasks songId={song.id} eventId={song.eventId} />
 
-      {!showAdminChrome ? (
+      {!canEditSong ? (
         <SongSuggestion
           eventId={song.eventId}
           songId={song.id}
@@ -793,16 +809,27 @@ async function AdminPersonnel({
   songId,
   eventId,
   assignments,
+  globalDirectory,
 }: {
   songId: string;
   eventId: string;
   assignments: NonNullable<Awaited<ReturnType<typeof getSong>>>["assignments"];
+  globalDirectory: boolean;
 }) {
   const [people, skills] = await Promise.all([
-    listPersonnelForAdmin(),
+    globalDirectory
+      ? listPersonnelForAdmin().then((rows) =>
+          rows
+            .filter((person) => person.isActive)
+            .map((person) => ({
+              id: person.id,
+              displayName: person.displayName,
+            })),
+        )
+      : listEventAssignablePeople(eventId),
     listSkills(),
   ]);
-  const activePeople = people.filter((p) => p.isActive);
+  const activePeople = people;
   const assignedIds = new Set(assignments.map((a) => a.personId));
   return (
     <Card title={`Personel (${assignments.length})`}>

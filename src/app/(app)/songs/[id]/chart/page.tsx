@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { requireFreshUser } from "@/lib/auth";
 import type { ChartSectionKind } from "@/lib/chart-arrangement";
 import { prisma } from "@/lib/db";
-import { isAdmin } from "@/lib/permissions";
+import { decideSongEdit, isAdmin } from "@/lib/permissions";
+import { getEventRole } from "@server/services/event-access";
 import { listChordCharts } from "@server/services/chord-service";
 import {
   listChartArrangements,
@@ -23,7 +24,6 @@ export default async function ChartEditorPage({
   searchParams: Promise<{ arrangement?: string; eventId?: string }>;
 }) {
   const user = await requireFreshUser();
-  if (!isAdmin(user)) notFound();
 
   const { id } = await params;
   const {
@@ -35,6 +35,33 @@ export default async function ChartEditorPage({
     select: { id: true, title: true },
   });
   if (!song) notFound();
+
+  const scopedEventId = eventId?.trim() || null;
+  const [eventSong, event, eventRole, sharedEventCount] = await Promise.all([
+    scopedEventId
+      ? prisma.eventSong.findUnique({
+          where: { eventId_songId: { eventId: scopedEventId, songId: id } },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    scopedEventId
+      ? prisma.event.findUnique({
+          where: { id: scopedEventId },
+          select: { accessClosedAt: true },
+        })
+      : Promise.resolve(null),
+    scopedEventId ? getEventRole(user, scopedEventId) : Promise.resolve(null),
+    prisma.eventSong.count({ where: { songId: id } }),
+  ]);
+  const decision = decideSongEdit({
+    globalAdmin: isAdmin(user),
+    eventRole,
+    accessClosed: Boolean(event?.accessClosedAt),
+    eventId: scopedEventId,
+    songLinkedToEvent: Boolean(eventSong && event),
+  });
+  if (!decision.ok) notFound();
+  const editorEventId = decision.scope === "event" ? scopedEventId ?? undefined : undefined;
 
   const [sections, arrangements, charts] = await Promise.all([
     listChartSections(id),
@@ -91,10 +118,17 @@ export default async function ChartEditorPage({
         <p className="text-sm text-zinc-500">
           Susun master bagian lagu, lalu buat aransemen dari bagian-bagian itu.
         </p>
+        {sharedEventCount > 1 ? (
+          <p className="mt-2 text-sm text-amber-800 dark:text-amber-300">
+            Lagu ini dipakai di {sharedEventCount} event. Perubahan chord,
+            bagian, dan aransemen ikut ke semua event tersebut.
+          </p>
+        ) : null}
       </div>
 
       <ChartArrangementEditor
         songId={song.id}
+        eventId={editorEventId}
         sections={sectionViews}
         arrangements={arrangementViews}
         initialArrangementId={requestedArrangementId}

@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import { eventSongDisplayKey } from "@/lib/event-song";
 import { uiModeForEvent } from "@/lib/ui-mode";
 import {
+  canEditEventSong,
   canManageAccounts,
   canManageEvent,
   canManageMembers,
   canAccessEvent,
   canReadDrafts,
   canWriteEventData,
+  decideSongEdit,
   canReadEventSong,
   canModifySongNote,
   canSuggest,
@@ -182,6 +184,68 @@ describe("permissions", () => {
     expect(canViewAllProgress(admin)).toBe(true);
     expect(canViewAllProgress(observer)).toBe(true);
     expect(canViewAllProgress(user)).toBe(false);
+  });
+
+  it("lets an event admin edit songs in an open event, and nobody else", () => {
+    expect(canEditEventSong("EVENT_ADMIN", false, false)).toBe(true);
+    expect(canEditEventSong("EVENT_ADMIN", true, false)).toBe(false);
+    expect(canEditEventSong("MEMBER", false, false)).toBe(false);
+    expect(canEditEventSong("OBSERVER", false, false)).toBe(false);
+    expect(canEditEventSong(null, false, false)).toBe(false);
+    expect(canEditEventSong(null, true, true)).toBe(true);
+    expect(canEditEventSong("EVENT_ADMIN", true, true)).toBe(true);
+  });
+
+  it("scopes shared-library song edits to the event in context", () => {
+    const openEventAdmin = {
+      globalAdmin: false,
+      eventRole: "EVENT_ADMIN" as const,
+      accessClosed: false,
+      eventId: "gehc",
+      songLinkedToEvent: true,
+    };
+    expect(decideSongEdit(openEventAdmin)).toEqual({ ok: true, scope: "event" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, eventId: "regional", songLinkedToEvent: false }),
+    ).toEqual({ ok: false, reason: "not-in-event" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, eventRole: "MEMBER" }),
+    ).toEqual({ ok: false, reason: "forbidden" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, eventRole: "OBSERVER" }),
+    ).toEqual({ ok: false, reason: "forbidden" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, eventRole: null }),
+    ).toEqual({ ok: false, reason: "forbidden" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, accessClosed: true }),
+    ).toEqual({ ok: false, reason: "forbidden" });
+    expect(
+      decideSongEdit({
+        ...openEventAdmin,
+        globalAdmin: true,
+        eventRole: null,
+        accessClosed: true,
+      }),
+    ).toEqual({ ok: true, scope: "event" });
+    expect(
+      decideSongEdit({
+        globalAdmin: true,
+        eventRole: null,
+        accessClosed: false,
+        eventId: null,
+        songLinkedToEvent: false,
+      }),
+    ).toEqual({ ok: true, scope: "library" });
+    expect(
+      decideSongEdit({
+        globalAdmin: false,
+        eventRole: "EVENT_ADMIN",
+        accessClosed: false,
+        eventId: null,
+        songLinkedToEvent: true,
+      }),
+    ).toEqual({ ok: false, reason: "forbidden" });
   });
 
   it("keeps Edit|Preview from changing canWriteEventData", () => {

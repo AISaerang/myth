@@ -37,7 +37,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - User cannot update another person's progress.
 - Rehearsal/attendance persists.
 - Admin imports a legacy chart, reviews sections, saves an arrangement, activates it, and the song page renders the active arrangement instead of the legacy chart.
-- Non-admin cannot create/edit sections, arrangements, or import legacy charts.
+- MEMBER, OBSERVER, and an EVENT_ADMIN of another event cannot create/edit sections, arrangements, chords, or song metadata. An EVENT_ADMIN of the song's event can while access is open, including when the song is also used by another event. Omitting eventId is global ADMIN only. A closed event blocks the event admin. Archive/restore stays global ADMIN. The audit actor is the signed-in user.
 - Audit log records role change, reset, final lock, chart section/arrangement changes, and legacy import.
 
 ## E2E critical flows

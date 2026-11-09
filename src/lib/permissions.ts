@@ -20,6 +20,53 @@ export function canWriteEventData(
   return globalAdmin || (canManageEvent(role) && !accessClosed);
 }
 
+// Edit lagu di satu event (chord, bagian chart, aransemen, metadata,
+// materi event, publikasi). Sama dengan canWriteEventData: global ADMIN,
+// atau EVENT_ADMIN saat akses event masih terbuka. MEMBER dan OBSERVER
+// tidak. Event lain ditolak di server lewat eventId + baris EventSong.
+export function canEditEventSong(
+  role: EventRole | null,
+  accessClosed: boolean,
+  globalAdmin: boolean,
+): boolean {
+  return canWriteEventData(role, accessClosed, globalAdmin);
+}
+
+export type SongEditDecision =
+  | { ok: true; scope: "event" | "library" }
+  | { ok: false; reason: "forbidden" | "not-in-event" };
+
+// Aturan lagu bersama (Pustaka):
+// - eventId wajib untuk EVENT_ADMIN. Lagu harus terhubung ke event itu.
+//   EVENT_ADMIN event lain, MEMBER, dan OBSERVER ditolak. Event tertutup
+//   menolak EVENT_ADMIN (global ADMIN tetap boleh).
+// - Tanpa eventId hanya global ADMIN (halaman Pustaka Lagu).
+// - Bila lagu dipakai banyak event, edit dari event yang dikelola tetap
+//   diizinkan. Chord, bagian, aransemen, dan metadata Song (judul, nada
+//   dasar, referensi) adalah satu record pustaka, jadi berubah di setiap
+//   event yang memakai lagu itu. Isolasi per event tetap di EventSong
+//   (eventKey, catatan, publish, kunci, materi ber-eventId, penugasan).
+export function decideSongEdit(input: {
+  globalAdmin: boolean;
+  eventRole: EventRole | null;
+  accessClosed: boolean;
+  eventId: string | null;
+  songLinkedToEvent: boolean;
+}): SongEditDecision {
+  if (!input.eventId) {
+    return input.globalAdmin
+      ? { ok: true, scope: "library" }
+      : { ok: false, reason: "forbidden" };
+  }
+  if (!input.songLinkedToEvent) {
+    return { ok: false, reason: "not-in-event" };
+  }
+  if (!canEditEventSong(input.eventRole, input.accessClosed, input.globalAdmin)) {
+    return { ok: false, reason: "forbidden" };
+  }
+  return { ok: true, scope: "event" };
+}
+
 export function canReadDrafts(role: EventRole | null): boolean {
   return role === "EVENT_ADMIN";
 }

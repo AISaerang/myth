@@ -74,7 +74,13 @@ export default async function AppLayout({
               href="/songs"
               className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
-              {preview ? "Lagu Saya" : admin ? "Lagu" : observer ? "Lagu" : "Lagu Saya"}
+              {preview
+                ? "Lagu Saya"
+                : admin || canManageEvent(eventRole)
+                  ? "Lagu"
+                  : observer
+                    ? "Lagu"
+                    : "Lagu Saya"}
             </Link>
           ) : null}
           {hasEventAccess && (admin || observer) && !preview ? (

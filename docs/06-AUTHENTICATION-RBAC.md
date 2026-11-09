@@ -49,6 +49,15 @@ Preview renders the musician song path: published list, batch badges, own practi
 
 Privilege is `User.role` plus `EventMembership.role`. Nothing in the request path grants access by username. Operationally, the global admin account is `alvandi` (`ADMIN`, and `EVENT_ADMIN` on the events that need it). The keyboard event admin `aisaerang` stays global `USER` and is `EVENT_ADMIN` only on events assigned at `/event/[id]/members`. Do not promote that account to global `ADMIN`. Hiding Edit controls in Preview is not authorization.
 
+## Song editing (event admin)
+An `EVENT_ADMIN` may edit songs on the setlist of an event they manage, while that event's access is open (`accessClosedAt` null). The check is `decideSongEdit` / `requireSongContentEditor`: global `ADMIN`, or `EVENT_ADMIN` of the event in the request. `MEMBER`, `OBSERVER`, and an `EVENT_ADMIN` of a different event are rejected. A closed event stays read-only for the event admin; a global admin can still write.
+
+The request must include that event's `eventId`, and the song must have an `EventSong` row there. Omitting `eventId` is the Pustaka Lagu path and stays global-admin-only.
+
+Chord charts, chart sections, chart arrangements, arrangement versions, and library song fields (title, artist, `Song.key`, tempo, reference URL) live on the shared `Song`. Editing them from one event changes the same record for every event that uses the song. The chart editor and the song form say so when the song is in more than one event. Event-only fields stay on `EventSong`: display key (`eventKey`), liturgical function, arrangement notes, status, publish, and final lock. Event materials (`SongMaterial.eventId`) and assignments follow the event. Library materials (`eventId` null), creating a new library song, archiving/restoring a song, the Pustaka Lagu page, accounts, invites, and personnel account tools stay global `ADMIN`.
+
+Audit rows keep the signed-in actor's user id. Preview mode hides the forms; it does not grant or remove the server check.
+
 ## Authorization checklist
 For each server request: validate session; active account; role; event scope; ownership/assignment; schema; then mutate. Log sensitive actions. Hidden UI is not authorization.
 
