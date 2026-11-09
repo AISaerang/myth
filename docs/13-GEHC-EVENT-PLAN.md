@@ -265,7 +265,8 @@ Correction 6 Nov 2026: Q1 named `aisaerang` as global ADMIN. That account identi
 |---|---|---|---|---|---|
 | See event in switcher | ✓ | ✓ | ✓ | ✓ | ✗ |
 | Event brief edit | ✓ | ✓ | ✗ | ✗ | ✗ |
-| Pustaka Lagu: create/edit library song, chords (C), original key, credits | ✓ | ✗ (see §6.4) | ✗ | ✗ | ✗ |
+| Pustaka Lagu page, create library song, archive/restore, library materials | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Edit chords/sections/arrangements of a song on this event's setlist | ✓ | ✓ while access is open (shared Song record; see §6.4) | ✗ | ✗ | ✗ |
 | Setlist: add/remove/order EventSong, event key/notes/status/publish | ✓ | ✓ | ✗ | ✗ | ✗ |
 | Batches/assignments in event | ✓ | ✓ | ✗ | ✗ | ✗ |
 | Pustaka Lagu read (to pick songs) | ✓ | ✓ | ✗ | ✗ | ✗ |
@@ -296,8 +297,8 @@ Correction 6 Nov 2026: Q1 named `aisaerang` as global ADMIN. That account identi
 - `Song` = library item. It holds title, credits (artist, arranger), **chords stored transposed to C**, **original key** in `Song.key`, chart sections/arrangements, library materials.
 - `EventSong` = the song inside one event setlist. It holds order, event key (`eventKey`), notes, status, publish, final lock, and links to batch, assignments, progress, rehearsal.
 - Display key = `EventSong.eventKey ?? Song.key`; chart renders from C to that key.
-- Editing library chords changes the chart for **every** event that uses the song. Show a warning: "Lagu ini dipakai di N event."
-- Library edit = global ADMIN only (assumption; EVENT_ADMIN may be allowed later). EVENT_ADMIN picks from the library and edits only `EventSong` fields.
+- Editing library chords changes the chart for **every** event that uses the song. The chart editor and song form warn: "Lagu ini dipakai di N event."
+- Update 9 Nov 2026: an `EVENT_ADMIN` may edit chords, chart sections, arrangements, and the song form (nada dasar, referensi, catatan, publish, materi event) for a song linked to **their** event, while access is open. The mutation requires that `eventId`. An event admin of a different event, a member, and an observer are rejected. A song in several events is still one library `Song`: the edit is allowed from any event they manage, and the shared chart/metadata changes everywhere that song is used. Creating a library song, the Pustaka page, archive/restore, and materials with `eventId` null stay global ADMIN. EVENT_ADMIN still picks existing songs onto the setlist.
 - Members see a library song only through an `EventSong` of an event they belong to, and only when `EventSong.isPublished` (or they are admin). No direct library browsing for MEMBER/OBSERVER.
 - Removing a song from a setlist deletes the `EventSong` (with its event data, after confirm); never deletes the library `Song` (`onDelete: Restrict`).
 

@@ -10,6 +10,8 @@ import {
   requireEventManager,
   requireMaterialManager,
   requireGlobalAdmin,
+  optionalEventId,
+  requireSongContentEditor,
 } from "./event-authorization";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
@@ -126,7 +128,7 @@ export async function updateSongAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const user = await requireActionUser();
   const id = String(formData.get("songId") ?? "");
   const eventId = String(formData.get("eventId") ?? "");
   if (!id || !eventId) return { ok: false, error: "Lagu tidak valid." };
@@ -134,7 +136,8 @@ export async function updateSongAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await updateSong(admin.id, id, eventId, parsed.data);
+  await requireEventManagerForSong(user, id, eventId);
+  const result = await updateSong(user.id, id, eventId, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(id);
   return { ok: true };
@@ -243,7 +246,7 @@ export async function createVersionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const user = await requireActionUser();
   const parsed = arrangementVersionSchema.safeParse({
     songId: formData.get("songId"),
     versionLabel: formData.get("versionLabel"),
@@ -257,7 +260,12 @@ export async function createVersionAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await createVersion(admin.id, parsed.data);
+  await requireSongContentEditor(
+    user,
+    parsed.data.songId,
+    optionalEventId(formData.get("eventId")),
+  );
+  const result = await createVersion(user.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(parsed.data.songId);
   return { ok: true };
@@ -267,11 +275,17 @@ export async function activateVersionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const user = await requireActionUser();
   const versionId = String(formData.get("versionId") ?? "");
   const songId = String(formData.get("songId") ?? "");
-  if (!versionId) return { ok: false, error: "Versi tidak valid." };
-  const result = await activateVersion(admin.id, versionId);
+  if (!versionId || !songId) return { ok: false, error: "Versi tidak valid." };
+  await requireSongContentEditor(
+    user,
+    songId,
+    optionalEventId(formData.get("eventId")),
+    { kind: "arrangementVersion", id: versionId },
+  );
+  const result = await activateVersion(user.id, versionId);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSongs(songId || undefined);
   return { ok: true };

@@ -30,10 +30,12 @@ export interface SectionData {
 
 export function ChartSectionEditor({
   songId,
+  eventId,
   section,
   onDone,
 }: {
   songId: string;
+  eventId?: string;
   section?: SectionData;
   onDone: () => void;
 }) {
@@ -61,6 +63,7 @@ export function ChartSectionEditor({
       className="flex flex-col gap-4 rounded-xl border border-sky-300 bg-sky-50/60 p-4 dark:border-sky-800 dark:bg-sky-950/30"
     >
       <input type="hidden" name="songId" value={songId} />
+      {eventId ? <input type="hidden" name="eventId" value={eventId} /> : null}
       {section ? (
         <input type="hidden" name="sectionId" value={section.id} />
       ) : null}
