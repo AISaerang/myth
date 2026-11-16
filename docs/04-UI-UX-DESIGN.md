@@ -73,4 +73,6 @@ Tambah/edit personel, username, role, skill, assignment, deactivate, reset passw
 Gunakan Button, Input, Select, Badge, Card, Dialog, Tabs, Table, Alert, Toast, Skeleton, Empty State. Status: green ready/done; amber in progress/review; red blocked/overdue; gray draft/not checked. Pastikan kontras baik, focus state terlihat, target sentuh cukup besar.
 
 ## Responsive/accessibility
-Label input, keyboard navigation, semantik HTML, focus state, tidak wajib drag-and-drop, uji mobile/tablet/desktop. Error harus membantu tanpa menampilkan stack trace.
+Shell memakai lebar penuh hingga batas 1536px dengan padding responsif. Header aplikasi tunggal tetap sticky dengan latar solid; pada mobile navigasi dan kontrol akun/event berada dalam drawer, sedangkan desktop menampilkan navigasi satu baris yang dapat di-scroll horizontal. Halaman lagu menumpuk chart dan ringkasan di mobile, lalu menempatkannya dalam dua kolom di desktop.
+
+Label input, keyboard navigation, semantik HTML, focus state, tidak wajib drag-and-drop, uji mobile/tablet/desktop. Target sentuh minimal 44px; drawer dapat ditutup dengan Escape, backdrop, tautan, atau perubahan route. Error harus membantu tanpa menampilkan stack trace.

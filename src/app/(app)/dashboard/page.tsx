@@ -28,7 +28,7 @@ import {
 } from "../tasks/WorkBadges";
 
 const linkCard =
-  "block rounded-xl border border-zinc-200 bg-white p-4 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900";
+  "block w-full min-w-0 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900";
 
 async function DashboardContent({
   searchParams,
@@ -81,7 +81,7 @@ async function DashboardContent({
           </p>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Link href={`/songs?eventId=${event.id}`} className={linkCard}>
             <p className="text-2xl font-bold">{c.totalSongs}</p>
             <p className="text-sm text-zinc-500">Total lagu</p>
@@ -122,6 +122,7 @@ async function DashboardContent({
           }}
         />
 
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {c.blockedTasks + c.overdueTasks + c.blockedEquipment + c.helpNeeded > 0 ? (
           <Card title="Perlu ditindaklanjuti">
             <ul className="flex flex-col gap-2 text-sm">
@@ -256,6 +257,7 @@ async function DashboardContent({
             </ul>
           )}
         </Card>
+        </div>
       </div>
     );
   }
@@ -283,7 +285,7 @@ async function DashboardContent({
           halaman Tasks &amp; Usulan atau detail lagu.
         </p>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Link href={`/songs?eventId=${event.id}`} className={linkCard}>
             <p className="text-2xl font-bold">{c.totalSongs}</p>
             <p className="text-sm text-zinc-500">Lagu publish</p>
@@ -310,6 +312,7 @@ async function DashboardContent({
           </Link>
         </div>
 
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {c.blockedTasks + c.overdueTasks + c.blockedEquipment + c.helpNeeded > 0 ? (
           <Card title="Perlu ditindaklanjuti">
             <ul className="flex flex-col gap-2 text-sm">
@@ -426,6 +429,7 @@ async function DashboardContent({
             </p>
           )}
         </Card>
+        </div>
       </div>
     );
   }
@@ -445,30 +449,31 @@ async function DashboardContent({
           : ""}
       </p>
 
-      {data.upcomingRehearsals.length > 0 ? (
-        <Card title="Rehearsal berikutnya">
-          <ul className="flex flex-col gap-1">
-            {data.upcomingRehearsals.map((r) => (
-              <li key={r.id}>
-                <Link
-                  href={`/rehearsals/${r.id}?eventId=${event.id}`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
-                >
-                  <span>
-                    <span className="font-medium">{r.title}</span>
-                    <span className="block text-xs text-zinc-500">
-                      {formatJakarta(r.startsAt)}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {data.upcomingRehearsals.length > 0 ? (
+          <Card title="Rehearsal berikutnya">
+            <ul className="flex flex-col gap-1">
+              {data.upcomingRehearsals.map((r) => (
+                <li key={r.id}>
+                  <Link
+                    href={`/rehearsals/${r.id}?eventId=${event.id}`}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  >
+                    <span>
+                      <span className="font-medium">{r.title}</span>
+                      <span className="block text-xs text-zinc-500">
+                        {formatJakarta(r.startsAt)}
+                      </span>
                     </span>
-                  </span>
-                  <RehearsalTypeBadge type={r.type} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
+                    <RehearsalTypeBadge type={r.type} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
 
-      <Card title={`Laguku (${data.mySongs.length})`}>
+        <Card title={`Laguku (${data.mySongs.length})`}>
         {data.mySongs.length === 0 ? (
           <EmptyState
             title="Belum ada lagu untukmu"
@@ -496,7 +501,8 @@ async function DashboardContent({
             ))}
           </ul>
         )}
-      </Card>
+        </Card>
+      </div>
 
       <UserTimelineCard
         userId={user.id}
@@ -511,6 +517,7 @@ async function DashboardContent({
         }}
       />
 
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       {data.myTasks.length > 0 ? (
         <Card title={`Task aktifku (${data.myTasks.length})`}>
           <ul className="flex flex-col gap-1 text-sm">
@@ -557,6 +564,7 @@ async function DashboardContent({
           </ul>
         </Card>
       ) : null}
+      </div>
     </div>
   );
 }

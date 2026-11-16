@@ -39,7 +39,10 @@ function Callout({
 
 export default function Notulensi16102026Page() {
   return (
-    <article className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <article
+      id="konten"
+      className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-3 py-6"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="neutral">Notulensi</Badge>
         <Badge tone="neutral">16 Okt 2026</Badge>

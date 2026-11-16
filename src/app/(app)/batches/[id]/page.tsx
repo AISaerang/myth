@@ -71,14 +71,14 @@ export default async function BatchDetailPage({
           {published.length === 0 ? (
             <p className="text-sm text-zinc-500">Belum ada lagu publish di batch ini.</p>
           ) : (
-            <ul className="flex flex-col gap-1">
+            <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {published.map((item) => {
                 const badge = badgeFromSortOrders(item.sortOrder, sortOrders);
                 return (
                 <li
                   key={item.songId}
                   id={batchBadgeAnchor(batch.id, badge)}
-                  className="flex scroll-mt-24 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  className="flex min-w-0 scroll-mt-24 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
                   <span className="flex items-center gap-2">
                     <BatchOrderBadge badge={badge} />
@@ -148,14 +148,14 @@ export default async function BatchDetailPage({
           {batch.items.length === 0 ? (
             <p className="text-sm text-zinc-500">Belum ada lagu.</p>
           ) : (
-            <ul className="flex flex-col gap-1">
+            <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {batch.items.map((item, index) => {
                 const badge = badgeFromSortOrders(item.sortOrder, sortOrders);
                 return (
                 <li
                   key={item.songId}
                   id={batchBadgeAnchor(batch.id, badge)}
-                  className="flex scroll-mt-24 flex-col gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  className="flex min-w-0 scroll-mt-24 flex-col gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
                   <span className="flex flex-wrap items-center justify-between gap-2">
                     <span className="flex items-center gap-2">

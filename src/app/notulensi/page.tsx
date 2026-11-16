@@ -17,7 +17,10 @@ const EDITIONS = [
 
 export default function NotulensiIndexPage() {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <main
+      id="konten"
+      className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-3 py-6"
+    >
       <div>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           Notulensi
@@ -42,6 +45,6 @@ export default function NotulensiIndexPage() {
           </li>
         ))}
       </ul>
-    </div>
+    </main>
   );
 }
