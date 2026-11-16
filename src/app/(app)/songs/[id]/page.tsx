@@ -209,7 +209,9 @@ export default async function SongDetailPage({
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           {song.title}
         </h1>
-        <SongStatusBadge status={song.status} />
+        <span title="Status kerja = tahap persiapan lagu. Publikasi = terlihat oleh pemusik.">
+          <SongStatusBadge status={song.status} />
+        </span>
         {batchBadges.map((badge) => (
           <BatchOrderBadge
             key={badge.anchorId}
@@ -223,9 +225,11 @@ export default async function SongDetailPage({
           </span>
         ) : null}
         {song.isPublished ? (
-          <Badge tone="success">Publikasi</Badge>
+          <span title="Publikasi = terlihat oleh pemusik.">
+            <Badge tone="success">Publikasi: Dipublikasi</Badge>
+          </span>
         ) : (
-          <Badge tone="neutral">Draft internal</Badge>
+          <Badge tone="neutral">Publikasi: Draft internal</Badge>
         )}
         {song.isFinalLocked ? <Badge tone="danger">Final terkunci</Badge> : null}
       </div>

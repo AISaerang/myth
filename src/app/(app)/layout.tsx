@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { cacheLife } from "next/cache";
 import { connection } from "next/server";
 import { cookies } from "next/headers";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { AppNav } from "@/components/ui/AppNav";
 import { EventSwitcher } from "@/components/ui/EventSwitcher";
 import { UiModeToggle } from "@/components/ui/UiModeToggle";
 import { EventTypeBadge } from "@/components/ui/EventTypeBadge";
@@ -43,130 +43,77 @@ export default async function AppLayout({
     : "edit";
   const preview = canToggleView && uiMode === "preview";
 
+  const navItems = [
+    { href: "/dashboard", label: "Dashboard" },
+    ...(hasEventAccess
+      ? [
+          { href: "/event", label: "Event Brief" },
+          { href: "/team", label: "Tim" },
+          {
+            href: "/songs",
+            label: preview ? "Lagu Saya" : admin || canManageEvent(eventRole) ? "Lagu" : observer ? "Lagu" : "Lagu Saya",
+          },
+        ]
+      : []),
+    ...(hasEventAccess && (admin || observer) && !preview
+      ? [{ href: "/batches", label: "Batch" }]
+      : []),
+    ...(hasEventAccess
+      ? [
+          {
+            href: "/tasks",
+            label: preview ? "Task Saya" : admin ? "Tasks" : observer ? "Tasks & Usulan" : "Task Saya",
+          },
+          { href: "/rehearsals", label: "Rehearsal" },
+          { href: "/equipment", label: "Equipment" },
+        ]
+      : []),
+    ...(hasEventAccess && admin && !preview
+      ? [{ href: "/decisions", label: "Keputusan" }]
+      : []),
+    ...(admin && !preview ? [{ href: "/people", label: "Personel & Akses" }] : []),
+    ...(admin && !preview ? [{ href: "/broadcast", label: "Broadcast" }] : []),
+  ];
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
-        <nav aria-label="Navigasi utama" className="flex flex-wrap gap-1">
-          <Link
-            href="/dashboard"
-            className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            Dashboard
-          </Link>
-          {hasEventAccess ? (
-            <>
-              <Link
-                href="/event"
-                className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              >
-                Event Brief
-              </Link>
-              <Link
-                href="/team"
-                className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              >
-                Tim
-              </Link>
-            </>
-          ) : null}
-          {hasEventAccess ? (
-            <Link
-              href="/songs"
-              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              {preview
-                ? "Lagu Saya"
-                : admin || canManageEvent(eventRole)
-                  ? "Lagu"
-                  : observer
-                    ? "Lagu"
-                    : "Lagu Saya"}
-            </Link>
-          ) : null}
-          {hasEventAccess && (admin || observer) && !preview ? (
-            <Link
-              href="/batches"
-              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Batch
-            </Link>
-          ) : null}
-          {hasEventAccess ? (
-            <Link
-              href="/tasks"
-              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              {preview ? "Task Saya" : admin ? "Tasks" : observer ? "Tasks & Usulan" : "Task Saya"}
-            </Link>
-          ) : null}
-          {hasEventAccess ? (
-            <Link
-              href="/rehearsals"
-              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Rehearsal
-            </Link>
-          ) : null}
-          {hasEventAccess ? (
-            <Link
-              href="/equipment"
-              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Equipment
-            </Link>
-          ) : null}
-          {hasEventAccess && admin && !preview ? (
-            <Link
-              href="/decisions"
-              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Keputusan
-            </Link>
-          ) : null}
-          {admin && !preview ? (
-            <Link
-              href="/people"
-              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Personel &amp; Akses
-            </Link>
-          ) : null}
-          {admin && !preview ? (
-            <Link
-              href="/broadcast"
-              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Broadcast
-            </Link>
-          ) : null}
-        </nav>
-        <div className="flex items-center gap-2">
-          {currentEvent ? (
-            <>
-              <EventTypeBadge type={currentEvent.eventType} />
-              <EventSwitcher
-                events={events.map(({ id, name, eventType }) => ({ id, name, eventType }))}
-                selectedEventId={currentEvent.id}
-              />
-            </>
-          ) : null}
-          {currentEvent && canToggleView ? (
-            <UiModeToggle eventId={currentEvent.id} mode={uiMode} />
-          ) : null}
-          {preview ? <Badge tone="warning">Pratinjau</Badge> : null}
-          <span className="text-sm text-zinc-600 dark:text-zinc-400">
-            {user.displayName}
-          </span>
-          <Badge tone={admin ? "success" : "neutral"}>
-            {roleLabel(user.role)}
-          </Badge>
-          <form action={logoutAction}>
-            <Button type="submit" variant="secondary" size="sm">
-              Keluar
-            </Button>
-          </form>
+      <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
+        <div className="mx-auto w-full max-w-screen-2xl px-3 py-3 sm:px-4 lg:px-6 xl:px-8">
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <AppNav items={navItems} />
+              </div>
+              <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+                {currentEvent ? (
+                  <>
+                    <EventTypeBadge type={currentEvent.eventType} />
+                    <EventSwitcher
+                      events={events.map(({ id, name, eventType }) => ({ id, name, eventType }))}
+                      selectedEventId={currentEvent.id}
+                    />
+                  </>
+                ) : null}
+                {currentEvent && canToggleView ? (
+                  <UiModeToggle eventId={currentEvent.id} mode={uiMode} />
+                ) : null}
+                {preview ? <Badge tone="warning">Pratinjau</Badge> : null}
+                <span className="truncate text-sm text-zinc-600 dark:text-zinc-400">
+                  {user.displayName}
+                </span>
+                <Badge tone={admin ? "success" : "neutral"}>
+                  {roleLabel(user.role)}
+                </Badge>
+                <form action={logoutAction}>
+                  <Button type="submit" variant="secondary" size="sm">
+                    Keluar
+                  </Button>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </header>
       {children}
     </div>
   );

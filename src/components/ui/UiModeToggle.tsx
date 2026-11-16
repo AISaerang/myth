@@ -11,7 +11,7 @@ export function UiModeToggle({
   return (
     <form
       action={setUiModeAction}
-      className="inline-flex overflow-hidden rounded-lg border border-zinc-300 dark:border-zinc-700"
+      className="inline-flex min-w-0 overflow-hidden rounded-lg border border-zinc-300 dark:border-zinc-700"
     >
       <input type="hidden" name="eventId" value={eventId} />
       <button
