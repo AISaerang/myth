@@ -36,6 +36,16 @@ export function AppNav({
     return () => document.removeEventListener("keydown", handleEscape);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
   const renderItem = (item: AppNavItem) => {
     const isActive =
       pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
@@ -77,7 +87,7 @@ export function AppNav({
         </button>
       </div>
 
-      <div className="hidden min-w-0 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-x-4 md:gap-y-2 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
+      <div className="hidden min-w-0 md:grid md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:gap-x-4 md:gap-y-2 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
         <span className="min-w-0 truncate text-sm font-semibold tracking-tight md:col-start-1 md:row-start-1">
           Music Youth Team Hub
         </span>
@@ -106,7 +116,7 @@ export function AppNav({
         aria-label="Menu navigasi"
         aria-hidden={!open}
         hidden={!open}
-        className="fixed inset-y-[60px] right-0 z-[70] flex w-[88vw] max-w-sm flex-col gap-3 overflow-y-auto border-l border-zinc-200 bg-white p-4 shadow-xl md:hidden dark:border-zinc-800 dark:bg-zinc-950"
+        className="fixed bottom-0 right-0 top-[60px] z-[70] flex w-[88vw] max-w-sm flex-col gap-3 overflow-y-auto overscroll-contain border-l border-zinc-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl md:hidden dark:border-zinc-800 dark:bg-zinc-950"
       >
         <div className="flex flex-col gap-1">{items.map(renderItem)}</div>
         <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
