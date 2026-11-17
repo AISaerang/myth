@@ -209,6 +209,15 @@ export default async function SongDetailPage({
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           {song.title}
         </h1>
+        {song.isPublished ? (
+          <span title="Status kerja = tahap persiapan lagu. Publikasi = terlihat oleh pemusik.">
+            <Badge tone="success">Publikasi: Dipublikasi</Badge>
+          </span>
+        ) : (
+          <span title="Status kerja = tahap persiapan lagu. Publikasi = terlihat oleh pemusik.">
+            <Badge tone="neutral">Publikasi: Draft internal</Badge>
+          </span>
+        )}
         <span title="Status kerja = tahap persiapan lagu. Publikasi = terlihat oleh pemusik.">
           <SongStatusBadge status={song.status} />
         </span>
@@ -224,13 +233,6 @@ export default async function SongDetailPage({
             Medley: {medleyLabels.join(" · ")}
           </span>
         ) : null}
-        {song.isPublished ? (
-          <span title="Publikasi = terlihat oleh pemusik.">
-            <Badge tone="success">Publikasi: Dipublikasi</Badge>
-          </span>
-        ) : (
-          <Badge tone="neutral">Publikasi: Draft internal</Badge>
-        )}
         {song.isFinalLocked ? <Badge tone="danger">Final terkunci</Badge> : null}
       </div>
 
@@ -261,135 +263,141 @@ export default async function SongDetailPage({
         </nav>
       ) : null}
 
-      <Card title="Overview">
-        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <Meta label="Fungsi liturgi" value={song.liturgicalFunction} />
-          <Meta label="Artis/pencipta" value={song.artistOrAuthor} />
-          <Meta label="Key" value={song.key} />
-          <Meta label="Tempo" value={song.bpm ? `${song.bpm} BPM` : null} />
-          <Meta label="Birama" value={song.timeSignature} />
-          <Meta
-            label="Estimasi durasi"
-            value={
-              song.estimatedDurationSeconds
-                ? `${Math.floor(song.estimatedDurationSeconds / 60)}:${String(song.estimatedDurationSeconds % 60).padStart(2, "0")}`
-                : null
-            }
-          />
-          <Meta label="Event" value={song.event.name} />
-          <Meta
-            label="Batch"
-            value={song.batchItems.map((b) => b.batch.name).join(", ") || null}
-          />
-        </dl>
-        {song.originalReferenceUrl ? (
-          <p className="mt-3 text-sm">
-            <a
-              href={song.originalReferenceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium underline"
-            >
-              Buka referensi original
-            </a>
-          </p>
-        ) : null}
-        {song.arrangementNotes ? (
-          <div className="mt-3 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
-            <p className="font-medium">Arah aransemen (MD)</p>
-            <p className="text-zinc-600 dark:text-zinc-400">{song.arrangementNotes}</p>
-          </div>
-        ) : null}
-      </Card>
-
-      {canWrite && !previewing && batchBadges.length > 0 ? (
-        <Card title="Medley">
-          <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-            Isi label yang sama pada lagu berurutan di satu batch untuk membuat koridor.
-            Di tengah medley, pemusik melihat lagu berikutnya. Kembali ke badge hanya
-            muncul di lagu terakhir medley atau lagu di luar medley.
-          </p>
-          <div className="flex flex-col gap-3">
-            {batchBadges.map((badge) => (
-              <div key={badge.batchId} className="flex flex-col gap-2">
-                <p className="text-sm font-medium">
-                  {badge.batchName} · badge {badge.badge}
-                </p>
-                <MedleyLabelForm
-                  batchId={badge.batchId}
-                  songId={song.id}
-                  songTitle={song.title}
-                  label={badge.medleyLabel}
-                />
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <aside className="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
+          <Card title="Overview">
+            <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
+              <Meta label="Fungsi liturgi" value={song.liturgicalFunction} />
+              <Meta label="Artis/pencipta" value={song.artistOrAuthor} />
+              <Meta label="Key" value={song.key} />
+              <Meta label="Tempo" value={song.bpm ? `${song.bpm} BPM` : null} />
+              <Meta label="Birama" value={song.timeSignature} />
+              <Meta
+                label="Estimasi durasi"
+                value={
+                  song.estimatedDurationSeconds
+                    ? `${Math.floor(song.estimatedDurationSeconds / 60)}:${String(song.estimatedDurationSeconds % 60).padStart(2, "0")}`
+                    : null
+                }
+              />
+              <Meta label="Event" value={song.event.name} />
+              <Meta
+                label="Batch"
+                value={song.batchItems.map((b) => b.batch.name).join(", ") || null}
+              />
+            </dl>
+            {song.originalReferenceUrl ? (
+              <p className="mt-3 text-sm">
+                <a
+                  href={song.originalReferenceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline"
+                >
+                  Buka referensi original
+                </a>
+              </p>
+            ) : null}
+            {song.arrangementNotes ? (
+              <div className="mt-3 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
+                <p className="font-medium">Arah aransemen (MD)</p>
+                <p className="text-zinc-600 dark:text-zinc-400">{song.arrangementNotes}</p>
               </div>
-            ))}
-          </div>
-        </Card>
-      ) : null}
+            ) : null}
+          </Card>
 
-      {!canEditSong && myAssignment ? (
-        <Card title="Tugasmu">
-          <p className="text-sm">
-            {myAssignment.instrumentSkill
-              ? `Part: ${myAssignment.instrumentSkill.name}`
-              : "Part: sesuai arahan MD"}
-            {myAssignment.assignmentNote ? ` — ${myAssignment.assignmentNote}` : ""}
-          </p>
-        </Card>
-      ) : null}
+          {canWrite && !previewing && batchBadges.length > 0 ? (
+            <Card title="Medley">
+              <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+                Isi label yang sama pada lagu berurutan di satu batch untuk membuat koridor.
+                Di tengah medley, pemusik melihat lagu berikutnya. Kembali ke badge hanya
+                muncul di lagu terakhir medley atau lagu di luar medley.
+              </p>
+              <div className="flex flex-col gap-3">
+                {batchBadges.map((badge) => (
+                  <div key={badge.batchId} className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">
+                      {badge.batchName} · badge {badge.badge}
+                    </p>
+                    <MedleyLabelForm
+                      batchId={badge.batchId}
+                      songId={song.id}
+                      songTitle={song.title}
+                      label={badge.medleyLabel}
+                    />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
 
-      {canEditSong || observer || myAssignment ? (
-        <SongProgress
-          songId={song.id}
-          eventSongId={song.eventSongId}
-          admin={canEditSong}
-          observer={observer && !previewing}
-          userId={user.id}
-        />
-      ) : (
-        <Card title="Progres latihan">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Kamu dapat melihat lagu ini. Update progres tersedia setelah lagu
-            ditugaskan kepadamu.
-          </p>
-        </Card>
-      )}
+          {!canEditSong && myAssignment ? (
+            <Card title="Tugasmu">
+              <p className="text-sm">
+                {myAssignment.instrumentSkill
+                  ? `Part: ${myAssignment.instrumentSkill.name}`
+                  : "Part: sesuai arahan MD"}
+                {myAssignment.assignmentNote ? ` — ${myAssignment.assignmentNote}` : ""}
+              </p>
+            </Card>
+          ) : null}
 
-      <SongChordChart
-        songId={song.id}
-        eventId={song.eventId}
-        eventSongId={song.eventSongId}
-        admin={canEditSong}
-        sections={chartSections.map((section) => ({
-          id: section.id,
-          label: section.label,
-          type: section.type,
-        }))}
-        notes={songNotes}
-        noteTargetOptions={noteTargetOptions}
-        canWriteNotes={canWriteNotes}
-        canModerateNotes={
-          !previewing && canManageSongNotes(user, eventRole)
-        }
-        currentUserId={user.id}
-        defaultPart={myAssignment?.instrumentSkill?.name ?? null}
-      />
+          {canEditSong || observer || myAssignment ? (
+            <SongProgress
+              songId={song.id}
+              eventSongId={song.eventSongId}
+              admin={canEditSong}
+              observer={observer && !previewing}
+              userId={user.id}
+            />
+          ) : (
+            <Card title="Progres latihan">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Kamu dapat melihat lagu ini. Update progres tersedia setelah lagu
+                ditugaskan kepadamu.
+              </p>
+            </Card>
+          )}
 
-      <SongNotes
-        songId={song.id}
-        eventSongId={song.eventSongId}
-        notes={songNotes}
-        sections={chartSections.map((section) => ({
-          id: section.id,
-          label: section.label,
-          type: section.type,
-        }))}
-        partOptions={skillRows.map((row) => row.name)}
-        defaultPart={myAssignment?.instrumentSkill?.name ?? null}
-        canWrite={canWriteNotes}
-        currentUserId={user.id}
-        canModerate={!previewing && canManageSongNotes(user, eventRole)}
-      />
+          <SongNotes
+            songId={song.id}
+            eventSongId={song.eventSongId}
+            notes={songNotes}
+            sections={chartSections.map((section) => ({
+              id: section.id,
+              label: section.label,
+              type: section.type,
+            }))}
+            partOptions={skillRows.map((row) => row.name)}
+            defaultPart={myAssignment?.instrumentSkill?.name ?? null}
+            canWrite={canWriteNotes}
+            currentUserId={user.id}
+            canModerate={!previewing && canManageSongNotes(user, eventRole)}
+          />
+        </aside>
+
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <SongChordChart
+            songId={song.id}
+            eventId={song.eventId}
+            eventSongId={song.eventSongId}
+            admin={canEditSong}
+            sections={chartSections.map((section) => ({
+              id: section.id,
+              label: section.label,
+              type: section.type,
+            }))}
+            notes={songNotes}
+            noteTargetOptions={noteTargetOptions}
+            canWriteNotes={canWriteNotes}
+            canModerateNotes={
+              !previewing && canManageSongNotes(user, eventRole)
+            }
+            currentUserId={user.id}
+            defaultPart={myAssignment?.instrumentSkill?.name ?? null}
+          />
+        </div>
+      </div>
 
       <Card title="Materi aktif">
         {song.materials.filter((m) => m.isActive).length === 0 ? (

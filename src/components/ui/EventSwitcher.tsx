@@ -13,24 +13,29 @@ export function EventSwitcher({
   events,
   selectedEventId,
   label = "Event aktif",
+  id = "active-event",
 }: {
   events: EventOption[];
   selectedEventId: string;
   label?: string;
+  id?: string;
 }) {
   if (events.length < 2) return null;
 
   return (
-    <form action={setActiveEventAction} className="flex min-w-0 items-center gap-2 text-sm">
-      <label htmlFor="active-event" className="sr-only sm:not-sr-only">
+    <form
+      action={setActiveEventAction}
+      className="flex w-full min-w-0 flex-col gap-1 text-sm sm:w-auto sm:flex-row sm:items-center sm:gap-2"
+    >
+      <label htmlFor={id} className="text-xs text-zinc-500 sm:text-sm">
         {label}
       </label>
       <select
-        id="active-event"
+        id={id}
         name="eventId"
         defaultValue={selectedEventId}
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
-        className="h-10 w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-2 text-sm text-zinc-700 shadow-sm transition-colors focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 sm:max-w-64"
+        className="h-11 w-full min-w-0 truncate rounded-lg border border-zinc-300 bg-white px-2 text-sm text-zinc-700 shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:focus-visible:outline-zinc-100 sm:max-w-64"
       >
         {events.map((event) => (
           <option key={event.id} value={event.id}>

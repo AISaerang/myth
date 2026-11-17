@@ -75,46 +75,85 @@ export default async function AppLayout({
     ...(admin && !preview ? [{ href: "/broadcast", label: "Broadcast" }] : []),
   ];
 
+  const eventOptions = events.map(({ id, name, eventType }) => ({
+    id,
+    name,
+    eventType,
+  }));
+  const desktopControls = (
+    <>
+      {currentEvent ? (
+        <>
+          <EventTypeBadge type={currentEvent.eventType} />
+          <EventSwitcher
+            id="active-event-desktop"
+            events={eventOptions}
+            selectedEventId={currentEvent.id}
+          />
+        </>
+      ) : null}
+      {currentEvent && canToggleView ? (
+        <UiModeToggle eventId={currentEvent.id} mode={uiMode} />
+      ) : null}
+      {preview ? <Badge tone="warning">Pratinjau</Badge> : null}
+      <span className="max-w-36 truncate text-sm text-zinc-600 dark:text-zinc-400">
+        {user.displayName}
+      </span>
+      <Badge tone={admin ? "success" : "neutral"}>{roleLabel(user.role)}</Badge>
+      <form action={logoutAction}>
+        <Button type="submit" variant="secondary" size="sm">
+          Keluar
+        </Button>
+      </form>
+    </>
+  );
+  const mobileControls = (
+    <div className="flex min-w-0 flex-col gap-3">
+      {currentEvent ? (
+        <div className="flex min-w-0 flex-col gap-2">
+          <EventTypeBadge type={currentEvent.eventType} />
+          <EventSwitcher
+            id="active-event-mobile"
+            events={eventOptions}
+            selectedEventId={currentEvent.id}
+          />
+        </div>
+      ) : null}
+      {currentEvent && canToggleView ? (
+        <UiModeToggle eventId={currentEvent.id} mode={uiMode} />
+      ) : null}
+      {preview ? <Badge tone="warning">Pratinjau</Badge> : null}
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm text-zinc-600 dark:text-zinc-400">
+          {user.displayName}
+        </span>
+        <Badge tone={admin ? "success" : "neutral"}>{roleLabel(user.role)}</Badge>
+      </div>
+      <form action={logoutAction}>
+        <Button type="submit" variant="secondary" size="sm" className="w-full">
+          Keluar
+        </Button>
+      </form>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-4">
-      <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
-        <div className="mx-auto w-full max-w-screen-2xl px-3 py-3 sm:px-4 lg:px-6 xl:px-8">
-          <div className="flex min-w-0 flex-col gap-3">
-            <div className="flex min-w-0 items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <AppNav items={navItems} />
-              </div>
-              <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
-                {currentEvent ? (
-                  <>
-                    <EventTypeBadge type={currentEvent.eventType} />
-                    <EventSwitcher
-                      events={events.map(({ id, name, eventType }) => ({ id, name, eventType }))}
-                      selectedEventId={currentEvent.id}
-                    />
-                  </>
-                ) : null}
-                {currentEvent && canToggleView ? (
-                  <UiModeToggle eventId={currentEvent.id} mode={uiMode} />
-                ) : null}
-                {preview ? <Badge tone="warning">Pratinjau</Badge> : null}
-                <span className="truncate text-sm text-zinc-600 dark:text-zinc-400">
-                  {user.displayName}
-                </span>
-                <Badge tone={admin ? "success" : "neutral"}>
-                  {roleLabel(user.role)}
-                </Badge>
-                <form action={logoutAction}>
-                  <Button type="submit" variant="secondary" size="sm">
-                    Keluar
-                  </Button>
-                </form>
-              </div>
-            </div>
-          </div>
+    <div className="flex min-h-0 w-full flex-1 flex-col">
+      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="mx-auto w-full max-w-screen-2xl px-3 py-2 sm:px-4 lg:px-6 xl:px-8">
+          <AppNav
+            items={navItems}
+            desktopControls={desktopControls}
+            mobileControls={mobileControls}
+          />
         </div>
       </header>
-      {children}
+      <main
+        id="konten"
+        className="mx-auto w-full max-w-screen-2xl flex-1 px-3 py-6 sm:px-4 lg:px-6 xl:px-8"
+      >
+        {children}
+      </main>
     </div>
   );
 }

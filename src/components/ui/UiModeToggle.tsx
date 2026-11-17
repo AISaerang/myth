@@ -19,7 +19,7 @@ export function UiModeToggle({
         name="mode"
         value="edit"
         aria-pressed={mode === "edit"}
-        className={`h-11 px-3 text-sm font-medium ${
+        className={`h-11 min-w-0 px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 ${
           mode === "edit"
             ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
             : "bg-white text-zinc-700 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -32,7 +32,7 @@ export function UiModeToggle({
         name="mode"
         value="preview"
         aria-pressed={mode === "preview"}
-        className={`h-11 px-3 text-sm font-medium ${
+        className={`h-11 min-w-0 px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 ${
           mode === "preview"
             ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
             : "bg-white text-zinc-700 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800"

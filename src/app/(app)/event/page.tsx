@@ -68,12 +68,12 @@ async function EventPageContent() {
         {events.length === 0 ? (
           <EmptyState title="Belum ada event" />
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {events.map((e) => (
               <li key={e.id}>
                 <Link
                   href={`/event/${e.id}`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                  className="flex h-full min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                 >
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{e.name}</span>
