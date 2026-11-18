@@ -303,6 +303,7 @@ model Song {
   chordCharts ChordChart[]
   chartSections ChartSection[]
   chartArrangements ChartArrangement[]
+  instrumentChart SongInstrumentChart?
   eventSongs  EventSong[]
   notes       SongNote[]
 
@@ -562,6 +563,17 @@ model ChartArrangementItem {
 
   @@unique([arrangementId, sortOrder])
   @@index([arrangementId, sortOrder])
+}
+
+model SongInstrumentChart {
+  id          String   @id @default(cuid())
+  songId      String   @unique
+  song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  capo        Int      @default(0)
+  data        Json
+  updatedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // Catatan per pemusik (POV part) pada satu lagu di satu event, mirip
