@@ -45,6 +45,7 @@ export interface ChartView {
 export function ChordChartSection({
   songId,
   eventId,
+  songKey,
   eventSongId,
   admin,
   charts,
@@ -59,6 +60,7 @@ export function ChordChartSection({
 }: {
   songId: string;
   eventId: string;
+  songKey?: string | null;
   eventSongId: string;
   admin: boolean;
   charts: ChartView[];
@@ -182,8 +184,13 @@ export function ChordChartSection({
           </p>
           <ChordViewer
             content={arrangement.content}
-            baseKey="C"
-            sections={displaySections}
+            baseKey={songKey || "C"}
+            preferenceKey={`myth-chart:${songId}`}
+            sections={displaySections.map((section) => ({
+              ...section,
+              baseKey: songKey || "C",
+              songId,
+            }))}
             getSectionAnnotations={getSectionAnnotations}
           />
         </div>
@@ -196,7 +203,8 @@ export function ChordChartSection({
           </p>
           <ChordViewer
             content={active.content}
-            baseKey={active.baseKey}
+            baseKey={songKey || active.baseKey}
+            preferenceKey={`myth-chart:${songId}`}
             sections={displaySections}
             getSectionAnnotations={getSectionAnnotations}
           />

@@ -93,6 +93,7 @@ export default async function ChartEditorPage({
         id: item.id,
         sectionId: item.sectionId,
         labelOverride: item.labelOverride,
+        modulationSemitones: item.modulationSemitones,
         section: toSection(item.section),
       })),
     }),

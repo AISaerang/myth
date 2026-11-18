@@ -73,6 +73,25 @@ describe("chartArrangementItemsSchema", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("defaults modulation to zero and rejects values outside one octave", () => {
+    const parsed = chartArrangementItemsSchema.safeParse({
+      songId: "song-1",
+      arrangementId: "arr-1",
+      items: [{ sectionId: "sec-1" }],
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.items[0]?.modulationSemitones).toBe(0);
+    }
+    expect(
+      chartArrangementItemsSchema.safeParse({
+        songId: "song-1",
+        arrangementId: "arr-1",
+        items: [{ sectionId: "sec-1", modulationSemitones: 13 }],
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("legacyChartImportSchema", () => {

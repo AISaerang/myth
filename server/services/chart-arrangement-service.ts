@@ -63,6 +63,7 @@ export async function getActiveArrangementContent(
     id: string;
     label: string;
     content: string;
+    modulationSemitones: number;
   }[];
 } | null> {
   const active = await prisma.chartArrangement.findFirst({
@@ -78,13 +79,17 @@ export async function getActiveArrangementContent(
   const content = composeArrangementContent(active.items);
   if (!content) return null;
   const sections = active.items
-    .map(({ section, labelOverride }) => ({
-      id: section.id,
-      label: displaySectionLabel(labelOverride?.trim() || section.label, {
-        type: section.type,
-        content: section.content,
-      }),
-      content: section.content.trim(),
+    .map((item) => ({
+      id: item.section.id,
+      label: displaySectionLabel(
+        item.labelOverride?.trim() || item.section.label,
+        {
+          type: item.section.type,
+          content: item.section.content,
+        },
+      ),
+      content: item.section.content.trim(),
+      modulationSemitones: item.modulationSemitones,
     }))
     .filter((section) => Boolean(section.content));
   return { name: active.name, content, sections };
@@ -400,6 +405,7 @@ export async function saveChartArrangementItems(
         sectionId: item.sectionId,
         sortOrder: index,
         labelOverride: item.labelOverride?.trim() || null,
+        modulationSemitones: item.modulationSemitones,
       })),
     });
   });

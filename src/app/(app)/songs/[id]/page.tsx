@@ -104,7 +104,6 @@ export default async function SongDetailPage({
     listEventBatchCatalog(eventId),
   ]);
   if (!song) notFound();
-  const batchBadges = badgesForSong(song.id, catalog);
   const eventRole = await getEventRole(user, song.eventId);
   const admin = isAdmin(user);
   const observer = isObserver(user);
@@ -121,9 +120,12 @@ export default async function SongDetailPage({
     uiModeForEvent((await cookies()).get(UI_MODE_COOKIE)?.value, song.eventId) ===
       "preview" &&
     (admin || canManageEvent(eventRole));
+  const publishedOnly =
+    previewing || !(admin || canReadDrafts(eventRole));
+  const batchBadges = badgesForSong(song.id, catalog, { publishedOnly });
   const canEditSong = canWrite && !previewing;
   const setlistNav = resolveSetlistNav(song.id, catalog, {
-    publishedOnly: previewing || !(admin || canReadDrafts(eventRole)),
+    publishedOnly,
     batchId,
   });
   const medleyLabels = [
@@ -359,6 +361,7 @@ export default async function SongDetailPage({
           <SongChordChart
             songId={song.id}
             eventId={song.eventId}
+            songKey={song.key}
             eventSongId={song.eventSongId}
             admin={canEditSong}
             sections={chartSections.map((section) => ({
@@ -591,6 +594,7 @@ export default async function SongDetailPage({
 async function SongChordChart({
   songId,
   eventId,
+  songKey,
   eventSongId,
   admin,
   sections,
@@ -603,6 +607,7 @@ async function SongChordChart({
 }: {
   songId: string;
   eventId: string;
+  songKey: string | null;
   eventSongId: string;
   admin: boolean;
   sections: {
@@ -625,6 +630,7 @@ async function SongChordChart({
     <ChordChartSection
       songId={songId}
       eventId={eventId}
+      songKey={songKey}
       eventSongId={eventSongId}
       admin={admin}
       charts={charts}

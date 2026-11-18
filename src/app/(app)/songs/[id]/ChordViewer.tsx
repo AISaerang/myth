@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { KeyTransposeBar } from "@/components/KeyTransposeBar";
 import { NotationLine } from "@/components/NotAngka";
 import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
@@ -11,6 +11,7 @@ import {
   transposeContent,
   transposeRoot,
 } from "@/lib/chords";
+import { formatKeyChange, keyOffsetFromC } from "@/lib/key-display";
 import { displaySectionLabel } from "@/lib/chart-arrangement";
 import {
   alignChordsToNotation,
@@ -20,11 +21,94 @@ import {
 } from "@/lib/jianpu-align";
 
 type ViewMode = "both" | "lyrics" | "chords";
+type ChartViewPreferences = {
+  offset: number;
+  setOffset: (value: number) => void;
+  useFlats: boolean;
+  setUseFlats: (value: boolean) => void;
+  mode: ViewMode;
+  setMode: (value: ViewMode) => void;
+};
+
+const ChartViewPreferencesContext =
+  createContext<ChartViewPreferences | null>(null);
+
+export function ChartViewPreferenceProvider({
+  preferenceKey,
+  children,
+}: {
+  preferenceKey: string;
+  children: ReactNode;
+}) {
+  const [offset, setOffset] = useState(0);
+  const [useFlats, setUseFlats] = useState(false);
+  const [mode, setMode] = useState<ViewMode>("both");
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  useEffect(() => {
+    let savedOffset = 0;
+    let savedFlats = false;
+    let savedMode: ViewMode = "both";
+    try {
+      const saved = window.localStorage.getItem(preferenceKey);
+      if (saved) {
+        const value: unknown = JSON.parse(saved);
+        if (typeof value === "object" && value !== null) {
+          const prefs = value as Record<string, unknown>;
+          if (
+            typeof prefs.offset === "number" &&
+            Number.isInteger(prefs.offset) &&
+            Math.abs(prefs.offset) <= 24
+          ) {
+            savedOffset = prefs.offset;
+          }
+          if (typeof prefs.useFlats === "boolean") savedFlats = prefs.useFlats;
+          if (
+            prefs.mode === "both" ||
+            prefs.mode === "lyrics" ||
+            prefs.mode === "chords"
+          ) {
+            savedMode = prefs.mode;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Preferensi tampilan chart tidak dapat dibaca.", error);
+    }
+    const timer = window.setTimeout(() => {
+      setOffset(savedOffset);
+      setUseFlats(savedFlats);
+      setMode(savedMode);
+      setPreferencesLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [preferenceKey]);
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    try {
+      window.localStorage.setItem(
+        preferenceKey,
+        JSON.stringify({ offset, useFlats, mode }),
+      );
+    } catch (error) {
+      console.warn("Preferensi tampilan chart tidak dapat disimpan.", error);
+    }
+  }, [preferenceKey, offset, useFlats, mode, preferencesLoaded]);
+  return (
+    <ChartViewPreferencesContext.Provider
+      value={{ offset, setOffset, useFlats, setUseFlats, mode, setMode }}
+    >
+      {children}
+    </ChartViewPreferencesContext.Provider>
+  );
+}
 
 export interface ChartDisplaySection {
   id: string;
   label: string;
   content: string;
+  modulationSemitones?: number;
+  baseKey?: string;
+  songId?: string;
 }
 
 export interface SectionNoteAnnotations {
@@ -209,24 +293,85 @@ export function ChordViewer({
   content,
   baseKey,
   initialOffset = 0,
+  preferenceKey,
   sections,
   getSectionAnnotations,
 }: {
   content: string;
   baseKey: string;
   initialOffset?: number;
+  preferenceKey?: string;
   sections?: ChartDisplaySection[];
   getSectionAnnotations?: (
     sectionId: string,
   ) => SectionNoteAnnotations | undefined;
 }) {
-  const [offset, setOffset] = useState(initialOffset);
-  const [useFlats, setUseFlats] = useState(false);
-  const [mode, setMode] = useState<ViewMode>("both");
+  const sharedPreferences = useContext(ChartViewPreferencesContext);
+  const [localOffset, setLocalOffset] = useState(initialOffset);
+  const [localFlats, setLocalFlats] = useState(false);
+  const [localMode, setLocalMode] = useState<ViewMode>("both");
+  const [localPreferencesLoaded, setLocalPreferencesLoaded] =
+    useState(!preferenceKey);
+  const offset = sharedPreferences?.offset ?? localOffset;
+  const setOffset = sharedPreferences?.setOffset ?? setLocalOffset;
+  const useFlats = sharedPreferences?.useFlats ?? localFlats;
+  const setUseFlats = sharedPreferences?.setUseFlats ?? setLocalFlats;
+  const mode = sharedPreferences?.mode ?? localMode;
+  const setMode = sharedPreferences?.setMode ?? setLocalMode;
+  useEffect(() => {
+    if (!preferenceKey || sharedPreferences) return;
+    let savedOffset = initialOffset;
+    let savedFlats = false;
+    let savedMode: ViewMode = "both";
+    try {
+      const saved = window.localStorage.getItem(preferenceKey);
+      if (saved) {
+        const value: unknown = JSON.parse(saved);
+        if (typeof value === "object" && value !== null) {
+          const prefs = value as Record<string, unknown>;
+          if (
+            typeof prefs.offset === "number" &&
+            Number.isInteger(prefs.offset) &&
+            Math.abs(prefs.offset) <= 24
+          ) {
+            savedOffset = prefs.offset;
+          }
+          if (typeof prefs.useFlats === "boolean") savedFlats = prefs.useFlats;
+          if (
+            prefs.mode === "both" ||
+            prefs.mode === "lyrics" ||
+            prefs.mode === "chords"
+          ) {
+            savedMode = prefs.mode;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Preferensi tampilan chart tidak dapat dibaca.", error);
+    }
+    const timer = window.setTimeout(() => {
+      setLocalOffset(savedOffset);
+      setLocalFlats(savedFlats);
+      setLocalMode(savedMode);
+      setLocalPreferencesLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialOffset, preferenceKey, sharedPreferences]);
+  useEffect(() => {
+    if (!preferenceKey || sharedPreferences || !localPreferencesLoaded) return;
+    try {
+      window.localStorage.setItem(
+        preferenceKey,
+        JSON.stringify({ offset, useFlats, mode }),
+      );
+    } catch (error) {
+      console.warn("Preferensi tampilan chart tidak dapat disimpan.", error);
+    }
+  }, [preferenceKey, offset, useFlats, mode, sharedPreferences, localPreferencesLoaded]);
 
   const transposed = useMemo(
-    () => transposeContent(content, offset, useFlats),
-    [content, offset, useFlats],
+    () => transposeContent(content, keyOffsetFromC(baseKey) + offset, useFlats),
+    [baseKey, content, offset, useFlats],
   );
   const currentKey = useMemo(
     () => transposeRoot(baseKey, offset, useFlats),
@@ -279,6 +424,19 @@ export function ChordViewer({
           <div className="flex min-w-0 flex-col gap-5">
             {sections.map((section, index) => {
               const annotations = getSectionAnnotations?.(section.id);
+              const sectionOffset =
+                keyOffsetFromC(section.baseKey ?? baseKey) +
+                offset +
+                sections
+                  .slice(0, index)
+                  .reduce(
+                    (total, previous) =>
+                      total +
+                      (previous.songId === section.songId
+                        ? previous.modulationSemitones ?? 0
+                        : 0),
+                    0,
+                  );
               return (
                 <section
                   key={`${section.id}-${index}`}
@@ -289,6 +447,16 @@ export function ChordViewer({
                     <h3 className="text-xs font-semibold tracking-wide text-zinc-500">
                       {section.label}
                     </h3>
+                    {section.modulationSemitones ? (
+                      <p className="text-xs text-indigo-700 dark:text-indigo-300">
+                        Modulasi setelah bagian:{" "}
+                        {formatKeyChange(
+                          transposeRoot("C", sectionOffset, useFlats),
+                          section.modulationSemitones,
+                          useFlats,
+                        )}
+                      </p>
+                    ) : null}
                     {annotations?.targeted}
                   </div>
                   <div
@@ -300,7 +468,7 @@ export function ChordViewer({
                   >
                     <div className="min-w-0 max-w-full overflow-x-auto">
                       {renderChart(
-                        transposeContent(section.content, offset, useFlats),
+                        transposeContent(section.content, sectionOffset, useFlats),
                         mode,
                         `${offset}-${useFlats}-${mode}-${section.id}-${index}`,
                       )}
