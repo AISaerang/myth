@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { parseLegacyChart } from "@/lib/chart-arrangement";
+import type { InstrumentChartData } from "@/lib/validation/instrument-chart";
 import type { SongNoteTargetOption, SongNoteView } from "@/lib/song-note";
 import { formatJakarta } from "@/lib/format";
 import {
@@ -32,6 +33,11 @@ import {
 const inputClass =
   "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900";
 
+const EMPTY_INSTRUMENT_DATA: InstrumentChartData = {
+  sections: {},
+  voicings: {},
+};
+
 export interface ChartView {
   id: string;
   content: string;
@@ -46,6 +52,8 @@ export function ChordChartSection({
   songId,
   eventId,
   songKey,
+  defaultCapo = 0,
+  instrumentData = EMPTY_INSTRUMENT_DATA,
   eventSongId,
   admin,
   charts,
@@ -61,6 +69,8 @@ export function ChordChartSection({
   songId: string;
   eventId: string;
   songKey?: string | null;
+  defaultCapo?: number;
+  instrumentData?: InstrumentChartData;
   eventSongId: string;
   admin: boolean;
   charts: ChartView[];
@@ -147,7 +157,13 @@ export function ChordChartSection({
   return (
     <Card title="Lirik & Chord">
       {admin ? (
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex flex-wrap justify-end gap-x-3 gap-y-1">
+          <Link
+            href={`/songs/${songId}/chart?eventId=${eventId}#instrument-chart`}
+            className="text-sm font-medium underline"
+          >
+            Kelola data instrumen
+          </Link>
           <Link
             href={`/songs/${songId}/chart?eventId=${eventId}`}
             className="text-sm font-medium underline"
@@ -185,7 +201,11 @@ export function ChordChartSection({
           <ChordViewer
             content={arrangement.content}
             baseKey={songKey || "C"}
-            preferenceKey={`myth-chart:${songId}`}
+            songId={songId}
+            defaultCapo={defaultCapo}
+            instrumentData={instrumentData}
+            preferenceKey={`myth_chart_view:${songId}`}
+            legacyPreferenceKey={`myth-chart:${songId}`}
             sections={displaySections.map((section) => ({
               ...section,
               baseKey: songKey || "C",
@@ -204,7 +224,11 @@ export function ChordChartSection({
           <ChordViewer
             content={active.content}
             baseKey={songKey || active.baseKey}
-            preferenceKey={`myth-chart:${songId}`}
+            songId={songId}
+            defaultCapo={defaultCapo}
+            instrumentData={instrumentData}
+            preferenceKey={`myth_chart_view:${songId}`}
+            legacyPreferenceKey={`myth-chart:${songId}`}
             sections={displaySections}
             getSectionAnnotations={getSectionAnnotations}
           />

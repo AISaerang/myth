@@ -136,7 +136,7 @@ function buildGuitarShape(root: string, intervals: number[]): GuitarShape {
     let score = 0;
     let highest = base;
     for (let string = 0; string < 6; string += 1) {
-      const candidates = Array.from({ length: 5 }, (_, fret) => base + fret).filter(
+      const candidates = Array.from({ length: 4 }, (_, fret) => base + fret).filter(
         (fret) =>
           intervals.includes(
             ((STRING_OPEN_NOTES[string]! + fret - rootIndex) % 12 + 12) % 12,

@@ -8,6 +8,8 @@ import { displaySectionLabel } from "@/lib/chart-arrangement";
 import { prisma } from "@/lib/db";
 import { getBatch, listMedleyTransitions } from "@server/services/batch-service";
 import { getEventRole } from "@server/services/event-access";
+import { getInstrumentChart } from "@server/services/instrument-chart-service";
+import { parseLegacyChart } from "@/lib/chart-arrangement";
 
 export default async function JoinedMedleyPage({
   params,
@@ -49,7 +51,7 @@ export default async function JoinedMedleyPage({
   if (!run || run.kind !== "medley") notFound();
 
   const songIds = run.items.map((item) => item.songId);
-  const [arrangements, legacyCharts] = await Promise.all([
+  const [arrangements, legacyCharts, instrumentCharts] = await Promise.all([
     prisma.chartArrangement.findMany({
       where: { songId: { in: songIds }, isActive: true },
       include: {
@@ -69,6 +71,7 @@ export default async function JoinedMedleyPage({
       },
       orderBy: { createdAt: "desc" },
     }),
+    Promise.all(songIds.map((songId) => getInstrumentChart(songId))),
   ]);
   const arrangementBySong = new Map(
     arrangements.map((arrangement) => [arrangement.songId, arrangement]),
@@ -80,14 +83,18 @@ export default async function JoinedMedleyPage({
   const transitionBySong = new Map(
     transitions.map((transition) => [transition.fromSongId, transition]),
   );
+  const instrumentChartBySong = new Map(
+    songIds.map((songId, index) => [songId, instrumentCharts[index]!]),
+  );
   const songs = run.items.map((item, index) => {
     const key = eventSongDisplayKey(
       item.eventSong?.eventKey ?? null,
       item.song.key,
     ) || "C";
     const arrangement = arrangementBySong.get(item.songId);
+    const instrumentChart = instrumentChartBySong.get(item.songId);
     const savedTransition = transitionBySong.get(item.songId);
-    const sections =
+    const arrangementSections =
       arrangement?.items
         .map(({ section, labelOverride, modulationSemitones }) => ({
           id: section.id,
@@ -102,11 +109,28 @@ export default async function JoinedMedleyPage({
         }))
         .filter((section) => Boolean(section.content)) ?? [];
     const legacy = legacyBySong.get(item.songId);
+    const sections =
+      arrangementSections.length > 0
+        ? arrangementSections
+        : legacy
+          ? parseLegacyChart(legacy.content).map((section, sectionIndex) => ({
+              id: `legacy-${item.songId}-${sectionIndex}`,
+              label: section.label,
+              content: section.content,
+              baseKey: key,
+              songId: item.songId,
+            }))
+          : [];
     return {
       id: item.songId,
       title: item.song.title,
       key,
       sections,
+      defaultCapo: instrumentChart?.capo ?? 0,
+      instrumentData: instrumentChart?.data ?? {
+        sections: {},
+        voicings: {},
+      },
       content:
         sections.length > 0
           ? null

@@ -6,8 +6,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import {
   ChartViewPreferenceProvider,
   ChordViewer,
+  useChartViewPreferences,
   type ChartDisplaySection,
 } from "@/app/(app)/songs/[id]/ChordViewer";
+import { InstrumentPovBar } from "@/components/InstrumentPovBar";
+import type { InstrumentChartData } from "@/lib/validation/instrument-chart";
 import { MedleyTransitionForm } from "./MedleyTransitionForm";
 
 interface SheetSong {
@@ -16,7 +19,35 @@ interface SheetSong {
   key: string;
   sections: ChartDisplaySection[];
   content: string | null;
+  defaultCapo: number;
+  instrumentData: InstrumentChartData;
   transition: { content: string; notes: string | null } | null;
+}
+
+function SharedMedleyInstrumentControls() {
+  const preferences = useChartViewPreferences();
+  return (
+    <InstrumentPovBar
+      instrumentPov={preferences.instrumentPov}
+      onInstrumentPov={preferences.setInstrumentPov}
+      resetToC={preferences.resetToC}
+      onResetToC={() => {
+        preferences.setResetToC(true);
+        preferences.setOffset(0);
+        preferences.setUseFlats(false);
+      }}
+      onReturnToSongKey={() => {
+        preferences.setResetToC(false);
+        preferences.setOffset(0);
+      }}
+      capo={0}
+      defaultCapo={0}
+      onCapo={() => undefined}
+      capoMode="sounding"
+      onCapoMode={() => undefined}
+      showCapo={false}
+    />
+  );
 }
 
 export function MedleyJoinedSheet({
@@ -46,10 +77,11 @@ export function MedleyJoinedSheet({
           </Link>
           <h1 className="mt-2 text-2xl font-bold">{label}</h1>
           <p className="text-sm text-zinc-500">
-            Sheet gabungan mengikuti urutan lagu di batch. Preferensi nada dan
-            mode tampilan berlaku untuk seluruh medley ini.
+            Sheet gabungan mengikuti urutan lagu di batch. Sudut pandang dan
+            Reset ke C berlaku untuk seluruh medley; capo tetap per lagu.
           </p>
         </div>
+        <SharedMedleyInstrumentControls />
         {songs.map((song, index) => {
           const next = songs[index + 1];
           return (
@@ -60,9 +92,28 @@ export function MedleyJoinedSheet({
                     content={song.sections.map((section) => section.content).join("\n\n")}
                     baseKey={song.key}
                     sections={song.sections}
+                    songId={song.id}
+                    defaultCapo={song.defaultCapo}
+                    instrumentData={song.instrumentData}
+                    songPreferenceKey={`myth_chart_view:${song.id}`}
+                    legacyPreferenceKey={`myth-chart:${song.id}`}
+                    showPovControls={false}
+                    showKeyControls={false}
+                    showCapoControls
                   />
                 ) : song.content ? (
-                  <ChordViewer content={song.content} baseKey={song.key} />
+                  <ChordViewer
+                    content={song.content}
+                    baseKey={song.key}
+                    songId={song.id}
+                    defaultCapo={song.defaultCapo}
+                    instrumentData={song.instrumentData}
+                    songPreferenceKey={`myth_chart_view:${song.id}`}
+                    legacyPreferenceKey={`myth-chart:${song.id}`}
+                    showPovControls={false}
+                    showKeyControls={false}
+                    showCapoControls
+                  />
                 ) : (
                   <EmptyState
                     title="Chart belum tersedia"
@@ -77,6 +128,9 @@ export function MedleyJoinedSheet({
                       <ChordViewer
                         content={song.transition.content}
                         baseKey={song.key}
+                        showPovControls={false}
+                        showKeyControls={false}
+                        showCapoControls={false}
                       />
                       {song.transition.notes ? (
                         <p className="text-sm text-zinc-600 dark:text-zinc-400">

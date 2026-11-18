@@ -32,6 +32,7 @@ import {
   getActiveArrangementContent,
   listChartSections,
 } from "@server/services/chart-arrangement-service";
+import { getInstrumentChart } from "@server/services/instrument-chart-service";
 import {
   listSongNotes,
 } from "@server/services/note-service";
@@ -622,15 +623,18 @@ async function SongChordChart({
   currentUserId: string;
   defaultPart: string | null;
 }) {
-  const [charts, arrangement] = await Promise.all([
+  const [charts, arrangement, instrumentChart] = await Promise.all([
     listChordCharts(songId),
     getActiveArrangementContent(songId),
+    getInstrumentChart(songId),
   ]);
   return (
     <ChordChartSection
       songId={songId}
       eventId={eventId}
       songKey={songKey}
+      defaultCapo={instrumentChart.capo}
+      instrumentData={instrumentChart.data}
       eventSongId={eventSongId}
       admin={admin}
       charts={charts}

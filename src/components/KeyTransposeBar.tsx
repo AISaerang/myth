@@ -11,6 +11,7 @@ export function KeyTransposeBar({
   onOffset,
   onFlats,
   onReset,
+  showResetButton = true,
 }: {
   baseKey: string;
   offset: number;
@@ -19,6 +20,7 @@ export function KeyTransposeBar({
   onOffset: (next: number) => void;
   onFlats: (next: boolean) => void;
   onReset: () => void;
+  showResetButton?: boolean;
 }) {
   const currentKey = transposeRoot(baseKey, offset, useFlats);
   return (
@@ -54,9 +56,11 @@ export function KeyTransposeBar({
         >
           +½
         </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={onReset}>
-          Reset ke {baseKey}
-        </Button>
+        {showResetButton ? (
+          <Button type="button" variant="secondary" size="sm" onClick={onReset}>
+            Reset ke {baseKey}
+          </Button>
+        ) : null}
         <button
           type="button"
           onClick={() => onFlats(!useFlats)}
