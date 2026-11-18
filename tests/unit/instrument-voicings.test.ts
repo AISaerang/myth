@@ -5,6 +5,8 @@ import {
   shapeChord,
   STANDARD_DICTIONARY,
 } from "@/lib/instrument-voicings";
+import { listChords } from "@/lib/chords";
+import { oComeAllYeFaithfulFixture } from "../fixtures/o-come-all-ye-faithful";
 
 const ROOTS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const QUALITIES = ["", "m", "7", "maj7", "m7", "sus2", "sus4", "add9", "dim", "aug"];
@@ -182,6 +184,50 @@ describe("standard instrument voicings", () => {
     expect(resetChorus?.sounding).toBe("D");
     expect(verse?.guitar).toEqual(STANDARD_DICTIONARY.D?.guitar);
     expect(chorus?.guitar).toEqual(STANDARD_DICTIONARY.E?.guitar);
+  });
+
+  it("uses the public-domain fixture for original-key, reset, and modulation voicings", () => {
+    const verseChords = listChords(oComeAllYeFaithfulFixture.sections[0].content);
+    expect(verseChords).toEqual(["C", "G", "Am", "D", "D7", "G7", "F"]);
+    expect(
+      verseChords.map((symbol) =>
+        frets(
+          resolveInstrumentVoicing({
+            baseSymbol: symbol,
+            sectionOffset: 0,
+            capo: 0,
+            capoMode: "sounding",
+          })?.guitar,
+        ),
+      ),
+    ).toEqual(["x32010", "320003", "x02210", "xx0232", "xx0212", "320001", "133211"]);
+
+    const originalKey = verseChords.map((symbol) =>
+      resolveInstrumentVoicing({
+        baseSymbol: symbol,
+        sectionOffset: 7,
+        capo: 0,
+        capoMode: "sounding",
+      })?.sounding,
+    );
+    expect(originalKey).toEqual(["G", "D", "Em", "A", "A7", "D7", "C"]);
+
+    const chorus = resolveInstrumentVoicing({
+      baseSymbol: "C",
+      sectionOffset: 9,
+      capo: 2,
+      capoMode: "shape",
+    });
+    expect(chorus?.sounding).toBe("A");
+    expect(chorus?.shape).toBe("G");
+    const resetChorus = resolveInstrumentVoicing({
+      baseSymbol: "C",
+      sectionOffset: 2,
+      capo: 2,
+      capoMode: "shape",
+    });
+    expect(resetChorus?.sounding).toBe("D");
+    expect(resetChorus?.shape).toBe("C");
   });
 
   it("rejects non-chords and invalid capos", () => {

@@ -14,6 +14,8 @@ describe("scientific pitch helpers", () => {
     expect(parsePitch("C4")).toBe(60);
     expect(parsePitch("F#4")).toBe(66);
     expect(parsePitch("Bb2")).toBe(46);
+    expect(parsePitch("B#4")).toBe(72);
+    expect(parsePitch("Cb4")).toBe(59);
   });
 
   it("transposes while keeping the input accidental style where possible", () => {
@@ -33,6 +35,7 @@ describe("scientific pitch helpers", () => {
   it("clamps by octaves into the piano registers", () => {
     expect(clampPitch("C0", LH_MIN, LH_MAX)).toBe("C2");
     expect(clampPitch("D4", LH_MIN, LH_MAX)).toBe("D2");
+    expect(clampPitch("C2", RH_MIN, RH_MAX)).toBe("C4");
     expect(clampPitch("D6", RH_MIN, RH_MAX)).toBe("D4");
     expect(clampPitch("F3", "C4", "D4")).toBe("D4");
   });

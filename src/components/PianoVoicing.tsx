@@ -1,5 +1,6 @@
 import type { PianoVoicing as PianoVoicingData } from "@/lib/instrument-voicings";
-import { parsePitch, LH_MIN, RH_MIN } from "@/lib/pitch";
+import { LH_MIN, RH_MIN } from "@/lib/pitch";
+import { buildPianoKeyboard } from "@/lib/piano-keyboard";
 
 function keyboard(
   notes: string[],
@@ -7,15 +8,7 @@ function keyboard(
   hand: "Kiri" | "Kanan",
   tone: "sky" | "amber",
 ) {
-  const startMidi = parsePitch(start);
-  const notesByMidi = new Map(notes.map((note) => [parsePitch(note), note]));
-  const keys = Array.from({ length: 24 }, (_, index) => {
-    const midi = startMidi + index;
-    const note = notesByMidi.get(midi);
-    const pitchClass = ((midi % 12) + 12) % 12;
-    const black = [1, 3, 6, 8, 10].includes(pitchClass);
-    return { midi, note, black };
-  });
+  const keys = buildPianoKeyboard(notes, start);
   const color =
     tone === "sky"
       ? "bg-sky-200 text-sky-950 ring-sky-700 dark:bg-sky-800 dark:text-white"
@@ -38,7 +31,7 @@ function keyboard(
           } ${index === 12 ? "border-l-2 border-l-zinc-600" : ""} ${
             note ? `ring-2 ring-inset ${color}` : ""
           }`}
-          title={note}
+          title={note ?? undefined}
         >
           {note ?? ""}
         </div>

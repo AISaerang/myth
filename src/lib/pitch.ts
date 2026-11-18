@@ -1,4 +1,4 @@
-import { noteIndex, transposeRoot } from "@/lib/chords";
+import { transposeRoot } from "@/lib/chords";
 
 export const RH_MIN = "A3";
 export const RH_MAX = "C5";
@@ -11,6 +11,16 @@ interface ParsedPitch {
   accidental: string;
 }
 
+const NATURAL_SEMITONES: Record<string, number> = {
+  C: 0,
+  D: 2,
+  E: 4,
+  F: 5,
+  G: 7,
+  A: 9,
+  B: 11,
+};
+
 function parsePitchParts(name: string): ParsedPitch {
   const match = /^([A-Ga-g])([#b]?)(-?\d+)$/.exec(name.trim());
   if (!match) throw new Error(`Nada tidak valid: ${name}`);
@@ -20,9 +30,11 @@ function parsePitchParts(name: string): ParsedPitch {
   if (!Number.isInteger(octave) || octave < -1 || octave > 9) {
     throw new Error(`Oktaf tidak valid: ${name}`);
   }
-  const pitchClass = noteIndex(`${letter}${accidental}`);
+  const natural = NATURAL_SEMITONES[letter];
+  if (natural === undefined) throw new Error(`Nada tidak valid: ${name}`);
+  const accidentalOffset = accidental === "#" ? 1 : accidental === "b" ? -1 : 0;
   return {
-    midi: (octave + 1) * 12 + pitchClass,
+    midi: (octave + 1) * 12 + natural + accidentalOffset,
     letter,
     accidental,
   };
