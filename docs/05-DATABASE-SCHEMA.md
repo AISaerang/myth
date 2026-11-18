@@ -29,6 +29,8 @@ SongBatchItem: `songBatchId`, `songId`, `sortOrder`, optional `medleyGroupId`, o
 
 A medley corridor is the set of items in one batch that share `medleyGroupId`, ordered by `sortOrder`. `medleyLabel` is the display name; an empty label clears both fields. The corridor lives on the batch item (not `EventSong`) so “next song” follows the same badge order musicians see. The same label inside one batch reuses one `medleyGroupId`. Enforce one active batch per song if product rule requires it.
 
+Readers split a legacy medley group into consecutive runs after sorting by `sortOrder`; hidden or archived items break a run. `MedleyTransition` stores optional ChordPro/not-angka notes between adjacent songs in the same run. Its composite foreign key ties the source to a batch item; the service validates the destination and current adjacency before writes.
+
 ### SongAssignment
 `id`, `songId`, `personId`, `instrumentSkillId?`, `assignmentNote?`, `isPrimary`, timestamps. Define uniqueness according to assignment semantics.
 
@@ -40,7 +42,7 @@ ChartSection: `id`, `songId`, `type` (`INTRO|VERSE|PRE_CHORUS|CHORUS|POST_CHORUS
 
 ChartArrangement: `id`, `songId`, `name`, `isActive`, `createdById`, timestamps; unique `songId+name`; at most one active arrangement per song. A named arrangement orders/repeats master sections independently of `ArrangementVersion`.
 
-ChartArrangementItem: `id`, `arrangementId`, `sectionId`, `sortOrder`, `labelOverride?`, `createdAt`; unique `arrangementId+sortOrder`. Recomposition uses section content, so editing a master section updates every arrangement that uses it.
+ChartArrangementItem: `id`, `arrangementId`, `sectionId`, `sortOrder`, `labelOverride?`, `modulationSemitones` (default 0, applied after this item), `createdAt`; unique `arrangementId+sortOrder`. Recomposition uses section content, so editing a master section updates every arrangement that uses it.
 
 Legacy `ChordChart` remains as fallback/history. Public display precedence: active structured arrangement → active legacy `ChordChart` → empty. Legacy charts can be imported into sections/arrangement by an admin and then reviewed before saving. All chart mutations are admin-only and audited.
 

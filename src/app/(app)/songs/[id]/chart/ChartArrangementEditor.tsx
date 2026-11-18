@@ -17,6 +17,7 @@ import {
   CHART_SECTION_TYPE_HINT,
   CHART_SECTION_TYPE_LABEL,
   composeArrangementContent,
+  displaySectionLabel,
   type ChartSectionKind,
 } from "@/lib/chart-arrangement";
 import {
@@ -52,6 +53,7 @@ export interface EditorItem {
   id: string;
   sectionId: string;
   labelOverride: string | null;
+  modulationSemitones: number;
   section: EditorSection;
 }
 
@@ -66,6 +68,7 @@ interface DraftItem {
   key: string;
   sectionId: string;
   labelOverride: string;
+  modulationSemitones: number;
 }
 
 function toDraft(arrangement: EditorArrangement | null): DraftItem[] {
@@ -74,6 +77,7 @@ function toDraft(arrangement: EditorArrangement | null): DraftItem[] {
       key: item.id,
       sectionId: item.sectionId,
       labelOverride: item.labelOverride ?? "",
+      modulationSemitones: item.modulationSemitones,
     })) ?? []
   );
 }
@@ -365,6 +369,26 @@ function ArrangementWorkspace({
       ),
     [draft, sectionMap],
   );
+  const previewSections = useMemo(
+    () =>
+      draft.flatMap((item) => {
+        const section = sectionMap.get(item.sectionId);
+        return section
+          ? [
+              {
+                id: item.key,
+                  label: displaySectionLabel(
+                    item.labelOverride.trim() || section.label,
+                    { type: section.type, content: section.content },
+                  ),
+                content: section.content,
+                modulationSemitones: item.modulationSemitones,
+              },
+            ]
+          : [];
+      }),
+    [draft, sectionMap],
+  );
 
   const handleSaved = useCallback(() => setDirty(false), []);
 
@@ -378,7 +402,12 @@ function ArrangementWorkspace({
     keyCounter.current += 1;
     updateDraft([
       ...draft,
-      { key: `new-${keyCounter.current}`, sectionId, labelOverride: "" },
+      {
+        key: `new-${keyCounter.current}`,
+        sectionId,
+        labelOverride: "",
+        modulationSemitones: 0,
+      },
     ]);
   }
 
@@ -412,6 +441,14 @@ function ArrangementWorkspace({
     updateDraft(
       draft.map((item, i) =>
         i === index ? { ...item, labelOverride: value } : item,
+      ),
+    );
+  }
+
+  function setModulation(index: number, value: number) {
+    updateDraft(
+      draft.map((item, i) =>
+        i === index ? { ...item, modulationSemitones: value } : item,
       ),
     );
   }
@@ -535,6 +572,24 @@ function ArrangementWorkspace({
                       placeholder={section.label}
                       className={`${inputClass} mt-1 w-full`}
                     />
+                    <label
+                      htmlFor={`modulation-${item.key}`}
+                      className="mt-2 block text-xs text-zinc-500"
+                    >
+                      Modulasi setelah bagian (semitone)
+                    </label>
+                    <input
+                      id={`modulation-${item.key}`}
+                      type="number"
+                      min={-12}
+                      max={12}
+                      step={1}
+                      value={item.modulationSemitones}
+                      onChange={(event) =>
+                        setModulation(index, Number(event.target.value))
+                      }
+                      className={`${inputClass} mt-1 w-full`}
+                    />
                   </li>
                 );
               })}
@@ -558,7 +613,11 @@ function ArrangementWorkspace({
             Preview mengikuti draft susunan. Simpan urutan untuk menerapkan.
           </p>
           {previewContent ? (
-            <ChordViewer content={previewContent} baseKey="C" />
+            <ChordViewer
+              content={previewContent}
+              baseKey="C"
+              sections={previewSections}
+            />
           ) : (
             <EmptyState
               title="Belum ada isi"
@@ -760,6 +819,7 @@ function SaveArrangementForm({
     draft.map((item) => ({
       sectionId: item.sectionId,
       labelOverride: item.labelOverride.trim() || null,
+      modulationSemitones: item.modulationSemitones,
     })),
   );
 

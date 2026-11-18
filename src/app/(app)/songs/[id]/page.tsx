@@ -2,13 +2,14 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { ArchiveSongButton, RestoreSongButton } from "@/components/SongArchiveButtons";
+import { SetlistNav } from "@/components/SetlistNav";
 import { BatchOrderBadge } from "@/components/BatchOrderBadge";
 import { Badge } from "@/components/ui/Badge";
 import { badgesForSong } from "@/lib/batch-badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { resolveMedleyNav } from "@/lib/medley-nav";
+import { resolveSetlistNav } from "@/lib/setlist-nav";
 import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
 import {
   canManageEvent,
@@ -82,11 +83,11 @@ export default async function SongDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ eventId?: string }>;
+  searchParams: Promise<{ eventId?: string; batchId?: string }>;
 }) {
   const user = await requireFreshUser();
   const { id } = await params;
-  const { eventId: requestedEventId } = await searchParams;
+  const { eventId: requestedEventId, batchId } = await searchParams;
   const legacySong = requestedEventId
     ? null
     : await prisma.song.findUnique({
@@ -103,7 +104,6 @@ export default async function SongDetailPage({
     listEventBatchCatalog(eventId),
   ]);
   if (!song) notFound();
-  const batchBadges = badgesForSong(song.id, catalog);
   const eventRole = await getEventRole(user, song.eventId);
   const admin = isAdmin(user);
   const observer = isObserver(user);
@@ -120,9 +120,13 @@ export default async function SongDetailPage({
     uiModeForEvent((await cookies()).get(UI_MODE_COOKIE)?.value, song.eventId) ===
       "preview" &&
     (admin || canManageEvent(eventRole));
+  const publishedOnly =
+    previewing || !(admin || canReadDrafts(eventRole));
+  const batchBadges = badgesForSong(song.id, catalog, { publishedOnly });
   const canEditSong = canWrite && !previewing;
-  const medleyNav = resolveMedleyNav(song.id, catalog, {
-    publishedOnly: previewing || !(admin || canReadDrafts(eventRole)),
+  const setlistNav = resolveSetlistNav(song.id, catalog, {
+    publishedOnly,
+    batchId,
   });
   const medleyLabels = [
     ...new Set(
@@ -236,32 +240,7 @@ export default async function SongDetailPage({
         {song.isFinalLocked ? <Badge tone="danger">Final terkunci</Badge> : null}
       </div>
 
-      {medleyNav.next.length > 0 || medleyNav.back ? (
-        <nav aria-label="Navigasi setlist" className="flex flex-col gap-2 text-sm">
-          {medleyNav.next.map((link) => (
-            <Link
-              key={`${link.batchId}-${link.songId}`}
-              href={`/songs/${link.songId}?eventId=${song.eventId}`}
-              className="font-medium underline"
-            >
-              Lagu berikutnya
-              {medleyNav.next.length > 1 ? ` (${link.batchName})` : ""}: {link.title}
-              <span className="block text-xs font-normal text-zinc-500">
-                {link.medleyLabel}
-              </span>
-            </Link>
-          ))}
-          {medleyNav.back ? (
-            <Link
-              href={`/songs?eventId=${song.eventId}#${medleyNav.back.anchorId}`}
-              className="font-medium underline"
-            >
-              Kembali ke badge {medleyNav.back.badge}
-              {medleyNav.back.batchName ? ` · ${medleyNav.back.batchName}` : ""}
-            </Link>
-          ) : null}
-        </nav>
-      ) : null}
+      <SetlistNav songId={song.id} eventId={song.eventId} nav={setlistNav} />
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <aside className="order-2 min-w-0 space-y-4 lg:order-none lg:col-start-2 lg:row-start-1">
@@ -382,6 +361,7 @@ export default async function SongDetailPage({
           <SongChordChart
             songId={song.id}
             eventId={song.eventId}
+            songKey={song.key}
             eventSongId={song.eventSongId}
             admin={canEditSong}
             sections={chartSections.map((section) => ({
@@ -614,6 +594,7 @@ export default async function SongDetailPage({
 async function SongChordChart({
   songId,
   eventId,
+  songKey,
   eventSongId,
   admin,
   sections,
@@ -626,6 +607,7 @@ async function SongChordChart({
 }: {
   songId: string;
   eventId: string;
+  songKey: string | null;
   eventSongId: string;
   admin: boolean;
   sections: {
@@ -648,6 +630,7 @@ async function SongChordChart({
     <ChordChartSection
       songId={songId}
       eventId={eventId}
+      songKey={songKey}
       eventSongId={eventSongId}
       admin={admin}
       charts={charts}

@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BatchOrderBadge } from "@/components/BatchOrderBadge";
 import { Card } from "@/components/ui/Card";
+import { prisma } from "@/lib/db";
+import { visibleMedleyItems } from "@/lib/medley-groups";
 import { badgeFromSortOrders, batchBadgeAnchor } from "@/lib/batch-badge";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { canReadDrafts, canWriteEventData, isAdmin } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
-import { getBatch } from "@server/services/batch-service";
+import { getBatch, listMedleyTransitions } from "@server/services/batch-service";
 import { listSongs } from "@server/services/song-service";
 import {
   listPersonnelForAdmin,
@@ -18,6 +20,7 @@ import { BatchStatusBadge } from "../BatchStatusBadge";
 import { getEventRole } from "@server/services/event-access";
 import { BatchItemMover } from "@/components/ui/MoveButtons";
 import { MedleyLabelForm } from "../MedleyLabelForm";
+import { MedleyGroupCards } from "../MedleyGroupCards";
 import {
   AddSongForm,
   AssignBatchForm,
@@ -36,7 +39,38 @@ export default async function BatchDetailPage({
   const { id } = await params;
   const batch = await getBatch(id);
   if (!batch) notFound();
-  if (!(await getEventRole(user, batch.eventId))) notFound();
+  const [eventRole, event, transitions] = await Promise.all([
+    getEventRole(user, batch.eventId),
+    prisma.event.findUnique({
+      where: { id: batch.eventId },
+      select: { accessClosedAt: true },
+    }),
+    listMedleyTransitions(batch.id),
+  ]);
+  if (!eventRole || !event) notFound();
+  const canWriteMedley = canWriteEventData(
+    eventRole,
+    Boolean(event.accessClosedAt),
+    isAdmin(user),
+  );
+  const medleyItems = visibleMedleyItems(
+    batch.items.map((item) => ({
+      ...item,
+      title: item.song.title,
+      isPublished: item.song.isPublished,
+      archived: item.song.archivedAt !== null,
+    })),
+    !canReadDrafts(eventRole),
+  );
+  const medleyCard = (
+    <MedleyGroupCards
+      batchId={batch.id}
+      eventId={batch.eventId}
+      items={medleyItems}
+      transitions={transitions}
+      canWrite={canWriteMedley}
+    />
+  );
 
   const sortOrders = batch.items.map((item) => item.sortOrder);
   if (observer) {
@@ -67,6 +101,7 @@ export default async function BatchDetailPage({
             </span>
           ) : null}
         </div>
+        {medleyCard}
         <Card title={`Lagu publish dalam batch (${published.length})`}>
           {published.length === 0 ? (
             <p className="text-sm text-zinc-500">Belum ada lagu publish di batch ini.</p>
@@ -82,7 +117,7 @@ export default async function BatchDetailPage({
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <BatchOrderBadge badge={badge} />
-                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="min-w-0 break-words font-medium underline">
+                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}&batchId=${batch.id}`} className="min-w-0 break-words font-medium underline">
                       {item.song.title}
                     </Link>
                   </span>
@@ -138,6 +173,7 @@ export default async function BatchDetailPage({
           </span>
         ) : null}
       </div>
+      {medleyCard}
 
       <Card title="Status batch">
         <BatchStatusChanger batchId={batch.id} current={batch.status} />
@@ -160,7 +196,7 @@ export default async function BatchDetailPage({
                   <span className="flex flex-wrap items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2">
                       <BatchOrderBadge badge={badge} />
-                      <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="min-w-0 break-words font-medium underline">
+                      <Link href={`/songs/${item.songId}?eventId=${batch.eventId}&batchId=${batch.id}`} className="min-w-0 break-words font-medium underline">
                         {item.song.title}
                       </Link>
                     </span>

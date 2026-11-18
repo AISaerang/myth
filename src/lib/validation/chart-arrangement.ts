@@ -76,6 +76,7 @@ export const chartArrangementActivateSchema = z.object({
 export const chartArrangementItemSchema = z.object({
   sectionId: z.string().min(1, "Bagian tidak valid."),
   labelOverride: z.string().trim().max(50).optional().nullable(),
+  modulationSemitones: z.number().int().min(-12).max(12).default(0),
 });
 
 export const chartArrangementItemsSchema = z.object({

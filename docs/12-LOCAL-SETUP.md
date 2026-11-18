@@ -54,6 +54,12 @@ Migration `20261106120000_song_note_audience` menambah target instrumen
 opsional pada catatan lagu secara additive. Untuk DB bersama/produksi,
 terapkan lewat prosedur `prisma migrate deploy` di atas setelah review dan
 backup; jangan menjalankan SQL migration secara manual.powershell
+
+Fitur medley/key menambah dua migration additive: `20261118190000_medley_transitions`
+membuat tabel transisi antarlagu, dan `20261118191000_chart_item_modulation`
+menambahkan `ChartArrangementItem.modulationSemitones` dengan default 0.
+Keduanya tidak mengubah atau menghapus data event. Jangan arahkan migration
+pengembangan ke database produksi.powershell
 npm.cmd run import:charts -- --dry-run  # daftar lagu yang akan diimpor
 npm.cmd run import:charts               # import + aransemen aktif
 ```
