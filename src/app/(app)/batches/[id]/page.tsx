@@ -82,7 +82,7 @@ export default async function BatchDetailPage({
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <BatchOrderBadge badge={badge} />
-                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="min-w-0 break-words font-medium underline">
+                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}&batchId=${batch.id}`} className="min-w-0 break-words font-medium underline">
                       {item.song.title}
                     </Link>
                   </span>
@@ -160,7 +160,7 @@ export default async function BatchDetailPage({
                   <span className="flex flex-wrap items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2">
                       <BatchOrderBadge badge={badge} />
-                      <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="min-w-0 break-words font-medium underline">
+                      <Link href={`/songs/${item.songId}?eventId=${batch.eventId}&batchId=${batch.id}`} className="min-w-0 break-words font-medium underline">
                         {item.song.title}
                       </Link>
                     </span>

@@ -43,7 +43,9 @@ export function BatchSongGroups({
                   className="scroll-mt-24"
                 >
                   <Link
-                    href={`/songs/${row.song.id}?eventId=${eventId}`}
+                    href={`/songs/${row.song.id}?eventId=${eventId}${
+                      group.batchId ? `&batchId=${group.batchId}` : ""
+                    }`}
                     className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
                     <span className="flex min-w-0 items-center gap-2">
