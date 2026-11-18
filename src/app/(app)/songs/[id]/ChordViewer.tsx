@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { KeyTransposeBar } from "@/components/KeyTransposeBar";
 import { NotationLine } from "@/components/NotAngka";
 import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
@@ -39,6 +39,7 @@ import {
   formatTransposeFormula,
   notationLineError,
 } from "@/lib/jianpu-align";
+import { clampTextSize, getStageSections, moveStageSection } from "@/lib/chart-stage";
 
 type ViewMode = "both" | "lyrics" | "chords";
 type ChartViewPreferences = {
@@ -480,6 +481,13 @@ export function ChordViewer({
   const showPOV = showPovControls ?? Boolean(songId);
   const showKey = showKeyControls ?? Boolean(songId);
   const showCapo = showCapoControls ?? Boolean(songId);
+  const [textSize, setTextSize] = useState(14);
+  const [stageActive, setStageActive] = useState(false);
+  const [stageTheme, setStageTheme] = useState<"dark" | "light">("dark");
+  const [autoScroll, setAutoScroll] = useState(false);
+  const [scrollSpeed, setScrollSpeed] = useState(2);
+  const [activeSection, setActiveSection] = useState(0);
+  const stageScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!preferenceKey || hasSharedPreferences) return;
@@ -702,7 +710,72 @@ export function ChordViewer({
     () => sectionOffsets(sections ?? [], baseKey, offset, resetToC),
     [baseKey, offset, resetToC, sections],
   );
+  const stageSections = useMemo(
+    () =>
+      sections
+        ? sections.map((section, index) => ({
+            index,
+            label: section.label,
+            lineIndex: index,
+          }))
+        : getStageSections(transposed),
+    [sections, transposed],
+  );
   const effectiveCapoMode = localCapoMode;
+
+  useEffect(() => {
+    const savedSize = Number(window.localStorage.getItem("myth-stage-text-size"));
+    if (Number.isFinite(savedSize) && savedSize > 0) {
+      const frame = window.requestAnimationFrame(() =>
+        setTextSize(clampTextSize(savedSize)),
+      );
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("myth-stage-text-size", String(textSize));
+  }, [textSize]);
+
+  useEffect(() => {
+    if (!stageActive) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const jump = (next: number) => {
+      setActiveSection(next);
+      document
+        .getElementById(`stage-section-${next}`)
+        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setStageActive(false);
+      if (event.key === "ArrowDown") {
+        jump(moveStageSection(activeSection, 1, stageSections.length));
+      }
+      if (event.key === "ArrowUp") {
+        jump(moveStageSection(activeSection, -1, stageSections.length));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [activeSection, stageActive, stageSections.length]);
+
+  useEffect(() => {
+    if (!stageActive || !autoScroll) return;
+    const timer = window.setInterval(() => {
+      const element = stageScrollRef.current;
+      if (!element) return;
+      if (element.scrollTop + element.clientHeight >= element.scrollHeight - 2) {
+        setAutoScroll(false);
+        return;
+      }
+      element.scrollBy({ top: scrollSpeed, behavior: "auto" });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [autoScroll, scrollSpeed, stageActive]);
 
   function resetViewerToC() {
     setResetToC(true);
@@ -723,6 +796,17 @@ export function ChordViewer({
   function chooseCapoMode(value: CapoMode) {
     setLocalCapoMode(value);
     setCapoModeExplicit(true);
+  }
+
+  function jumpToSection(index: number) {
+    const next =
+      stageSections.length === 0
+        ? 0
+        : Math.min(stageSections.length - 1, Math.max(0, index));
+    setActiveSection(next);
+    document
+      .getElementById(`stage-section-${next}`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
   return (
@@ -793,6 +877,35 @@ export function ChordViewer({
             showCapo={false}
           />
         ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          onClick={() => setTextSize((size) => clampTextSize(size - 2))}
+          disabled={textSize <= 14}
+        >
+          A−
+        </button>
+        <button
+          type="button"
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          onClick={() => setTextSize((size) => clampTextSize(size + 2))}
+          disabled={textSize >= 24}
+        >
+          A+
+        </button>
+        <span className="text-xs text-zinc-500">{textSize}px</span>
+        <button
+          type="button"
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          onClick={() => {
+            setActiveSection(0);
+            setStageActive(true);
+          }}
+        >
+          Mode panggung
+        </button>
       </div>
       <div
         data-chart-body=""
@@ -990,6 +1103,105 @@ export function ChordViewer({
           </div>
         )}
       </div>
+      {stageActive ? (
+        <div
+          className={`fixed inset-0 z-[100] flex flex-col ${
+            stageTheme === "dark"
+              ? "bg-zinc-950 text-zinc-100"
+              : "bg-white text-zinc-950"
+          }`}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mode panggung"
+        >
+          <div className="flex min-h-14 flex-wrap items-center gap-2 border-b border-zinc-700/40 px-3 py-2">
+            <button
+              type="button"
+              className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
+              onClick={() => jumpToSection(moveStageSection(activeSection, -1, stageSections.length))}
+              disabled={stageSections.length === 0 || activeSection === 0}
+            >
+              Sebelumnya
+            </button>
+            <button
+              type="button"
+              className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
+              onClick={() => jumpToSection(moveStageSection(activeSection, 1, stageSections.length))}
+              disabled={stageSections.length === 0 || activeSection >= stageSections.length - 1}
+            >
+              Berikutnya
+            </button>
+            <select
+              value={activeSection}
+              onChange={(event) => jumpToSection(Number(event.target.value))}
+              aria-label="Lompat ke section"
+              className="h-11 max-w-[45vw] rounded-lg border border-zinc-500/50 bg-transparent px-2 text-sm"
+            >
+              {stageSections.length === 0 ? (
+                <option value={0}>Tanpa section</option>
+              ) : (
+                stageSections.map((section) => (
+                  <option key={`${section.lineIndex}-${section.label}`} value={section.index}>
+                    {section.index + 1}. {section.label}
+                  </option>
+                ))
+              )}
+            </select>
+            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextSize((size) => clampTextSize(size - 2))} disabled={textSize <= 14}>A−</button>
+            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextSize((size) => clampTextSize(size + 2))} disabled={textSize >= 24}>A+</button>
+            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setStageTheme((theme) => (theme === "dark" ? "light" : "dark"))}>
+              {stageTheme === "dark" ? "Terang" : "Gelap"}
+            </button>
+            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setAutoScroll((enabled) => !enabled)} aria-pressed={autoScroll}>
+              {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
+            </button>
+            <label className="flex items-center gap-2 text-xs">
+              Kecepatan
+              <input type="range" min={1} max={5} value={scrollSpeed} onChange={(event) => setScrollSpeed(Number(event.target.value))} aria-label="Kecepatan auto-scroll" />
+            </label>
+            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setStageActive(false)}>Keluar</button>
+          </div>
+          <div
+            ref={stageScrollRef}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-8"
+            style={{ fontSize: textSize }}
+          >
+            {sections ? (
+              <div className="flex flex-col gap-5">
+                {sections.map((section, index) => {
+                  const sectionOffset = offsets[index] ?? keyOffsetFromC(baseKey) + offset;
+                  return (
+                    <section
+                      key={section.id}
+                      id={`stage-section-${index}`}
+                      className={`rounded-lg border px-3 py-4 ${
+                        activeSection === index
+                          ? "border-sky-500"
+                          : "border-zinc-500/30"
+                      }`}
+                    >
+                      <h2 className="mb-3 font-bold">
+                        {index + 1}. {section.label}
+                      </h2>
+                      {renderChart(
+                        transposeContent(section.content, sectionOffset, useFlats),
+                        mode,
+                        `stage-${sectionOffset}-${useFlats}-${mode}-${section.id}-${index}`,
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            ) : (
+              <ChartBody
+                content={transposed}
+                mode={mode}
+                renderKey={`stage-${offset}-${useFlats}-${mode}`}
+              />
+            )}
+          </div>
+        </div>
+      ) : null}
       {openVoicing ? (
         <div
           role="presentation"

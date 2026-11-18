@@ -12,6 +12,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Invalid BPM/duration rejected.
 - Only one active arrangement version per song.
 - Chart legacy parser recognizes section headings (Verse/Chorus/Reff/Tagline/Prechorus/Interlude/Bridge/Modulation→Key Change/Coda/Outro/Intro, plus Post-Chorus/Solo/Hook/Breakdown/Vamp/Turnaround/Ad-lib/Spoken/Transition/Reprise), keeps repeated sections, and ignores empty blocks.
+- Chart stage helpers keep repeated sections, clamp text size, and prevent prev/next navigation from leaving section bounds.
 - Arrangement composition keeps item order/duplicates and applies label overrides.
 - Medley runs split on non-consecutive legacy members and on hidden/archived items; singleton runs are not medleys. A reorder recalculates runs from batch order.
 - Medley transition validation rejects malformed notation, same-song endpoints, and writes whose songs are not currently adjacent in one medley group.
