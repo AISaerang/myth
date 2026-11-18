@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { displayKey, formatKeyChange, keyOffsetFromC } from "@/lib/key-display";
+import {
+  displayKey,
+  formatKeyChange,
+  keyOffsetFromC,
+  sectionOffsets,
+} from "@/lib/key-display";
 import { transposeContent } from "@/lib/chords";
 
 describe("key display", () => {
@@ -20,5 +25,16 @@ describe("key display", () => {
   it("treats a missing song key as C", () => {
     expect(keyOffsetFromC(null)).toBe(0);
     expect(displayKey(undefined, 0)).toBe("C");
+  });
+
+  it("calculates section offsets from song key, viewer offset, and prior modulation", () => {
+    const sections = [
+      { songId: "song-a", baseKey: "D", modulationSemitones: 0 },
+      { songId: "song-a", baseKey: "D", modulationSemitones: 2 },
+      { songId: "song-a", baseKey: "D", modulationSemitones: 0 },
+      { songId: "song-b", baseKey: "G", modulationSemitones: 0 },
+    ];
+    expect(sectionOffsets(sections, "C", 0, false)).toEqual([2, 2, 4, 7]);
+    expect(sectionOffsets(sections, "C", 0, true)).toEqual([0, 0, 2, 0]);
   });
 });

@@ -5,6 +5,34 @@ export function keyOffsetFromC(key: string | null | undefined): number {
   return semitonesBetween("C", key.trim());
 }
 
+export interface SectionOffsetInput {
+  baseKey?: string | null;
+  modulationSemitones?: number;
+  songId?: string;
+}
+
+export function sectionOffsets(
+  sections: readonly SectionOffsetInput[],
+  songKey: string | null | undefined,
+  viewerOffset: number,
+  resetToC: boolean,
+): number[] {
+  const cumulativeBySong = new Map<string, number>();
+  return sections.map((section) => {
+    const songId = section.songId ?? "";
+    const cumulative = cumulativeBySong.get(songId) ?? 0;
+    const baseOffset = resetToC
+      ? 0
+      : keyOffsetFromC(section.baseKey ?? songKey);
+    const offset = baseOffset + viewerOffset + cumulative;
+    cumulativeBySong.set(
+      songId,
+      cumulative + (section.modulationSemitones ?? 0),
+    );
+    return offset;
+  });
+}
+
 export function displayKey(
   baseKey: string | null | undefined,
   semitones: number,

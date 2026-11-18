@@ -5,7 +5,13 @@ import { parseJianpu, type JianpuNote } from "@/lib/jianpu";
  * Not angka satu baris dengan kunci di kolom yang sama.
  * Titik oktaf, garis kres/mol, beam, dan legato digambar CSS — tanpa font khusus.
  */
-export function NotationLine({ alignment }: { alignment: NotationAlignment }) {
+export function NotationLine({
+  alignment,
+  onChordClick,
+}: {
+  alignment: NotationAlignment;
+  onChordClick?: (symbol: string) => void;
+}) {
   const notes = alignment.tokens.filter((token) => token.kind === "note");
   const aria = [
     alignment.chords.length > 0
@@ -25,21 +31,42 @@ export function NotationLine({ alignment }: { alignment: NotationAlignment }) {
       data-notation-line=""
       data-notation="css"
       data-columns={alignment.columns}
-      role="img"
+      role={onChordClick ? "group" : "img"}
       aria-label={aria}
     >
       {alignment.chords.length > 0 ? (
-        <div className="notation-chords">
+        <div
+          className="notation-chords"
+          style={{ height: onChordClick ? "44px" : undefined }}
+        >
           {alignment.chords.map((chord, index) => (
-            <span
-              key={`${chord.token}-${chord.renderCol}-${index}`}
-              data-chord={chord.token}
-              data-render-col={chord.renderCol}
-              className="absolute font-semibold text-sky-700 dark:text-sky-400"
-              style={{ left: `calc(${chord.renderCol} * 1ch)` }}
-            >
-              {chord.token}
-            </span>
+            onChordClick ? (
+              <button
+                key={`${chord.token}-${chord.renderCol}-${index}`}
+                type="button"
+                data-chord={chord.token}
+                data-render-col={chord.renderCol}
+                className="absolute flex min-h-[44px] min-w-[44px] items-center justify-start font-semibold text-sky-700 dark:text-sky-400"
+                style={{
+                  left: `calc(${chord.renderCol} * 1ch)`,
+                  top: "calc((1.5rem - 1em) / 2)",
+                }}
+                aria-label={`Tampilkan voicing ${chord.token}`}
+                onClick={() => onChordClick(chord.token)}
+              >
+                {chord.token}
+              </button>
+            ) : (
+              <span
+                key={`${chord.token}-${chord.renderCol}-${index}`}
+                data-chord={chord.token}
+                data-render-col={chord.renderCol}
+                className="absolute font-semibold text-sky-700 dark:text-sky-400"
+                style={{ left: `calc(${chord.renderCol} * 1ch)` }}
+              >
+                {chord.token}
+              </span>
+            )
           ))}
         </div>
       ) : null}

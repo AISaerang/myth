@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { requireFreshUser } from "@/lib/auth";
 import type { ChartSectionKind } from "@/lib/chart-arrangement";
 import { prisma } from "@/lib/db";
-import { decideSongEdit, isAdmin } from "@/lib/permissions";
+import { canManageEvent, decideSongEdit, isAdmin } from "@/lib/permissions";
+import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
 import { getEventRole } from "@server/services/event-access";
 import { listChordCharts } from "@server/services/chord-service";
+import { getInstrumentChart } from "@server/services/instrument-chart-service";
 import {
   listChartArrangements,
   listChartSections,
@@ -15,6 +18,7 @@ import {
   type EditorArrangement,
   type EditorSection,
 } from "./ChartArrangementEditor";
+import { InstrumentChartEditor } from "./InstrumentChartEditor";
 
 export default async function ChartEditorPage({
   params,
@@ -61,12 +65,21 @@ export default async function ChartEditorPage({
     songLinkedToEvent: Boolean(eventSong && event),
   });
   if (!decision.ok) notFound();
+  const previewing =
+    Boolean(scopedEventId) &&
+    uiModeForEvent(
+      (await cookies()).get(UI_MODE_COOKIE)?.value,
+      scopedEventId ?? "",
+    ) === "preview" &&
+    (isAdmin(user) || canManageEvent(eventRole));
+  if (previewing) notFound();
   const editorEventId = decision.scope === "event" ? scopedEventId ?? undefined : undefined;
 
-  const [sections, arrangements, charts] = await Promise.all([
+  const [sections, arrangements, charts, instrumentChart] = await Promise.all([
     listChartSections(id),
     listChartArrangements(id),
     listChordCharts(id),
+    getInstrumentChart(id),
   ]);
 
   const toSection = (section: {
@@ -138,6 +151,17 @@ export default async function ChartEditorPage({
             ? { label: activeLegacy.label ?? activeLegacy.originalKey }
             : null
         }
+      />
+      <InstrumentChartEditor
+        songId={song.id}
+        eventId={editorEventId}
+        sections={sectionViews.map((section) => ({
+          id: section.id,
+          label: section.label,
+          content: section.content,
+        }))}
+        initialCapo={instrumentChart.capo}
+        initialData={instrumentChart.data}
       />
     </div>
   );

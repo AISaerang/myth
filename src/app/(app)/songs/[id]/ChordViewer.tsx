@@ -5,14 +5,34 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { KeyTransposeBar } from "@/components/KeyTransposeBar";
 import { NotationLine } from "@/components/NotAngka";
 import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
+import { Badge } from "@/components/ui/Badge";
 import {
   extractChordLines,
   layoutChordLine,
+  listChords,
+  parseChord,
+  transposeChord,
   transposeContent,
   transposeRoot,
 } from "@/lib/chords";
-import { formatKeyChange, keyOffsetFromC } from "@/lib/key-display";
+import {
+  formatKeyChange,
+  keyOffsetFromC,
+  sectionOffsets,
+} from "@/lib/key-display";
 import { displaySectionLabel } from "@/lib/chart-arrangement";
+import {
+  InstrumentPovBar,
+  type CapoMode,
+  type InstrumentPov,
+} from "@/components/InstrumentPovBar";
+import { GuitarChordDiagram } from "@/components/GuitarChordDiagram";
+import { PianoVoicing } from "@/components/PianoVoicing";
+import {
+  resolveInstrumentVoicing,
+  type ResolvedInstrumentVoicing,
+} from "@/lib/instrument-voicings";
+import type { InstrumentChartData } from "@/lib/validation/instrument-chart";
 import {
   alignChordsToNotation,
   contentHasNotation,
@@ -24,10 +44,14 @@ type ViewMode = "both" | "lyrics" | "chords";
 type ChartViewPreferences = {
   offset: number;
   setOffset: (value: number) => void;
+  resetToC: boolean;
+  setResetToC: (value: boolean) => void;
   useFlats: boolean;
   setUseFlats: (value: boolean) => void;
   mode: ViewMode;
   setMode: (value: ViewMode) => void;
+  instrumentPov: InstrumentPov;
+  setInstrumentPov: (value: InstrumentPov) => void;
 };
 
 const ChartViewPreferencesContext =
@@ -41,33 +65,49 @@ export function ChartViewPreferenceProvider({
   children: ReactNode;
 }) {
   const [offset, setOffset] = useState(0);
+  const [resetToC, setResetToC] = useState(false);
   const [useFlats, setUseFlats] = useState(false);
   const [mode, setMode] = useState<ViewMode>("both");
+  const [instrumentPov, setInstrumentPov] = useState<InstrumentPov>("chart");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   useEffect(() => {
     let savedOffset = 0;
+    let savedResetToC = false;
     let savedFlats = false;
     let savedMode: ViewMode = "both";
+    let savedInstrumentPov: InstrumentPov = "chart";
     try {
       const saved = window.localStorage.getItem(preferenceKey);
       if (saved) {
         const value: unknown = JSON.parse(saved);
         if (typeof value === "object" && value !== null) {
           const prefs = value as Record<string, unknown>;
-          if (
-            typeof prefs.offset === "number" &&
-            Number.isInteger(prefs.offset) &&
-            Math.abs(prefs.offset) <= 24
-          ) {
-            savedOffset = prefs.offset;
+          if (typeof prefs.resetToC === "boolean") {
+            savedResetToC = prefs.resetToC;
           }
-          if (typeof prefs.useFlats === "boolean") savedFlats = prefs.useFlats;
+          if (
+            typeof (prefs.viewerOffset ?? prefs.offset) === "number" &&
+            Number.isInteger(prefs.viewerOffset ?? prefs.offset) &&
+            Math.abs(Number(prefs.viewerOffset ?? prefs.offset)) <= 24
+          ) {
+            savedOffset = Number(prefs.viewerOffset ?? prefs.offset);
+          }
+          if (typeof (prefs.flatsOverride ?? prefs.useFlats) === "boolean") {
+            savedFlats = Boolean(prefs.flatsOverride ?? prefs.useFlats);
+          }
           if (
             prefs.mode === "both" ||
             prefs.mode === "lyrics" ||
             prefs.mode === "chords"
           ) {
             savedMode = prefs.mode;
+          }
+          if (
+            prefs.instrumentPov === "chart" ||
+            prefs.instrumentPov === "guitar" ||
+            prefs.instrumentPov === "piano"
+          ) {
+            savedInstrumentPov = prefs.instrumentPov;
           }
         }
       }
@@ -76,8 +116,10 @@ export function ChartViewPreferenceProvider({
     }
     const timer = window.setTimeout(() => {
       setOffset(savedOffset);
+      setResetToC(savedResetToC);
       setUseFlats(savedFlats);
       setMode(savedMode);
+      setInstrumentPov(savedInstrumentPov);
       setPreferencesLoaded(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -87,19 +129,52 @@ export function ChartViewPreferenceProvider({
     try {
       window.localStorage.setItem(
         preferenceKey,
-        JSON.stringify({ offset, useFlats, mode }),
+        JSON.stringify({
+          resetToC,
+          viewerOffset: offset,
+          flatsOverride: useFlats,
+          instrumentPov,
+          mode,
+        }),
       );
     } catch (error) {
       console.warn("Preferensi tampilan chart tidak dapat disimpan.", error);
     }
-  }, [preferenceKey, offset, useFlats, mode, preferencesLoaded]);
+  }, [
+    preferenceKey,
+    offset,
+    resetToC,
+    useFlats,
+    mode,
+    instrumentPov,
+    preferencesLoaded,
+  ]);
   return (
     <ChartViewPreferencesContext.Provider
-      value={{ offset, setOffset, useFlats, setUseFlats, mode, setMode }}
+      value={{
+        offset,
+        setOffset,
+        resetToC,
+        setResetToC,
+        useFlats,
+        setUseFlats,
+        mode,
+        setMode,
+        instrumentPov,
+        setInstrumentPov,
+      }}
     >
       {children}
     </ChartViewPreferencesContext.Provider>
   );
+}
+
+export function useChartViewPreferences(): ChartViewPreferences {
+  const preferences = useContext(ChartViewPreferencesContext);
+  if (!preferences) {
+    throw new Error("useChartViewPreferences must be used within its provider.");
+  }
+  return preferences;
 }
 
 export interface ChartDisplaySection {
@@ -142,10 +217,52 @@ function sectionLabelAt(lines: string[], index: number): string | null {
   return displaySectionLabel(layout.label, { content: body.join("\n") });
 }
 
+function renderChordTokens(
+  line: string,
+  onChordClick?: (symbol: string) => void,
+): ReactNode[] {
+  const children: ReactNode[] = [];
+  const tokenRegex = /\S+/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = tokenRegex.exec(line)) !== null) {
+    const token = match[0] as string;
+    if (match.index > cursor) {
+      children.push(line.slice(cursor, match.index));
+    }
+    let isChord = false;
+    try {
+      parseChord(token);
+      isChord = true;
+    } catch {
+      isChord = false;
+    }
+    if (onChordClick && isChord) {
+      children.push(
+        <button
+          key={`${match.index}-${token}`}
+          type="button"
+          className="min-h-[44px] min-w-[44px] font-semibold text-sky-700 underline decoration-dotted underline-offset-2 dark:text-sky-400"
+          aria-label={`Tampilkan voicing ${token}`}
+          onClick={() => onChordClick(token)}
+        >
+          {token}
+        </button>,
+      );
+    } else {
+      children.push(token);
+    }
+    cursor = match.index + token.length;
+  }
+  if (cursor < line.length) children.push(line.slice(cursor));
+  return children;
+}
+
 function renderChart(
   content: string,
   mode: ViewMode,
   key: string,
+  onChordClick?: (symbol: string) => void,
 ) {
   const lines = content.split("\n");
   return lines.map((line, index) => {
@@ -184,7 +301,7 @@ function renderChart(
           key={lineKey}
           className="font-mono text-sm leading-7 whitespace-pre-wrap"
         >
-          {extracted}
+          {renderChordTokens(extracted, onChordClick)}
         </pre>
       );
     }
@@ -213,7 +330,7 @@ function renderChart(
     if (aligned) {
       return (
         <div key={lineKey} className="max-w-full">
-          <NotationLine alignment={aligned} />
+          <NotationLine alignment={aligned} onChordClick={onChordClick} />
         </div>
       );
     }
@@ -237,7 +354,9 @@ function renderChart(
         <div key={lineKey} className="min-w-0 max-w-full">
           <div className="w-max font-mono text-sm leading-6 whitespace-pre">
             {chordLine.trim() ? (
-              <div className="font-semibold text-sky-700 dark:text-sky-400">{chordLine}</div>
+              <div className="font-semibold text-sky-700 dark:text-sky-400">
+                {renderChordTokens(chordLine, onChordClick)}
+              </div>
             ) : null}
             {lyricLine.trim() ? <div>{lyricLine}</div> : null}
           </div>
@@ -255,7 +374,9 @@ function renderChart(
       <div key={lineKey} className="min-w-0 max-w-full">
         <div className="w-max font-mono text-sm leading-6 whitespace-pre">
           {chordLine.trim() ? (
-            <div className="font-semibold text-sky-700 dark:text-sky-400">{chordLine}</div>
+            <div className="font-semibold text-sky-700 dark:text-sky-400">
+              {renderChordTokens(chordLine, onChordClick)}
+            </div>
           ) : null}
           {lyricLine.trim() ? <div>{lyricLine}</div> : null}
         </div>
@@ -279,14 +400,14 @@ export function ChartBody({
   content,
   mode = "both",
   renderKey,
+  onChordClick,
 }: {
   content: string;
   mode?: ViewMode;
   renderKey: string;
+  onChordClick?: (symbol: string) => void;
 }) {
-  return (
-    <>{renderChart(content, mode, renderKey)}</>
-  );
+  return <>{renderChart(content, mode, renderKey, onChordClick)}</>;
 }
 
 export function ChordViewer({
@@ -294,55 +415,130 @@ export function ChordViewer({
   baseKey,
   initialOffset = 0,
   preferenceKey,
+  legacyPreferenceKey,
   sections,
   getSectionAnnotations,
+  songId,
+  defaultCapo = 0,
+  instrumentData,
+  songPreferenceKey,
+  showPovControls,
+  showKeyControls,
+  showCapoControls,
 }: {
   content: string;
   baseKey: string;
   initialOffset?: number;
   preferenceKey?: string;
+  legacyPreferenceKey?: string;
   sections?: ChartDisplaySection[];
   getSectionAnnotations?: (
     sectionId: string,
   ) => SectionNoteAnnotations | undefined;
+  songId?: string;
+  defaultCapo?: number;
+  instrumentData?: InstrumentChartData;
+  songPreferenceKey?: string;
+  showPovControls?: boolean;
+  showKeyControls?: boolean;
+  showCapoControls?: boolean;
 }) {
   const sharedPreferences = useContext(ChartViewPreferencesContext);
+  const hasSharedPreferences = Boolean(sharedPreferences);
   const [localOffset, setLocalOffset] = useState(initialOffset);
+  const [localResetToC, setLocalResetToC] = useState(false);
   const [localFlats, setLocalFlats] = useState(false);
   const [localMode, setLocalMode] = useState<ViewMode>("both");
+  const [localInstrumentPov, setLocalInstrumentPov] =
+    useState<InstrumentPov>("chart");
+  const [capoOverride, setCapoOverride] = useState<number | null>(null);
+  const [localCapoMode, setLocalCapoMode] = useState<CapoMode>(
+    defaultCapo > 0 ? "shape" : "sounding",
+  );
+  const [capoModeExplicit, setCapoModeExplicit] = useState(false);
+  const [openVoicing, setOpenVoicing] = useState<{
+    chord: string;
+    voicing: ResolvedInstrumentVoicing;
+  } | null>(null);
   const [localPreferencesLoaded, setLocalPreferencesLoaded] =
     useState(!preferenceKey);
+  const [songPreferencesLoaded, setSongPreferencesLoaded] =
+    useState(!hasSharedPreferences || !songPreferenceKey);
   const offset = sharedPreferences?.offset ?? localOffset;
   const setOffset = sharedPreferences?.setOffset ?? setLocalOffset;
+  const resetToC = sharedPreferences?.resetToC ?? localResetToC;
+  const setResetToC = sharedPreferences?.setResetToC ?? setLocalResetToC;
   const useFlats = sharedPreferences?.useFlats ?? localFlats;
   const setUseFlats = sharedPreferences?.setUseFlats ?? setLocalFlats;
   const mode = sharedPreferences?.mode ?? localMode;
   const setMode = sharedPreferences?.setMode ?? setLocalMode;
+  const instrumentPov =
+    sharedPreferences?.instrumentPov ?? localInstrumentPov;
+  const setInstrumentPov =
+    sharedPreferences?.setInstrumentPov ?? setLocalInstrumentPov;
+  const capo = capoOverride ?? defaultCapo;
+  const showPOV = showPovControls ?? Boolean(songId);
+  const showKey = showKeyControls ?? Boolean(songId);
+  const showCapo = showCapoControls ?? Boolean(songId);
+
   useEffect(() => {
-    if (!preferenceKey || sharedPreferences) return;
+    if (!preferenceKey || hasSharedPreferences) return;
     let savedOffset = initialOffset;
+    let savedResetToC = false;
     let savedFlats = false;
     let savedMode: ViewMode = "both";
+    let savedInstrumentPov: InstrumentPov = "chart";
+    let savedCapoOverride: number | null = null;
+    let savedCapoMode: CapoMode = defaultCapo > 0 ? "shape" : "sounding";
+    let hasSavedCapoMode = false;
     try {
-      const saved = window.localStorage.getItem(preferenceKey);
+      const saved =
+        window.localStorage.getItem(preferenceKey) ??
+        (legacyPreferenceKey
+          ? window.localStorage.getItem(legacyPreferenceKey)
+          : null);
       if (saved) {
         const value: unknown = JSON.parse(saved);
         if (typeof value === "object" && value !== null) {
           const prefs = value as Record<string, unknown>;
-          if (
-            typeof prefs.offset === "number" &&
-            Number.isInteger(prefs.offset) &&
-            Math.abs(prefs.offset) <= 24
-          ) {
-            savedOffset = prefs.offset;
+          if (typeof prefs.resetToC === "boolean") {
+            savedResetToC = prefs.resetToC;
           }
-          if (typeof prefs.useFlats === "boolean") savedFlats = prefs.useFlats;
+          if (
+            typeof (prefs.viewerOffset ?? prefs.offset) === "number" &&
+            Number.isInteger(prefs.viewerOffset ?? prefs.offset) &&
+            Math.abs(Number(prefs.viewerOffset ?? prefs.offset)) <= 24
+          ) {
+            savedOffset = Number(prefs.viewerOffset ?? prefs.offset);
+          }
+          if (typeof (prefs.flatsOverride ?? prefs.useFlats) === "boolean") {
+            savedFlats = Boolean(prefs.flatsOverride ?? prefs.useFlats);
+          }
           if (
             prefs.mode === "both" ||
             prefs.mode === "lyrics" ||
             prefs.mode === "chords"
           ) {
             savedMode = prefs.mode;
+          }
+          if (
+            prefs.instrumentPov === "chart" ||
+            prefs.instrumentPov === "guitar" ||
+            prefs.instrumentPov === "piano"
+          ) {
+            savedInstrumentPov = prefs.instrumentPov;
+          }
+          if (
+            typeof prefs.capoOverride === "number" &&
+            Number.isInteger(prefs.capoOverride) &&
+            prefs.capoOverride >= 0 &&
+            prefs.capoOverride <= 11
+          ) {
+            savedCapoOverride = prefs.capoOverride;
+          }
+          if (prefs.capoMode === "shape" || prefs.capoMode === "sounding") {
+            savedCapoMode = prefs.capoMode;
+            hasSavedCapoMode = true;
           }
         }
       }
@@ -351,70 +547,252 @@ export function ChordViewer({
     }
     const timer = window.setTimeout(() => {
       setLocalOffset(savedOffset);
+      setLocalResetToC(savedResetToC);
       setLocalFlats(savedFlats);
       setLocalMode(savedMode);
+      setLocalInstrumentPov(savedInstrumentPov);
+      setCapoOverride(savedCapoOverride);
+      setLocalCapoMode(savedCapoMode);
+      setCapoModeExplicit(hasSavedCapoMode);
       setLocalPreferencesLoaded(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [initialOffset, preferenceKey, sharedPreferences]);
+  }, [
+    defaultCapo,
+    hasSharedPreferences,
+    initialOffset,
+    legacyPreferenceKey,
+    preferenceKey,
+  ]);
   useEffect(() => {
-    if (!preferenceKey || sharedPreferences || !localPreferencesLoaded) return;
+    if (!hasSharedPreferences || !songPreferenceKey) return;
+    let savedCapoOverride: number | null = null;
+    let savedCapoMode: CapoMode = defaultCapo > 0 ? "shape" : "sounding";
+    let hasSavedCapoMode = false;
+    try {
+      const saved =
+        window.localStorage.getItem(songPreferenceKey) ??
+        (legacyPreferenceKey
+          ? window.localStorage.getItem(legacyPreferenceKey)
+          : null);
+      if (saved) {
+        const value: unknown = JSON.parse(saved);
+        if (typeof value === "object" && value !== null) {
+          const prefs = value as Record<string, unknown>;
+          if (
+            typeof prefs.capoOverride === "number" &&
+            Number.isInteger(prefs.capoOverride) &&
+            prefs.capoOverride >= 0 &&
+            prefs.capoOverride <= 11
+          ) {
+            savedCapoOverride = prefs.capoOverride;
+          }
+          if (prefs.capoMode === "shape" || prefs.capoMode === "sounding") {
+            savedCapoMode = prefs.capoMode;
+            hasSavedCapoMode = true;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Preferensi capo tidak dapat dibaca.", error);
+    }
+    const timer = window.setTimeout(() => {
+      setCapoOverride(savedCapoOverride);
+      setLocalCapoMode(savedCapoMode);
+      setCapoModeExplicit(hasSavedCapoMode);
+      setSongPreferencesLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [
+    defaultCapo,
+    hasSharedPreferences,
+    legacyPreferenceKey,
+    songPreferenceKey,
+  ]);
+  useEffect(() => {
+    if (!preferenceKey || hasSharedPreferences || !localPreferencesLoaded) return;
     try {
       window.localStorage.setItem(
         preferenceKey,
-        JSON.stringify({ offset, useFlats, mode }),
+        JSON.stringify({
+          resetToC,
+          viewerOffset: offset,
+          flatsOverride: useFlats,
+          instrumentPov,
+          capoOverride,
+          capoMode: localCapoMode,
+          mode,
+        }),
       );
     } catch (error) {
       console.warn("Preferensi tampilan chart tidak dapat disimpan.", error);
     }
-  }, [preferenceKey, offset, useFlats, mode, sharedPreferences, localPreferencesLoaded]);
+  }, [
+    preferenceKey,
+    offset,
+    resetToC,
+    useFlats,
+    instrumentPov,
+    capoOverride,
+    localCapoMode,
+    mode,
+    hasSharedPreferences,
+    localPreferencesLoaded,
+  ]);
+  useEffect(() => {
+    if (!hasSharedPreferences || !songPreferenceKey || !songPreferencesLoaded) {
+      return;
+    }
+    try {
+      const saved = window.localStorage.getItem(songPreferenceKey);
+      let preferences: Record<string, unknown> = {};
+      if (saved) {
+        const value: unknown = JSON.parse(saved);
+        if (typeof value === "object" && value !== null) {
+          preferences = value as Record<string, unknown>;
+        }
+      }
+      window.localStorage.setItem(
+        songPreferenceKey,
+        JSON.stringify({
+          ...preferences,
+          capoOverride,
+          capoMode: localCapoMode,
+        }),
+      );
+    } catch (error) {
+      console.warn("Preferensi capo tidak dapat disimpan.", error);
+    }
+  }, [
+    capoOverride,
+    hasSharedPreferences,
+    localCapoMode,
+    songPreferenceKey,
+    songPreferencesLoaded,
+  ]);
 
+  useEffect(() => {
+    if (!openVoicing) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenVoicing(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [openVoicing]);
+
+  const displayBaseKey = resetToC ? "C" : baseKey;
   const transposed = useMemo(
-    () => transposeContent(content, keyOffsetFromC(baseKey) + offset, useFlats),
-    [baseKey, content, offset, useFlats],
+    () =>
+      transposeContent(
+        content,
+        keyOffsetFromC(displayBaseKey) + offset,
+        useFlats,
+      ),
+    [content, displayBaseKey, offset, useFlats],
   );
   const currentKey = useMemo(
-    () => transposeRoot(baseKey, offset, useFlats),
-    [baseKey, offset, useFlats],
+    () => transposeRoot(displayBaseKey, offset, useFlats),
+    [displayBaseKey, offset, useFlats],
   );
   const hasNotation = useMemo(() => contentHasNotation(content), [content]);
-  const formula = hasNotation ? formatTransposeFormula(baseKey, currentKey) : "";
+  const formula = hasNotation
+    ? formatTransposeFormula(displayBaseKey, currentKey)
+    : "";
+  const offsets = useMemo(
+    () => sectionOffsets(sections ?? [], baseKey, offset, resetToC),
+    [baseKey, offset, resetToC, sections],
+  );
+  const effectiveCapoMode = localCapoMode;
+
+  function resetViewerToC() {
+    setResetToC(true);
+    setOffset(0);
+    setUseFlats(false);
+  }
+
+  function returnToSongKey() {
+    setResetToC(false);
+    setOffset(0);
+  }
+
+  function chooseCapo(value: number) {
+    if (value > 0 && !capoModeExplicit) setLocalCapoMode("shape");
+    setCapoOverride(value === defaultCapo ? null : value);
+  }
+
+  function chooseCapoMode(value: CapoMode) {
+    setLocalCapoMode(value);
+    setCapoModeExplicit(true);
+  }
 
   return (
     <div className="flex flex-col gap-3">
+      {showPOV || showKey || showCapo ? (
+        <InstrumentPovBar
+          instrumentPov={instrumentPov}
+          onInstrumentPov={setInstrumentPov}
+          resetToC={resetToC}
+          onResetToC={resetViewerToC}
+          onReturnToSongKey={returnToSongKey}
+          capo={capo}
+          defaultCapo={defaultCapo}
+          onCapo={chooseCapo}
+          capoMode={effectiveCapoMode}
+          onCapoMode={chooseCapoMode}
+          showPov={false}
+          showKeyControls={showKey}
+          showCapo={showCapo}
+        />
+      ) : null}
       <div data-chart-controls="">
         <KeyTransposeBar
-          baseKey={baseKey}
+          baseKey={displayBaseKey}
           offset={offset}
           useFlats={useFlats}
           formula={formula || undefined}
           onOffset={setOffset}
           onFlats={setUseFlats}
-          onReset={() => {
-            setOffset(0);
-            setUseFlats(false);
-          }}
+          onReset={resetViewerToC}
+          showResetButton={false}
         />
         <div className="mt-2">
           <NotationSymbolGuide compact />
         </div>
       </div>
-      <div className="flex flex-wrap gap-1" role="group" aria-label="Mode tampil">
-        {MODES.map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => setMode(item.value)}
-            aria-pressed={mode === item.value}
-            className={`min-h-[44px] rounded-lg px-3 text-sm font-medium ${
-              mode === item.value
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "border border-zinc-300 dark:border-zinc-700"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Mode tampil">
+          {MODES.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setMode(item.value)}
+              aria-pressed={mode === item.value}
+              className={`min-h-[44px] rounded-lg px-3 text-sm font-medium ${
+                mode === item.value
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "border border-zinc-300 dark:border-zinc-700"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        {showPOV ? (
+          <InstrumentPovBar
+            instrumentPov={instrumentPov}
+            onInstrumentPov={setInstrumentPov}
+            resetToC={resetToC}
+            onResetToC={resetViewerToC}
+            onReturnToSongKey={returnToSongKey}
+            capo={capo}
+            defaultCapo={defaultCapo}
+            onCapo={chooseCapo}
+            capoMode={effectiveCapoMode}
+            onCapoMode={chooseCapoMode}
+            showKeyControls={false}
+            showCapo={false}
+          />
+        ) : null}
       </div>
       <div
         data-chart-body=""
@@ -424,19 +802,37 @@ export function ChordViewer({
           <div className="flex min-w-0 flex-col gap-5">
             {sections.map((section, index) => {
               const annotations = getSectionAnnotations?.(section.id);
-              const sectionOffset =
-                keyOffsetFromC(section.baseKey ?? baseKey) +
-                offset +
-                sections
-                  .slice(0, index)
-                  .reduce(
-                    (total, previous) =>
-                      total +
-                      (previous.songId === section.songId
-                        ? previous.modulationSemitones ?? 0
-                        : 0),
-                    0,
-                  );
+              const sectionOffset = offsets[index] ?? keyOffsetFromC(baseKey) + offset;
+              const sectionMetadata = instrumentData?.sections[section.id];
+              const rhythmParts = [
+                sectionMetadata?.rhythm?.meter?.trim(),
+                instrumentPov === "guitar" || instrumentPov === "chart"
+                  ? sectionMetadata?.rhythm?.guitar?.trim()
+                  : null,
+                instrumentPov === "piano" || instrumentPov === "chart"
+                  ? sectionMetadata?.rhythm?.piano?.trim()
+                  : null,
+              ].filter((part): part is string => Boolean(part));
+              const openDisplayedChord = (symbol: string) => {
+                const baseSymbol = transposeChord(
+                  symbol,
+                  -sectionOffset,
+                  useFlats,
+                );
+                const voicing = resolveInstrumentVoicing({
+                  baseSymbol,
+                  sectionOffset,
+                  capo,
+                  capoMode: effectiveCapoMode,
+                  useFlats,
+                  override: instrumentData?.voicings,
+                });
+                if (voicing) setOpenVoicing({ chord: symbol, voicing });
+              };
+              const chords =
+                instrumentPov === "guitar" || instrumentPov === "piano"
+                  ? listChords(section.content)
+                  : [];
               return (
                 <section
                   key={`${section.id}-${index}`}
@@ -447,6 +843,26 @@ export function ChordViewer({
                     <h3 className="text-xs font-semibold tracking-wide text-zinc-500">
                       {section.label}
                     </h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {sectionMetadata?.dynamic ? (
+                        <Badge
+                          tone={
+                            ["f", "ff", "cresc.", "decresc.", "rit."].includes(
+                              sectionMetadata.dynamic,
+                            )
+                              ? "warning"
+                              : "neutral"
+                          }
+                        >
+                          {sectionMetadata.dynamic}
+                        </Badge>
+                      ) : null}
+                      {rhythmParts.length > 0 ? (
+                        <span className="break-words text-xs text-zinc-600 dark:text-zinc-400">
+                          {rhythmParts.join(" · ")}
+                        </span>
+                      ) : null}
+                    </div>
                     {section.modulationSemitones ? (
                       <p className="text-xs text-indigo-700 dark:text-indigo-300">
                         Modulasi setelah bagian:{" "}
@@ -458,6 +874,66 @@ export function ChordViewer({
                       </p>
                     ) : null}
                     {annotations?.targeted}
+                    {chords.length > 0 ? (
+                      <div
+                        className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1"
+                        aria-label={`${section.label} chord voicings`}
+                      >
+                        {chords.map((chord) => {
+                          const voicing = resolveInstrumentVoicing({
+                            baseSymbol: chord,
+                            sectionOffset,
+                            capo,
+                            capoMode: effectiveCapoMode,
+                            useFlats,
+                            override: instrumentData?.voicings,
+                          });
+                          return (
+                            <button
+                              key={chord}
+                              type="button"
+                              className="flex min-h-[44px] shrink-0 flex-col items-center rounded-lg border border-zinc-300 p-2 text-xs dark:border-zinc-700"
+                              onClick={() =>
+                                voicing
+                                  ? setOpenVoicing({ chord, voicing })
+                                  : setOpenVoicing(null)
+                              }
+                            >
+                              <span className="font-semibold">
+                                {instrumentPov === "guitar"
+                                  ? voicing?.shape ?? chord
+                                  : voicing?.sounding ?? chord}
+                              </span>
+                              {instrumentPov === "guitar" && voicing?.guitar ? (
+                                <GuitarChordDiagram
+                                  chord={voicing.shape}
+                                  shape={voicing.guitar}
+                                  compact
+                                />
+                              ) : instrumentPov === "piano" && voicing?.piano ? (
+                                <PianoVoicing
+                                  chord={voicing.sounding}
+                                  voicing={voicing.piano}
+                                  compact
+                                />
+                              ) : (
+                                <span className="px-2 py-4 text-zinc-500">
+                                  Voicing belum ada
+                                </span>
+                              )}
+                              {instrumentPov === "guitar" &&
+                              capo > 0 &&
+                              effectiveCapoMode === "shape" &&
+                              voicing ? (
+                                <span className="text-[10px] text-zinc-500">
+                                  terdengar: {voicing.sounding}
+                                </span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
                   <div
                     className={`grid min-w-0 grid-cols-1 gap-3 ${
@@ -470,7 +946,10 @@ export function ChordViewer({
                       {renderChart(
                         transposeContent(section.content, sectionOffset, useFlats),
                         mode,
-                        `${offset}-${useFlats}-${mode}-${section.id}-${index}`,
+                        `${sectionOffset}-${useFlats}-${mode}-${section.id}-${index}`,
+                        instrumentPov === "chart"
+                          ? undefined
+                          : openDisplayedChord,
                       )}
                     </div>
                     {annotations?.general}
@@ -485,10 +964,79 @@ export function ChordViewer({
               content={transposed}
               mode={mode}
               renderKey={`${offset}-${useFlats}-${mode}`}
+              onChordClick={
+                instrumentPov === "chart"
+                  ? undefined
+                  : (symbol) => {
+                      const sectionOffset =
+                        keyOffsetFromC(displayBaseKey) + offset;
+                      const baseSymbol = transposeChord(
+                        symbol,
+                        -sectionOffset,
+                        useFlats,
+                      );
+                      const voicing = resolveInstrumentVoicing({
+                        baseSymbol,
+                        sectionOffset,
+                        capo,
+                        capoMode: effectiveCapoMode,
+                        useFlats,
+                        override: instrumentData?.voicings,
+                      });
+                      if (voicing) setOpenVoicing({ chord: symbol, voicing });
+                    }
+              }
             />
           </div>
         )}
       </div>
+      {openVoicing ? (
+        <div
+          role="presentation"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setOpenVoicing(null);
+          }}
+          onTouchStart={(event) => {
+            if (event.target === event.currentTarget) setOpenVoicing(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Voicing ${openVoicing.chord}`}
+            className="max-h-[90vh] max-w-full overflow-auto rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900"
+          >
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-semibold">
+                {instrumentPov === "guitar"
+                  ? openVoicing.voicing.shape
+                  : openVoicing.voicing.sounding}
+              </h2>
+              <button
+                type="button"
+                className="min-h-[44px] rounded-lg border px-3 text-sm"
+                onClick={() => setOpenVoicing(null)}
+              >
+                Tutup
+              </button>
+            </div>
+            {instrumentPov === "guitar" && openVoicing.voicing.guitar ? (
+              <GuitarChordDiagram
+                chord={openVoicing.voicing.shape}
+                shape={openVoicing.voicing.guitar}
+              />
+            ) : instrumentPov === "piano" && openVoicing.voicing.piano ? (
+              <PianoVoicing
+                chord={openVoicing.voicing.sounding}
+                voicing={openVoicing.voicing.piano}
+              />
+            ) : (
+              <p>Voicing belum ada</p>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
