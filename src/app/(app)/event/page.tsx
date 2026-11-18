@@ -70,13 +70,13 @@ async function EventPageContent() {
         ) : (
           <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {events.map((e) => (
-              <li key={e.id}>
+              <li key={e.id} className="min-w-0">
                 <Link
                   href={`/event/${e.id}`}
-                  className="flex h-full min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                  className="flex h-full w-full min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                 >
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{e.name}</span>
+                  <span className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="min-w-0 break-words font-medium">{e.name}</span>
                     <EventTypeBadge type={e.eventType} />
                     {e.region ? <span className="text-sm text-zinc-500">{e.region}</span> : null}
                   </span>

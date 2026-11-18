@@ -78,11 +78,11 @@ export default async function BatchDetailPage({
                 <li
                   key={item.songId}
                   id={batchBadgeAnchor(batch.id, badge)}
-                  className="flex min-w-0 scroll-mt-24 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  className="flex w-full min-w-0 scroll-mt-24 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
                     <BatchOrderBadge badge={badge} />
-                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
+                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="min-w-0 break-words font-medium underline">
                       {item.song.title}
                     </Link>
                   </span>
@@ -155,12 +155,12 @@ export default async function BatchDetailPage({
                 <li
                   key={item.songId}
                   id={batchBadgeAnchor(batch.id, badge)}
-                  className="flex min-w-0 scroll-mt-24 flex-col gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  className="flex w-full min-w-0 scroll-mt-24 flex-col gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
                   <span className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="flex items-center gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
                       <BatchOrderBadge badge={badge} />
-                      <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
+                      <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="min-w-0 break-words font-medium underline">
                         {item.song.title}
                       </Link>
                     </span>
