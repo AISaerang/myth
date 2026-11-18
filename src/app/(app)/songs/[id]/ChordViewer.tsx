@@ -899,7 +899,11 @@ export function ChordViewer({
                                   : setOpenVoicing(null)
                               }
                             >
-                              <span className="font-semibold">{voicing?.shape ?? chord}</span>
+                              <span className="font-semibold">
+                                {instrumentPov === "guitar"
+                                  ? voicing?.shape ?? chord
+                                  : voicing?.sounding ?? chord}
+                              </span>
                               {instrumentPov === "guitar" && voicing?.guitar ? (
                                 <GuitarChordDiagram
                                   chord={voicing.shape}
@@ -1004,7 +1008,11 @@ export function ChordViewer({
             className="max-h-[90vh] max-w-full overflow-auto rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900"
           >
             <div className="mb-3 flex items-center justify-between gap-4">
-              <h2 className="text-lg font-semibold">{openVoicing.voicing.shape}</h2>
+              <h2 className="text-lg font-semibold">
+                {instrumentPov === "guitar"
+                  ? openVoicing.voicing.shape
+                  : openVoicing.voicing.sounding}
+              </h2>
               <button
                 type="button"
                 className="min-h-[44px] rounded-lg border px-3 text-sm"

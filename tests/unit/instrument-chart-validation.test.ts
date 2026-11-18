@@ -68,6 +68,17 @@ describe("instrument chart validation", () => {
         data: {
           ...validPayload.data,
           sections: {
+            "section-1": { rhythm: { meter: "123456789" } },
+          },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      instrumentChartInputSchema.safeParse({
+        ...validPayload,
+        data: {
+          ...validPayload.data,
+          sections: {
             "section-1": { rhythm: { guitar: "x".repeat(81) } },
           },
         },

@@ -42,6 +42,36 @@ export const guitarShapeSchema = z.object({
     .refine((barre) => barre.fromString < barre.toString)
     .nullable(),
   baseFret: z.number().int().min(1).max(24),
+}).superRefine((shape, context) => {
+  for (const [index, fret] of shape.frets.entries()) {
+    const finger = shape.fingers[index] ?? 0;
+    if (
+      (fret === "x" || fret === 0) !== (finger === 0) ||
+      (typeof fret === "number" &&
+        fret > 0 &&
+        (fret < shape.baseFret || fret > shape.baseFret + 3))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["frets", index],
+        message: "Fret dan jari harus sesuai dengan diagram empat fret.",
+      });
+    }
+  }
+  if (
+    shape.barre &&
+    (shape.barre.fret < shape.baseFret ||
+      shape.barre.fret > shape.baseFret + 3 ||
+      !shape.frets
+        .slice(shape.barre.fromString, shape.barre.toString + 1)
+      .some((fret) => fret === shape.barre?.fret))
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["barre"],
+      message: "Barre harus menutup senar pada fret yang sama.",
+    });
+  }
 });
 
 export const pianoVoicingSchema = z.object({
@@ -62,7 +92,7 @@ const sectionMetadataSchema = z.object({
     .optional(),
 });
 
-const instrumentOverrideSchema = z.object({
+export const instrumentOverrideSchema = z.object({
   guitar: guitarShapeSchema.optional(),
   piano: pianoVoicingSchema.optional(),
 });

@@ -44,7 +44,9 @@ ChartArrangement: `id`, `songId`, `name`, `isActive`, `createdById`, timestamps;
 
 ChartArrangementItem: `id`, `arrangementId`, `sectionId`, `sortOrder`, `labelOverride?`, `modulationSemitones` (default 0, applied after this item), `createdAt`; unique `arrangementId+sortOrder`. Recomposition uses section content, so editing a master section updates every arrangement that uses it.
 
-Legacy `ChordChart` remains as fallback/history. Public display precedence: active structured arrangement → active legacy `ChordChart` → empty. Legacy charts can be imported into sections/arrangement by an admin and then reviewed before saving. All chart mutations are admin-only and audited.
+Legacy `ChordChart` remains as fallback/history. Public display precedence: active structured arrangement → active legacy `ChordChart` → empty. Legacy charts can be imported into sections/arrangement by an admin and then reviewed before saving. All chart mutations are authorized server-side and audited.
+
+`SongInstrumentChart` is an additive 1:1 library record for instrument guidance: `songId` (unique), `capo` (default 0, validated 0–11), validated `data` JSON keyed by `ChartSection.id` and base-C chord symbol, `updatedById`, and timestamps. Its JSON holds section dynamics/rhythm and optional guitar/piano voicing overrides. Missing rows mean no overrides and capo 0; there is no event-data backfill. Writes use the existing `requireSongContentEditor` authorization and are audited against the `Song`.
 
 ### SongMaterial
 `id`, `songId`, `eventId?`, `arrangementVersionId?`, `title`, `category`, `url`, `versionLabel?`, `description?`, `isActive`, `createdById`, timestamps. Categories: `ORIGINAL|ARRANGEMENT_REFERENCE|PART_GUIDE|CHORD_CHART|LYRICS|CLICK_CUE|SEQUENCER|REHEARSAL_RECORDING|FINAL_ASSET|OTHER`. `eventId` null = materi pustaka (tampil di setiap event yang memakai lagu). Terisi = materi khusus event itu. Kolom ini foreign key ke `Event`; jangan isi sentinel.

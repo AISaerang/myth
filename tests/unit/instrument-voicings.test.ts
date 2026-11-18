@@ -247,6 +247,22 @@ describe("standard instrument voicings", () => {
         capoMode: "sounding",
       }),
     ).toBeNull();
+    expect(
+      resolveInstrumentVoicing({
+        baseSymbol: "C9",
+        sectionOffset: 0,
+        capo: 0,
+        capoMode: "sounding",
+      }),
+    ).toBeNull();
     expect(() => shapeChord("A", 12)).toThrow();
+    expect(() =>
+      resolveInstrumentVoicing({
+        baseSymbol: "A",
+        sectionOffset: 0,
+        capo: 12,
+        capoMode: "sounding",
+      }),
+    ).toThrow();
   });
 });

@@ -92,6 +92,9 @@ Document who needs click, spoken/musical cue type, FOH outputs, monitor/IEM outp
 ## Practice status
 Not started; learning; tried with reference; needs help; ready for rehearsal. User checks active version, learns assigned part, updates status and describes blockers.
 
+## Instrument POV
+Song charts remain stored in base C. The viewer applies the event/song key, per-section modulation, viewer offset, and optional "Reset ke C" consistently to guitar and piano voicings. Guitar shape mode looks up the chord after transpose and capo (it never shifts an existing diagram); piano notes transpose and clamp to LH E1–C3 / RH A3–C5. Capo default, section dynamics/rhythm, and voicing overrides are library-level `SongInstrumentChart` data. On a song page, a viewer's POV, key reset, spelling, and capo override stay in `localStorage` (`myth_chart_view:<songId>`); they do not modify shared song data. The joined sheet shares POV/key reset for the medley and stores each song's capo override under that song's key. Editors use `requireSongContentEditor`; members and observers remain read-only, and Preview hides the editor.
+
 ## Online monitoring
 Confirm everyone has correct reference; check form, key, tempo, vocal range, cues, transitions, part guide clarity and technical constraints. Assign owner and due date for each unresolved issue.
 

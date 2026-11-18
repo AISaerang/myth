@@ -328,6 +328,9 @@ export function resolveInstrumentVoicing({
   if (!Number.isInteger(sectionOffset)) {
     throw new Error("Offset bagian harus berupa bilangan bulat.");
   }
+  if (!Number.isInteger(capo) || capo < 0 || capo > 11) {
+    throw new Error("Capo harus berupa bilangan bulat 0–11.");
+  }
   const sounding = transposeChord(normalizedBase, sectionOffset, useFlats);
   const shape =
     capoMode === "shape" && capo > 0
