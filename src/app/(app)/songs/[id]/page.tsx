@@ -72,7 +72,7 @@ function Meta({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <dt className="text-zinc-500 dark:text-zinc-400">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+      <dd className="font-medium break-words">{value}</dd>
     </div>
   );
 }
@@ -204,9 +204,9 @@ export default async function SongDetailPage({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+    <div className="flex w-full min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <h1 className="min-w-0 break-words text-xl font-bold tracking-tight sm:text-2xl">
           {song.title}
         </h1>
         {song.isPublished ? (
@@ -263,8 +263,8 @@ export default async function SongDetailPage({
         </nav>
       ) : null}
 
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <aside className="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <aside className="order-2 min-w-0 space-y-4 lg:order-none lg:col-start-2 lg:row-start-1">
           <Card title="Overview">
             <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
               <Meta label="Fungsi liturgi" value={song.liturgicalFunction} />
@@ -301,7 +301,9 @@ export default async function SongDetailPage({
             {song.arrangementNotes ? (
               <div className="mt-3 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
                 <p className="font-medium">Arah aransemen (MD)</p>
-                <p className="text-zinc-600 dark:text-zinc-400">{song.arrangementNotes}</p>
+                <p className="text-zinc-600 break-words dark:text-zinc-400">
+                  {song.arrangementNotes}
+                </p>
               </div>
             ) : null}
           </Card>
@@ -376,7 +378,7 @@ export default async function SongDetailPage({
           />
         </aside>
 
-        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+        <div className="order-1 min-w-0 max-w-full lg:order-none lg:col-start-1 lg:row-start-1">
           <SongChordChart
             songId={song.id}
             eventId={song.eventId}
@@ -426,7 +428,7 @@ export default async function SongDetailPage({
                     {m.versionLabel ? ` · ${m.versionLabel}` : ""}
                   </p>
                   {m.description ? (
-                    <p className="text-zinc-600 dark:text-zinc-400">{m.description}</p>
+                    <p className="text-zinc-600 break-words dark:text-zinc-400">{m.description}</p>
                   ) : null}
                   {canManageThisMaterial(m.eventId) ? (
                     <div className="mt-2">
@@ -552,17 +554,19 @@ export default async function SongDetailPage({
                     <Badge tone="neutral">Digantikan/arsip</Badge>
                   ) : null}
                 </div>
-                <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                <p className="mt-1 text-zinc-600 break-words dark:text-zinc-400">
                   {v.changeSummary}
                 </p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-zinc-500 break-words">
                   {[v.key ? `Key ${v.key}` : null, v.bpm ? `${v.bpm} BPM` : null]
                     .filter(Boolean)
                     .join(" · ")}
                   {v.grooveNotes ? ` · Groove: ${v.grooveNotes}` : ""}
                 </p>
                 {v.structureNotes ? (
-                  <p className="text-xs text-zinc-500">Struktur: {v.structureNotes}</p>
+                  <p className="text-xs text-zinc-500 break-words">
+                    Struktur: {v.structureNotes}
+                  </p>
                 ) : null}
                 {v.referenceUrl ? (
                   <p className="text-xs">
