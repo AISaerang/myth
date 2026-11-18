@@ -138,9 +138,12 @@ export default async function AppLayout({
   );
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col">
-      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="mx-auto w-full max-w-screen-2xl px-3 py-2 sm:px-4 lg:px-6 xl:px-8">
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+      <header
+        data-app-header=""
+        className="sticky top-0 z-50 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+      >
+        <div className="mx-auto w-full min-w-0 max-w-screen-2xl px-3 py-2 sm:px-4 lg:px-6 xl:px-8">
           <AppNav
             items={navItems}
             desktopControls={desktopControls}
@@ -150,7 +153,7 @@ export default async function AppLayout({
       </header>
       <main
         id="konten"
-        className="mx-auto w-full max-w-screen-2xl flex-1 px-3 py-6 sm:px-4 lg:px-6 xl:px-8"
+        className="mx-auto w-full min-w-0 max-w-screen-2xl flex-1 px-3 py-6 sm:px-4 lg:px-6 xl:px-8"
       >
         {children}
       </main>

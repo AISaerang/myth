@@ -87,7 +87,7 @@ function renderChart(
           <pre
             key={lineKey}
             data-section-label={shownLabel}
-            className="overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap"
+            className="font-mono text-sm leading-7 whitespace-pre-wrap"
           >
             {`— ${shownLabel} —`}
           </pre>
@@ -98,7 +98,7 @@ function renderChart(
       return (
         <pre
           key={lineKey}
-          className="overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap"
+          className="font-mono text-sm leading-7 whitespace-pre-wrap"
         >
           {extracted}
         </pre>
@@ -128,7 +128,7 @@ function renderChart(
     );
     if (aligned) {
       return (
-        <div key={lineKey} className="max-w-full overflow-x-auto overscroll-x-contain">
+        <div key={lineKey} className="max-w-full">
           <NotationLine alignment={aligned} />
         </div>
       );
@@ -138,7 +138,7 @@ function renderChart(
       return (
         <pre
           key={lineKey}
-          className="overflow-x-auto font-mono text-sm leading-7 whitespace-pre-wrap"
+          className="font-mono text-sm leading-7 whitespace-pre-wrap"
         >
           {lyricLine.trimEnd()}
         </pre>
@@ -150,7 +150,7 @@ function renderChart(
     const notationError = notationLineError(lyricLine);
     if (notationError || looksLikeNoteLine(lyricLine)) {
       return (
-        <div key={lineKey} className="overflow-x-auto overscroll-x-contain">
+        <div key={lineKey} className="min-w-0 max-w-full">
           <div className="w-max font-mono text-sm leading-6 whitespace-pre">
             {chordLine.trim() ? (
               <div className="font-semibold text-sky-700 dark:text-sky-400">{chordLine}</div>
@@ -168,7 +168,7 @@ function renderChart(
     }
 
     return (
-      <div key={lineKey} className="overflow-x-auto overscroll-x-contain">
+      <div key={lineKey} className="min-w-0 max-w-full">
         <div className="w-max font-mono text-sm leading-6 whitespace-pre">
           {chordLine.trim() ? (
             <div className="font-semibold text-sky-700 dark:text-sky-400">{chordLine}</div>
@@ -271,9 +271,12 @@ export function ChordViewer({
           </button>
         ))}
       </div>
-      <div data-chart-body="" className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
+      <div
+        data-chart-body=""
+        className="min-w-0 max-w-full rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900"
+      >
         {sections ? (
-          <div className="flex flex-col gap-5">
+          <div className="flex min-w-0 flex-col gap-5">
             {sections.map((section, index) => {
               const annotations = getSectionAnnotations?.(section.id);
               return (
@@ -295,7 +298,7 @@ export function ChordViewer({
                         : ""
                     }`}
                   >
-                    <div className="min-w-0 overflow-x-auto">
+                    <div className="min-w-0 max-w-full overflow-x-auto">
                       {renderChart(
                         transposeContent(section.content, offset, useFlats),
                         mode,
@@ -309,11 +312,13 @@ export function ChordViewer({
             })}
           </div>
         ) : (
-          <ChartBody
-            content={transposed}
-            mode={mode}
-            renderKey={`${offset}-${useFlats}-${mode}`}
-          />
+          <div className="min-w-0 max-w-full overflow-x-auto">
+            <ChartBody
+              content={transposed}
+              mode={mode}
+              renderKey={`${offset}-${useFlats}-${mode}`}
+            />
+          </div>
         )}
       </div>
     </div>
