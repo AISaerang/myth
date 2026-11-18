@@ -13,6 +13,10 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Only one active arrangement version per song.
 - Chart legacy parser recognizes section headings (Verse/Chorus/Reff/Tagline/Prechorus/Interlude/Bridge/Modulation→Key Change/Coda/Outro/Intro, plus Post-Chorus/Solo/Hook/Breakdown/Vamp/Turnaround/Ad-lib/Spoken/Transition/Reprise), keeps repeated sections, and ignores empty blocks.
 - Arrangement composition keeps item order/duplicates and applies label overrides.
+- Medley runs split on non-consecutive legacy members and on hidden/archived items; singleton runs are not medleys. A reorder recalculates runs from batch order.
+- Medley transition validation rejects malformed notation, same-song endpoints, and writes whose songs are not currently adjacent in one medley group.
+- Arrangement modulation defaults to zero, is limited to ±12 semitones, applies after the marked section, and transposes chords but not not-angka.
+- Key display derives from the event song key and persists display mode/transpose preferences locally.
 - Chart section/arrangement validation rejects empty labels/content, duplicate labels, invalid item payloads, and over-limit sequences.
 - Setlist lyric seed keeps unique labels, non-empty content, and arrangement items that reference existing sections.
 - Intro-column migration builds a ChordPro Intro section (chords over not angka, note as a `#` comment), skips songs that already have an Intro section, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
@@ -37,6 +41,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - User cannot update another person's progress.
 - Rehearsal/attendance persists.
 - Admin imports a legacy chart, reviews sections, saves an arrangement, activates it, and the song page renders the active arrangement instead of the legacy chart.
+- A joined medley sheet displays active arrangements (then legacy charts) in batch order, with transitions only on current adjacent pairs; restricted readers see published, non-archived songs only. Event admins can edit transitions only while the event is open.
 - MEMBER, OBSERVER, and an EVENT_ADMIN of another event cannot create/edit sections, arrangements, chords, or song metadata. An EVENT_ADMIN of the song's event can while access is open, including when the song is also used by another event. Omitting eventId is global ADMIN only. A closed event blocks the event admin. Archive/restore stays global ADMIN. The audit actor is the signed-in user.
 - Proxy: `GET /songs/[id]/chart?eventId=` is allowed for an EVENT_ADMIN of that open event when the song is on the setlist (including an arrangement query). MEMBER, OBSERVER, a non-member, a closed event, a song that is not on the setlist, and a missing eventId are the plain-text 404. Global ADMIN skips the filter. `GET /event/[id]` follows event membership instead of rejecting every non-admin.
 - Catatan umum di chart ("Semua personel" / "Tambah catatan umum") tampil untuk EVENT_ADMIN mode Edit walau id bagian chart bukan master section, dan tanpa flag admin global. Catatan per instrumen ikut tampil bila lagu punya assignment. MEMBER pada lagu publish tetap melihat panel bagian yang id-nya cocok, tanpa kotak editor tambahan di atas chart. OBSERVER tidak melihat tombol tambah. Materi pustaka pada lagu setlist boleh dikelola EVENT_ADMIN bila `eventId` dikirim; tanpa `eventId` tetap admin global.

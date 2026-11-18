@@ -108,4 +108,46 @@ describe("batch badge", () => {
     expect(badgesForSong("song-a", catalog)[0]?.badge).toBe(1);
     expect(badgesForSong("missing", catalog)).toEqual([]);
   });
+
+  it("does not bridge a hidden song when displaying a published medley", () => {
+    const catalog: BatchCatalog[] = [
+      batch({
+        id: "b1",
+        name: "B1",
+        status: "PUBLISHED",
+        items: [
+          {
+            songId: "song-a",
+            sortOrder: 0,
+            isPublished: true,
+            medleyGroupId: "group",
+            medleyLabel: "Set",
+          },
+          {
+            songId: "hidden",
+            sortOrder: 1,
+            isPublished: false,
+            medleyGroupId: "group",
+            medleyLabel: "Set",
+          },
+          {
+            songId: "song-c",
+            sortOrder: 2,
+            isPublished: true,
+            medleyGroupId: "group",
+            medleyLabel: "Set",
+          },
+        ],
+      }),
+    ];
+    expect(
+      badgesForSong("song-a", catalog, { publishedOnly: true })[0]?.medleyLabel,
+    ).toBeNull();
+    expect(
+      groupSongsByBatchBadge(
+        [{ id: "song-a", title: "A" }, { id: "song-c", title: "C" }],
+        catalog,
+      )[0]?.rows.map((row) => row.medleyLabel),
+    ).toEqual([null, null]);
+  });
 });

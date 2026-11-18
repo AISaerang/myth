@@ -2,7 +2,9 @@ import "server-only";
 import type { BatchStatus } from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
 import type { BatchCatalog } from "@/lib/batch-badge";
+import { isAdjacentMedleyPair } from "@/lib/medley-groups";
 import { canTransitionBatch } from "@/lib/batch-status";
+import type { MedleyTransitionInput } from "@/lib/validation/medley";
 import { prisma } from "@/lib/db";
 import type { BatchInput } from "@/lib/validation/song";
 
@@ -67,6 +69,7 @@ export async function listBatches(eventId: string) {
               eventId: true,
               status: true,
               isPublished: true,
+              eventKey: true,
               _count: { select: { assignments: true } },
             },
           },
@@ -118,6 +121,7 @@ export async function getBatch(id: string) {
               eventId: true,
               status: true,
               isPublished: true,
+              eventKey: true,
               _count: { select: { assignments: true } },
             },
           },
@@ -350,15 +354,28 @@ export async function setBatchItemMedley(
   songId: string,
   label: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const item = await prisma.songBatchItem.findUnique({
-    where: { songBatchId_songId: { songBatchId: batchId, songId } },
-    include: {
-      song: { select: { title: true } },
-      batch: { select: { name: true } },
-    },
-  });
+  const [item, orderedItems] = await Promise.all([
+    prisma.songBatchItem.findUnique({
+      where: { songBatchId_songId: { songBatchId: batchId, songId } },
+      include: {
+        song: { select: { title: true } },
+        batch: { select: { name: true } },
+      },
+    }),
+    prisma.songBatchItem.findMany({
+      where: { songBatchId: batchId },
+      orderBy: [{ sortOrder: "asc" }, { songId: "asc" }],
+      select: {
+        songId: true,
+        sortOrder: true,
+        medleyGroupId: true,
+        medleyLabel: true,
+      },
+    }),
+  ]);
   if (!item) return { ok: false, error: "Lagu tidak ditemukan di batch." };
   const trimmed = label.trim();
+  const index = orderedItems.findIndex((row) => row.songId === songId);
   if (!trimmed) {
     await prisma.songBatchItem.update({
       where: { songBatchId_songId: { songBatchId: batchId, songId } },
@@ -374,23 +391,42 @@ export async function setBatchItemMedley(
     });
     return { ok: true };
   }
-  const siblings = await prisma.songBatchItem.findMany({
-    where: { songBatchId: batchId, NOT: { songId } },
-    select: { medleyGroupId: true, medleyLabel: true },
-  });
+
   const normalized = trimmed.toLocaleLowerCase("id");
-  const match = siblings.find(
+  const adjacent = [orderedItems[index - 1], orderedItems[index + 1]].filter(
     (row) =>
+      row &&
       row.medleyGroupId &&
       row.medleyLabel?.trim().toLocaleLowerCase("id") === normalized,
   );
-  const medleyLabel = match?.medleyLabel?.trim() || trimmed;
-  await prisma.songBatchItem.update({
-    where: { songBatchId_songId: { songBatchId: batchId, songId } },
-    data: {
-      medleyGroupId: match?.medleyGroupId ?? crypto.randomUUID(),
-      medleyLabel,
-    },
+  const medleyLabel = adjacent[0]?.medleyLabel?.trim() || trimmed;
+  const groupId = adjacent[0]?.medleyGroupId ?? crypto.randomUUID();
+  const rightGroupId = adjacent[1]?.medleyGroupId;
+  await prisma.$transaction(async (tx) => {
+    await tx.songBatchItem.update({
+      where: { songBatchId_songId: { songBatchId: batchId, songId } },
+      data: { medleyGroupId: groupId, medleyLabel },
+    });
+    if (rightGroupId && rightGroupId !== groupId) {
+      let cursor = index + 1;
+      while (
+        cursor < orderedItems.length &&
+        orderedItems[cursor]?.medleyGroupId === rightGroupId &&
+        orderedItems[cursor]?.medleyLabel?.trim().toLocaleLowerCase("id") ===
+          normalized
+      ) {
+        const row = orderedItems[cursor];
+        if (row) {
+          await tx.songBatchItem.update({
+            where: {
+              songBatchId_songId: { songBatchId: batchId, songId: row.songId },
+            },
+            data: { medleyGroupId: groupId, medleyLabel },
+          });
+        }
+        cursor += 1;
+      }
+    }
   });
   await writeAudit({
     actorUserId,
@@ -399,6 +435,104 @@ export async function setBatchItemMedley(
     entityId: batchId,
     summary: `"${item.song.title}" masuk medley "${medleyLabel}" di batch "${item.batch.name}".`,
     metadata: { songId, batch: item.batch.name, medley: medleyLabel },
+  });
+  return { ok: true };
+}
+
+export async function listMedleyTransitions(batchId: string) {
+  return prisma.medleyTransition.findMany({
+    where: { songBatchId: batchId },
+    select: {
+      id: true,
+      fromSongId: true,
+      toSongId: true,
+      content: true,
+      notes: true,
+    },
+  });
+}
+
+export async function saveMedleyTransition(
+  actorUserId: string,
+  input: MedleyTransitionInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const items = await prisma.songBatchItem.findMany({
+    where: { songBatchId: input.batchId },
+    include: { song: { select: { title: true, archivedAt: true } } },
+    orderBy: [{ sortOrder: "asc" }, { songId: "asc" }],
+  });
+  const index = items.findIndex((item) => item.songId === input.fromSongId);
+  const from = items[index];
+  const to = items[index + 1];
+  if (
+    !isAdjacentMedleyPair(
+      items.map((item) => ({
+        songId: item.songId,
+        sortOrder: item.sortOrder,
+        medleyGroupId: item.medleyGroupId,
+        archived: item.song.archivedAt !== null,
+        isPublished: true,
+      })),
+      input.fromSongId,
+      input.toSongId,
+    ) ||
+    !from ||
+    !to
+  ) {
+    return {
+      ok: false,
+      error: "Transisi hanya dapat disimpan di antara dua lagu berurutan dalam medley yang sama.",
+    };
+  }
+
+  if (input.remove) {
+    const deleted = await prisma.medleyTransition.deleteMany({
+      where: {
+        songBatchId: input.batchId,
+        fromSongId: input.fromSongId,
+      },
+    });
+    if (deleted.count > 0) {
+      await writeAudit({
+        actorUserId,
+        action: "MEDLEY_TRANSITION_DELETED",
+        entityType: "SongBatch",
+        entityId: input.batchId,
+        summary: `Transisi "${from.song.title}" → "${to.song.title}" dihapus.`,
+        metadata: { fromSongId: from.songId, toSongId: to.songId },
+      });
+    }
+    return { ok: true };
+  }
+
+  await prisma.medleyTransition.upsert({
+    where: {
+      songBatchId_fromSongId: {
+        songBatchId: input.batchId,
+        fromSongId: input.fromSongId,
+      },
+    },
+    create: {
+      songBatchId: input.batchId,
+      fromSongId: input.fromSongId,
+      toSongId: input.toSongId,
+      content: input.content,
+      notes: input.notes?.trim() || null,
+      createdById: actorUserId,
+    },
+    update: {
+      toSongId: input.toSongId,
+      content: input.content,
+      notes: input.notes?.trim() || null,
+    },
+  });
+  await writeAudit({
+    actorUserId,
+    action: "MEDLEY_TRANSITION_SAVED",
+    entityType: "SongBatch",
+    entityId: input.batchId,
+    summary: `Transisi "${from.song.title}" → "${to.song.title}" disimpan.`,
+    metadata: { fromSongId: from.songId, toSongId: to.songId },
   });
   return { ok: true };
 }

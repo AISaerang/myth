@@ -3,6 +3,11 @@
 // bukan SongStatus. Angka yang tampil adalah peringkat 1…N pada daftar
 // admin batch (item diurut sortOrder), jadi lagu 1 di admin = badge 1.
 
+import {
+  groupMedleyRuns,
+  visibleMedleyItems,
+} from "@/lib/medley-groups";
+
 export interface BatchCatalogItem {
   songId: string;
   title?: string;
@@ -49,6 +54,15 @@ export interface SongBadgeGroup<T> {
   batchName: string | null;
   archived: boolean;
   rows: GroupedSongRow<T>[];
+}
+
+function medleyRunLabels(items: readonly BatchCatalogItem[]): Map<string, string> {
+  const labels = new Map<string, string>();
+  for (const block of groupMedleyRuns(items)) {
+    if (block.kind !== "medley") continue;
+    for (const item of block.items) labels.set(item.songId, block.label);
+  }
+  return labels;
 }
 
 export function batchBadgeAnchor(batchId: string, badge: number): string {
@@ -98,6 +112,15 @@ export function groupSongsByBatchBadge<T extends { id: string }>(
 
   for (const batch of orderBatchCatalog(catalog)) {
     const ranked = { items: withBadges(batch) };
+    const medleyLabelBySongId = medleyRunLabels(
+      visibleMedleyItems(
+        ranked.items.map((item) => ({
+          ...item,
+          archived: item.archived || !byId.has(item.songId),
+        })),
+        false,
+      ),
+    );
     const rows: GroupedSongRow<T>[] = [];
     const items = [...ranked.items].sort(
       (a, b) => a.sortOrder - b.sortOrder || a.songId.localeCompare(b.songId),
@@ -111,7 +134,7 @@ export function groupSongsByBatchBadge<T extends { id: string }>(
         badge: item.badge,
         anchorId: item.anchorId,
         sortOrder: item.sortOrder,
-        medleyLabel: item.medleyLabel ?? null,
+        medleyLabel: medleyLabelBySongId.get(item.songId) ?? null,
       });
     }
     if (rows.length === 0) continue;
@@ -144,10 +167,12 @@ export function groupSongsByBatchBadge<T extends { id: string }>(
 export function badgesForSong(
   songId: string,
   catalog: readonly BatchCatalog[],
+  options: { publishedOnly?: boolean } = {},
 ): BatchBadgeRef[] {
   const badges: BatchBadgeRef[] = [];
   for (const batch of orderBatchCatalog(catalog)) {
-    const item = withBadges(batch).find((row) => row.songId === songId);
+    const ranked = withBadges(batch);
+    const item = ranked.find((row) => row.songId === songId);
     if (!item) continue;
     badges.push({
       batchId: batch.id,
@@ -156,7 +181,9 @@ export function badgesForSong(
       badge: item.badge,
       anchorId: item.anchorId,
       medleyGroupId: item.medleyGroupId ?? null,
-      medleyLabel: item.medleyLabel ?? null,
+      medleyLabel: medleyRunLabels(
+        visibleMedleyItems(ranked, options.publishedOnly ?? false),
+      ).get(songId) ?? null,
     });
   }
   return badges;
