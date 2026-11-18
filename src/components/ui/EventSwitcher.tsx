@@ -36,7 +36,7 @@ export function EventSwitcher({
           name="eventId"
           defaultValue={selectedEventId}
           onChange={(event) => event.currentTarget.form?.requestSubmit()}
-          className="h-11 w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-2 text-sm text-ellipsis text-zinc-700 shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:focus-visible:outline-zinc-100"
+          className="h-11 w-full min-w-0 truncate rounded-lg border border-zinc-300 bg-white px-2 text-sm text-zinc-700 shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:focus-visible:outline-zinc-100"
         >
           {events.map((event) => (
             <option key={event.id} value={event.id}>
