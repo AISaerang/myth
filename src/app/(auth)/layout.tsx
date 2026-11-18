@@ -4,7 +4,10 @@ export default function AuthLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-8">
+    <main
+      id="konten"
+      className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-3 py-8"
+    >
       <div className="text-center">
         <p className="text-lg font-bold tracking-tight">Music Youth Team Hub</p>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -12,6 +15,6 @@ export default function AuthLayout({
         </p>
       </div>
       {children}
-    </div>
+    </main>
   );
 }

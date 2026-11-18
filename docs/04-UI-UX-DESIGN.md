@@ -39,15 +39,18 @@ Song detail:
 3. Assigned personnel/instruments.
 4. Materials and active version.
 5. Practice progress.
-6. Version history.
-7. Tasks/issues.
-8. Decision notes.
+6. Catatan Part: daftar lengkap dengan filter status/bagian/POV penulis; catatan section umum tampil di sisi lirik pada desktop dan ditumpuk setelah chart di mobile. Catatan bertarget tampil sebagai callout ringkas di atas section. Composer berada di disclosure per-section agar chart tetap ringkas; semua catatan juga tersedia dalam daftar, dengan balasan, edit/hapus sesuai izin, dan status selesai.
+7. Version history.
+8. Tasks/issues.
+9. Decision notes.
 
 Materi aktif harus mudah dikenali; versi lama ditandai superseded/archive.
 
 Chord viewer: chord bertumpuk sejajar di atas suku kata lirik (font monospace), label seksi ditandai, baris panjang scroll horizontal di mobile. Mode Lirik+Chord / Lirik saja / Chord saja, dengan transpose ±½ dan reset ke basis C. Admin dapat mengedit chart aktif langsung (konten basis C) atau menambah versi baru dari nada asal lain.
 
 Mode panggung: tampilkan chart layar penuh dengan tema gelap atau terang, lompat section bernomor, prev/next section, tombol A−/A+, dan auto-scroll kecepatan dapat disetel. Ukuran teks disimpan di perangkat. Tombol Escape atau Keluar menutup mode panggung.
+
+Baris not angka — biasanya di bagian Intro — dirender sebagai notasi CSS (bukan teks mentah dan bukan font khusus) di preview master bagian, tampilan aransemen, chart lagu, dan halaman latihan. Angka 1–7 dan 0 seukuran baris lirik (`text-sm`, `leading-6`); garis birama memakai karakter `|` setinggi angka. Oktaf atas `'` menjadi titik di atas angka; oktaf bawah `,` atau titik di depan (`.6`, `..6`) menjadi titik di bawah — beberapa tanda berarti beberapa titik. `#4` digambar dengan garis `/` menembus angka (naik ke kanan), `b7` dengan garis `\`. `[5 6]` satu garis horizontal di atas kelompok, `[[5 6 5 6]]` dua garis, `(5 6)` busur di atas. `/` dan `//` di belakang nada tetap garis bawah; `-` perpanjangan. Kunci tetap di kolom editor karena tanda yang dilipat tidak menggeser kolom. Baris nada sedikit lebih tinggi dari satu baris lirik agar titik dan garis tidak terpotong di ponsel. Transpose menggeser kunci saja; angka (do = 1) tidak berubah. Bila chart berisi not angka, rumus nada (cth. `C + 2 = D`) tampil sekali di kontrol transpose chart itu, bukan di tiap bagian dan bukan di kartu intro terpisah. Intro diedit sebagai bagian master bertipe Intro dan heading-nya tampil "Intro". Chart lama tanpa `{Intro}` yang isinya hanya not angka tidak lagi jatuh ke label "Bagian n" (yang CSS `uppercase` menampilkan sebagai BAGIAN 1).
 
 Chord editor: semua form edit chord (bagian di `/songs/[id]/chart`, chart aktif, dan tambah chart baru) memakai editor berformat "kunci di atas lirik" — tiap baris lirik punya baris chord di atasnya, posisi digeser pakai spasi, sehingga editing mirip tampilan final (termasuk chord tepat di pemisah suku kata, cth. `ha-[D]ti-ku`). Tempel dari internet dapat dalam format ini maupun ChordPro `[bracket]` dan dideteksi otomatis. Toggle "Teks ChordPro" tersedia untuk editing sintaks mentah. Nilai yang dikirim ke server tetap ChordPro — konversi over-under ⇄ ChordPro terjadi di klien; format tersimpan di database tidak berubah (basis C).
 
@@ -66,10 +69,12 @@ Tipe, tanggal/jam, lokasi/link, agenda, lagu, attendance, catatan, keputusan, ac
 Checklist mobile: item, kategori, PIC, sumber/pemilik, status, due date, notes. Filter belum dicek, butuh konfirmasi, blocked, tested.
 
 ## People & Access
-Tambah/edit personel, username, role, skill, assignment, deactivate, reset password. Password sementara hanya terlihat sekali; admin tidak dapat melihat password lama.
+Tambah/edit personel, username, role, skill, assignment, deactivate, reset password. Form buat akun dan reset sudah terisi password sementara default (`DEFAULT_TEMP_PASSWORD`, fallback `1234567890ais`); admin boleh mengubah atau mengosongkannya agar sistem menghasilkan password acak. Pesan japri di Broadcast memakai password default yang sama dan tetap punya link undangan unik per orang. Password sementara hanya terlihat sekali; admin tidak dapat melihat password lama. Setiap input password (login, ganti password, buat/reset akun) punya tombol tampilkan/sembunyikan. Password baru minimal 1 karakter (kosong ditolak).
 
 ## Design system
 Gunakan Button, Input, Select, Badge, Card, Dialog, Tabs, Table, Alert, Toast, Skeleton, Empty State. Status: green ready/done; amber in progress/review; red blocked/overdue; gray draft/not checked. Pastikan kontras baik, focus state terlihat, target sentuh cukup besar.
 
 ## Responsive/accessibility
-Label input, keyboard navigation, semantik HTML, focus state, tidak wajib drag-and-drop, uji mobile/tablet/desktop. Error harus membantu tanpa menampilkan stack trace.
+Shell memakai lebar penuh hingga batas 1536px dengan padding responsif. Header aplikasi tunggal tetap sticky dengan latar solid; pada mobile navigasi dan kontrol akun/event berada dalam drawer yang offset-nya mengikuti tinggi header nyata (`--app-header-h`), sedangkan desktop menampilkan seluruh tautan tanpa strip scroll horizontal — tautan yang jarang dipakai masuk menu "Lainnya". Halaman lagu menampilkan sheet (not angka/chord) lebih dulu di mobile, lalu ringkasan/progres/catatan; di desktop chart dan ringkasan tetap dua kolom. Baris chart yang lebar hanya menggeser di dalam blok sheet, tidak pernah membuat halaman atau header bergeser ke samping.
+
+Label input, keyboard navigation, semantik HTML, focus state, tidak wajib drag-and-drop, uji mobile/tablet/desktop. Target sentuh minimal 44px; drawer dapat ditutup dengan Escape, backdrop, tautan, atau perubahan route. Error harus membantu tanpa menampilkan stack trace.

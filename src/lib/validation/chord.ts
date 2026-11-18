@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeNotationInput } from "@/lib/jianpu";
 
 const requiredKey = z
   .string()
@@ -14,7 +15,8 @@ export const chordChartSchema = z.object({
     .trim()
     .min(10, "Konten ChordPro minimal 10 karakter.")
     .max(20000, "Konten maksimal 20000 karakter.")
-    .refine((v) => /\[([^\]]+)\]/.test(v), "Konten harus memuat chord [..]."),
+    .refine((v) => /\[([^\]]+)\]/.test(v), "Konten harus memuat chord [..].")
+    .transform(normalizeNotationInput),
   originalKey: requiredKey,
   label: z.string().trim().max(50).optional(),
 });

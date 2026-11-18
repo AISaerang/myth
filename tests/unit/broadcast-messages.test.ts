@@ -4,6 +4,7 @@ import {
   buildGroupMessage,
   resolveBroadcastVariant,
 } from "@/lib/broadcast-messages";
+import { FALLBACK_TEMP_PASSWORD } from "@/lib/password-policy";
 
 describe("broadcast variants", () => {
   it("resolves singer for Vokal, band for instruments, coordinator otherwise", () => {
@@ -32,13 +33,23 @@ describe("direct message", () => {
     assignmentCount: 10,
   };
 
-  it("greets by first name and embeds username + placeholders", () => {
+  it("greets by first name and embeds username, default password, and a unique invite placeholder", () => {
     const msg = buildDirectMessage(base);
     expect(msg).toContain("Shalom Nathanael!");
     expect(msg).toContain("nathanmewengkang");
     expect(msg).toContain("[LINK UNDANGAN]");
-    expect(msg).toContain("[PASSWORD SEMENTARA]");
+    expect(msg).toContain(`Password sementara: ${FALLBACK_TEMP_PASSWORD}`);
+    expect(msg).not.toContain("[PASSWORD SEMENTARA]");
     expect(msg).toContain("bagian vokal");
+  });
+
+  it("uses an explicit temporary password when the caller passes one", () => {
+    const msg = buildDirectMessage({
+      ...base,
+      passwordPlaceholder: "rahasia-sementara",
+    });
+    expect(msg).toContain("Password sementara: rahasia-sementara");
+    expect(msg).toContain("[LINK UNDANGAN]");
   });
 
   it("uses the band paragraph for players and coordinator paragraph otherwise", () => {

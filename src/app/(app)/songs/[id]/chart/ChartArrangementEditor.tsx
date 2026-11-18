@@ -17,6 +17,7 @@ import {
   CHART_SECTION_TYPE_HINT,
   CHART_SECTION_TYPE_LABEL,
   composeArrangementContent,
+  displaySectionLabel,
   type ChartSectionKind,
 } from "@/lib/chart-arrangement";
 import {
@@ -28,12 +29,17 @@ import {
   saveChartArrangementItemsAction,
   updateChartArrangementAction,
 } from "@server/actions/chart-arrangements";
-import { ChordViewer } from "../ChordViewer";
+import { ChartBody, ChordViewer } from "../ChordViewer";
 import { ChartSectionEditor, type SectionData } from "./ChartSectionEditor";
 import { HintSelect } from "@/components/ui/HintSelect";
 
 const inputClass =
   "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900";
+
+function EventIdField({ eventId }: { eventId?: string }) {
+  if (!eventId) return null;
+  return <input type="hidden" name="eventId" value={eventId} />;
+}
 
 export interface EditorSection {
   id: string;
@@ -47,6 +53,7 @@ export interface EditorItem {
   id: string;
   sectionId: string;
   labelOverride: string | null;
+  modulationSemitones: number;
   section: EditorSection;
 }
 
@@ -61,6 +68,7 @@ interface DraftItem {
   key: string;
   sectionId: string;
   labelOverride: string;
+  modulationSemitones: number;
 }
 
 function toDraft(arrangement: EditorArrangement | null): DraftItem[] {
@@ -69,18 +77,21 @@ function toDraft(arrangement: EditorArrangement | null): DraftItem[] {
       key: item.id,
       sectionId: item.sectionId,
       labelOverride: item.labelOverride ?? "",
+      modulationSemitones: item.modulationSemitones,
     })) ?? []
   );
 }
 
 export function ChartArrangementEditor({
   songId,
+  eventId,
   sections,
   arrangements,
   initialArrangementId,
   legacyChart,
 }: {
   songId: string;
+  eventId?: string;
   sections: EditorSection[];
   arrangements: EditorArrangement[];
   initialArrangementId?: string;
@@ -156,7 +167,7 @@ export function ChartArrangementEditor({
             </p>
           )}
 
-          <ArrangementCreateForm songId={songId} />
+          <ArrangementCreateForm songId={songId} eventId={eventId} />
 
           {selected ? (
             <div className="flex flex-col gap-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
@@ -166,11 +177,13 @@ export function ChartArrangementEditor({
                 ) : (
                   <ArrangementActivateButton
                     songId={songId}
+                    eventId={eventId}
                     arrangementId={selected.id}
                   />
                 )}
                 <ArrangementDeleteButton
                   songId={songId}
+                  eventId={eventId}
                   arrangementId={selected.id}
                   name={selected.name}
                   isActive={selected.isActive}
@@ -178,6 +191,7 @@ export function ChartArrangementEditor({
               </div>
               <ArrangementRenameForm
                 songId={songId}
+                eventId={eventId}
                 arrangementId={selected.id}
                 name={selected.name}
               />
@@ -193,7 +207,7 @@ export function ChartArrangementEditor({
                 {"{Chorus}"}, dan seterusnya.
               </p>
               <div className="mt-2">
-                <ImportLegacyForm songId={songId} />
+                <ImportLegacyForm songId={songId} eventId={eventId} />
               </div>
             </div>
           ) : null}
@@ -204,6 +218,7 @@ export function ChartArrangementEditor({
         <ArrangementWorkspace
           key={selected.id}
           songId={songId}
+          eventId={eventId}
           arrangement={selected}
           sections={sections}
           sectionMap={sectionMap}
@@ -251,6 +266,7 @@ export function ChartArrangementEditor({
             <ChartSectionEditor
               key="new"
               songId={songId}
+              eventId={eventId}
               onDone={() => setCreatingSection(false)}
             />
           ) : null}
@@ -259,6 +275,7 @@ export function ChartArrangementEditor({
             <ChartSectionEditor
               key={editingSection.id}
               songId={songId}
+              eventId={eventId}
               section={editingSection as SectionData}
               onDone={() => setEditingSectionId(null)}
             />
@@ -284,9 +301,9 @@ export function ChartArrangementEditor({
                           · {CHART_SECTION_TYPE_LABEL[section.type]}
                         </span>
                       </p>
-                      <p className="line-clamp-2 text-xs text-zinc-500">
-                        {section.content}
-                      </p>
+                      <div className="mt-2 max-h-40 overflow-auto rounded-lg bg-zinc-50 p-2 dark:bg-zinc-900">
+                        <ChartBody content={section.content} renderKey={section.id} />
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-1">
                       <Button
@@ -302,6 +319,7 @@ export function ChartArrangementEditor({
                       </Button>
                       <SectionDeleteButton
                         songId={songId}
+                        eventId={eventId}
                         sectionId={section.id}
                         label={section.label}
                       />
@@ -320,12 +338,14 @@ export function ChartArrangementEditor({
 
 function ArrangementWorkspace({
   songId,
+  eventId,
   arrangement,
   sections,
   sectionMap,
   onRequestNewSection,
 }: {
   songId: string;
+  eventId?: string;
   arrangement: EditorArrangement;
   sections: EditorSection[];
   sectionMap: Map<string, EditorSection>;
@@ -349,6 +369,26 @@ function ArrangementWorkspace({
       ),
     [draft, sectionMap],
   );
+  const previewSections = useMemo(
+    () =>
+      draft.flatMap((item) => {
+        const section = sectionMap.get(item.sectionId);
+        return section
+          ? [
+              {
+                id: item.key,
+                  label: displaySectionLabel(
+                    item.labelOverride.trim() || section.label,
+                    { type: section.type, content: section.content },
+                  ),
+                content: section.content,
+                modulationSemitones: item.modulationSemitones,
+              },
+            ]
+          : [];
+      }),
+    [draft, sectionMap],
+  );
 
   const handleSaved = useCallback(() => setDirty(false), []);
 
@@ -362,7 +402,12 @@ function ArrangementWorkspace({
     keyCounter.current += 1;
     updateDraft([
       ...draft,
-      { key: `new-${keyCounter.current}`, sectionId, labelOverride: "" },
+      {
+        key: `new-${keyCounter.current}`,
+        sectionId,
+        labelOverride: "",
+        modulationSemitones: 0,
+      },
     ]);
   }
 
@@ -396,6 +441,14 @@ function ArrangementWorkspace({
     updateDraft(
       draft.map((item, i) =>
         i === index ? { ...item, labelOverride: value } : item,
+      ),
+    );
+  }
+
+  function setModulation(index: number, value: number) {
+    updateDraft(
+      draft.map((item, i) =>
+        i === index ? { ...item, modulationSemitones: value } : item,
       ),
     );
   }
@@ -519,6 +572,24 @@ function ArrangementWorkspace({
                       placeholder={section.label}
                       className={`${inputClass} mt-1 w-full`}
                     />
+                    <label
+                      htmlFor={`modulation-${item.key}`}
+                      className="mt-2 block text-xs text-zinc-500"
+                    >
+                      Modulasi setelah bagian (semitone)
+                    </label>
+                    <input
+                      id={`modulation-${item.key}`}
+                      type="number"
+                      min={-12}
+                      max={12}
+                      step={1}
+                      value={item.modulationSemitones}
+                      onChange={(event) =>
+                        setModulation(index, Number(event.target.value))
+                      }
+                      className={`${inputClass} mt-1 w-full`}
+                    />
                   </li>
                 );
               })}
@@ -527,6 +598,7 @@ function ArrangementWorkspace({
 
           <SaveArrangementForm
             songId={songId}
+            eventId={eventId}
             arrangementId={arrangement.id}
             draft={draft}
             dirty={dirty}
@@ -541,7 +613,11 @@ function ArrangementWorkspace({
             Preview mengikuti draft susunan. Simpan urutan untuk menerapkan.
           </p>
           {previewContent ? (
-            <ChordViewer content={previewContent} baseKey="C" />
+            <ChordViewer
+              content={previewContent}
+              baseKey="C"
+              sections={previewSections}
+            />
           ) : (
             <EmptyState
               title="Belum ada isi"
@@ -554,7 +630,13 @@ function ArrangementWorkspace({
   );
 }
 
-function ArrangementCreateForm({ songId }: { songId: string }) {
+function ArrangementCreateForm({
+  songId,
+  eventId,
+}: {
+  songId: string;
+  eventId?: string;
+}) {
   const [state, formAction, pending] = useActionState(
     createChartArrangementAction,
     { ok: false },
@@ -566,6 +648,7 @@ function ArrangementCreateForm({ songId }: { songId: string }) {
       </summary>
       <form action={formAction} className="mt-3 flex flex-col gap-2">
         <input type="hidden" name="songId" value={songId} />
+        <EventIdField eventId={eventId} />
         <label htmlFor="new-arrangement-name" className="text-sm font-medium">
           Nama aransemen
         </label>
@@ -592,10 +675,12 @@ function ArrangementCreateForm({ songId }: { songId: string }) {
 
 function ArrangementRenameForm({
   songId,
+  eventId,
   arrangementId,
   name,
 }: {
   songId: string;
+  eventId?: string;
   arrangementId: string;
   name: string;
 }) {
@@ -606,6 +691,7 @@ function ArrangementRenameForm({
   return (
     <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="songId" value={songId} />
+      <EventIdField eventId={eventId} />
       <input type="hidden" name="arrangementId" value={arrangementId} />
       <label htmlFor="rename-arrangement" className="text-sm font-medium">
         Nama aransemen
@@ -634,9 +720,11 @@ function ArrangementRenameForm({
 
 function ArrangementActivateButton({
   songId,
+  eventId,
   arrangementId,
 }: {
   songId: string;
+  eventId?: string;
   arrangementId: string;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -646,6 +734,7 @@ function ArrangementActivateButton({
   return (
     <form action={formAction} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="songId" value={songId} />
+      <EventIdField eventId={eventId} />
       <input type="hidden" name="arrangementId" value={arrangementId} />
       <Button type="submit" variant="secondary" size="sm" disabled={pending}>
         {pending ? "…" : "Jadikan aktif"}
@@ -659,11 +748,13 @@ function ArrangementActivateButton({
 
 function ArrangementDeleteButton({
   songId,
+  eventId,
   arrangementId,
   name,
   isActive,
 }: {
   songId: string;
+  eventId?: string;
   arrangementId: string;
   name: string;
   isActive: boolean;
@@ -683,6 +774,7 @@ function ArrangementDeleteButton({
       className="flex flex-wrap items-center gap-2"
     >
       <input type="hidden" name="songId" value={songId} />
+      <EventIdField eventId={eventId} />
       <input type="hidden" name="arrangementId" value={arrangementId} />
       <Button
         type="submit"
@@ -702,12 +794,14 @@ function ArrangementDeleteButton({
 
 function SaveArrangementForm({
   songId,
+  eventId,
   arrangementId,
   draft,
   dirty,
   onSaved,
 }: {
   songId: string;
+  eventId?: string;
   arrangementId: string;
   draft: DraftItem[];
   dirty: boolean;
@@ -725,12 +819,14 @@ function SaveArrangementForm({
     draft.map((item) => ({
       sectionId: item.sectionId,
       labelOverride: item.labelOverride.trim() || null,
+      modulationSemitones: item.modulationSemitones,
     })),
   );
 
   return (
     <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="songId" value={songId} />
+      <EventIdField eventId={eventId} />
       <input type="hidden" name="arrangementId" value={arrangementId} />
       <input type="hidden" name="items" value={items} />
       <div className="flex flex-wrap items-center gap-2">
@@ -760,10 +856,12 @@ function SaveArrangementForm({
 
 function SectionDeleteButton({
   songId,
+  eventId,
   sectionId,
   label,
 }: {
   songId: string;
+  eventId?: string;
   sectionId: string;
   label: string;
 }) {
@@ -782,6 +880,7 @@ function SectionDeleteButton({
       className="flex flex-wrap items-center gap-2"
     >
       <input type="hidden" name="songId" value={songId} />
+      <EventIdField eventId={eventId} />
       <input type="hidden" name="sectionId" value={sectionId} />
       <Button type="submit" variant="danger" size="sm" disabled={pending}>
         {pending ? "…" : "Hapus"}
@@ -793,7 +892,13 @@ function SectionDeleteButton({
   );
 }
 
-function ImportLegacyForm({ songId }: { songId: string }) {
+function ImportLegacyForm({
+  songId,
+  eventId,
+}: {
+  songId: string;
+  eventId?: string;
+}) {
   const [state, formAction, pending] = useActionState(
     importLegacyChartAction,
     { ok: false },
@@ -801,6 +906,7 @@ function ImportLegacyForm({ songId }: { songId: string }) {
   return (
     <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="songId" value={songId} />
+      <EventIdField eventId={eventId} />
       <label htmlFor="import-name" className="text-sm font-medium">
         Nama aransemen hasil import (opsional)
       </label>

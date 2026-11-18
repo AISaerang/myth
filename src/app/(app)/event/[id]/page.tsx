@@ -6,6 +6,7 @@ import Link from "next/link";
 import { requireFreshUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canManageEvent, canManageMembers, canWriteEventData, isAdmin } from "@/lib/permissions";
+import { toJakartaDateInput } from "@/lib/datetime-local";
 import { formatJakarta } from "@/lib/format";
 import { getAccessibleEvent, getEventRole } from "@server/services/event-access";
 import { EventAccessControl } from "./EventAccessControl";
@@ -19,7 +20,7 @@ function toFormDefaults(
     name: event.name,
     description: event.description,
     eventDate: event.eventDate
-      ? event.eventDate.toISOString().slice(0, 10)
+      ? toJakartaDateInput(event.eventDate)
       : undefined,
     startTime: event.startTime,
     endTime: event.endTime,
@@ -65,7 +66,12 @@ async function EventDetailContent({
         picContact={isAdmin(user) ? event.committeePicContact : null}
       />
       {canEdit ? (
-        <EventForm mode="edit" eventId={event.id} defaults={toFormDefaults(event)} />
+        <EventForm
+          key={event.id}
+          mode="edit"
+          eventId={event.id}
+          defaults={toFormDefaults(event)}
+        />
       ) : null}
       {canManageMembers(role) ? (
         <Link href={`/event/${event.id}/members`} className="text-sm font-medium underline">

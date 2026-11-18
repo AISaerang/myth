@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { eventSongDisplayKey } from "@/lib/event-song";
+import { uiModeForEvent } from "@/lib/ui-mode";
 import {
+  canEditEventSong,
   canManageAccounts,
   canManageEvent,
   canManageMembers,
   canAccessEvent,
   canReadDrafts,
   canWriteEventData,
+  decideSongEdit,
   canReadEventSong,
+  canModifySongNote,
   canSuggest,
   canUpdateProgress,
   canViewAllProgress,
+  canWriteSongNotes,
   isAdmin,
   isObserver,
   roleLabel,
@@ -181,9 +186,116 @@ describe("permissions", () => {
     expect(canViewAllProgress(user)).toBe(false);
   });
 
+  it("lets an event admin edit songs in an open event, and nobody else", () => {
+    expect(canEditEventSong("EVENT_ADMIN", false, false)).toBe(true);
+    expect(canEditEventSong("EVENT_ADMIN", true, false)).toBe(false);
+    expect(canEditEventSong("MEMBER", false, false)).toBe(false);
+    expect(canEditEventSong("OBSERVER", false, false)).toBe(false);
+    expect(canEditEventSong(null, false, false)).toBe(false);
+    expect(canEditEventSong(null, true, true)).toBe(true);
+    expect(canEditEventSong("EVENT_ADMIN", true, true)).toBe(true);
+  });
+
+  it("scopes shared-library song edits to the event in context", () => {
+    const openEventAdmin = {
+      globalAdmin: false,
+      eventRole: "EVENT_ADMIN" as const,
+      accessClosed: false,
+      eventId: "gehc",
+      songLinkedToEvent: true,
+    };
+    expect(decideSongEdit(openEventAdmin)).toEqual({ ok: true, scope: "event" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, eventId: "regional", songLinkedToEvent: false }),
+    ).toEqual({ ok: false, reason: "not-in-event" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, eventRole: "MEMBER" }),
+    ).toEqual({ ok: false, reason: "forbidden" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, eventRole: "OBSERVER" }),
+    ).toEqual({ ok: false, reason: "forbidden" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, eventRole: null }),
+    ).toEqual({ ok: false, reason: "forbidden" });
+    expect(
+      decideSongEdit({ ...openEventAdmin, accessClosed: true }),
+    ).toEqual({ ok: false, reason: "forbidden" });
+    expect(
+      decideSongEdit({
+        ...openEventAdmin,
+        globalAdmin: true,
+        eventRole: null,
+        accessClosed: true,
+      }),
+    ).toEqual({ ok: true, scope: "event" });
+    expect(
+      decideSongEdit({
+        globalAdmin: true,
+        eventRole: null,
+        accessClosed: false,
+        eventId: null,
+        songLinkedToEvent: false,
+      }),
+    ).toEqual({ ok: true, scope: "library" });
+    expect(
+      decideSongEdit({
+        globalAdmin: false,
+        eventRole: "EVENT_ADMIN",
+        accessClosed: false,
+        eventId: null,
+        songLinkedToEvent: true,
+      }),
+    ).toEqual({ ok: false, reason: "forbidden" });
+  });
+
+  it("keeps Edit|Preview from changing canWriteEventData", () => {
+    expect(uiModeForEvent("event-a", "event-a")).toBe("preview");
+    expect(uiModeForEvent(undefined, "event-a")).toBe("edit");
+    const openEventAdmin = canWriteEventData("EVENT_ADMIN", false, false);
+    const closedEventAdmin = canWriteEventData("EVENT_ADMIN", true, false);
+    const member = canWriteEventData("MEMBER", false, false);
+    expect(openEventAdmin).toBe(true);
+    expect(closedEventAdmin).toBe(false);
+    expect(member).toBe(false);
+  });
+
   it("lets USER and OBSERVER suggest, ADMIN uses the full task flow", () => {
     expect(canSuggest(user)).toBe(true);
     expect(canSuggest(observer)).toBe(true);
     expect(canSuggest(admin)).toBe(false);
+  });
+
+  describe("song part notes", () => {
+    it("lets members write on published songs only", () => {
+      expect(canWriteSongNotes(user, "MEMBER", false, true)).toBe(true);
+      expect(canWriteSongNotes(user, "MEMBER", false, false)).toBe(false);
+      expect(canWriteSongNotes(user, null, false, true)).toBe(false);
+    });
+
+    it("lets event admins write drafts, but not when access is closed", () => {
+      expect(canWriteSongNotes(user, "EVENT_ADMIN", false, false)).toBe(true);
+      expect(canWriteSongNotes(user, "EVENT_ADMIN", true, true)).toBe(false);
+    });
+
+    it("keeps OBSERVER read-only even on published songs", () => {
+      expect(canWriteSongNotes(observer, "OBSERVER", false, true)).toBe(false);
+      expect(canWriteSongNotes(user, "OBSERVER", false, true)).toBe(false);
+    });
+
+    it("lets global admin write even when event access is closed", () => {
+      expect(canWriteSongNotes(admin, "EVENT_ADMIN", true, false)).toBe(true);
+    });
+
+    it("lets authors and admins modify a note, but not other members", () => {
+      expect(canModifySongNote(user, "user-1")).toBe(true);
+      expect(canModifySongNote(user, "user-2")).toBe(false);
+      expect(canModifySongNote(admin, "user-2")).toBe(true);
+      expect(canModifySongNote(observer, "obs-1")).toBe(false);
+    });
+
+    it("lets event admins moderate notes within their event", () => {
+      expect(canModifySongNote(user, "user-2", "EVENT_ADMIN")).toBe(true);
+      expect(canModifySongNote(user, "user-2", "MEMBER")).toBe(false);
+    });
   });
 });

@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { requireFreshUser } from "@/lib/auth";
 import type { ChartSectionKind } from "@/lib/chart-arrangement";
 import { prisma } from "@/lib/db";
-import { isAdmin } from "@/lib/permissions";
+import { canManageEvent, decideSongEdit, isAdmin } from "@/lib/permissions";
+import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
+import { getEventRole } from "@server/services/event-access";
 import { listChordCharts } from "@server/services/chord-service";
+import { getInstrumentChart } from "@server/services/instrument-chart-service";
 import {
   listChartArrangements,
   listChartSections,
@@ -14,6 +18,7 @@ import {
   type EditorArrangement,
   type EditorSection,
 } from "./ChartArrangementEditor";
+import { InstrumentChartEditor } from "./InstrumentChartEditor";
 
 export default async function ChartEditorPage({
   params,
@@ -23,7 +28,6 @@ export default async function ChartEditorPage({
   searchParams: Promise<{ arrangement?: string; eventId?: string }>;
 }) {
   const user = await requireFreshUser();
-  if (!isAdmin(user)) notFound();
 
   const { id } = await params;
   const {
@@ -36,10 +40,46 @@ export default async function ChartEditorPage({
   });
   if (!song) notFound();
 
-  const [sections, arrangements, charts] = await Promise.all([
+  const scopedEventId = eventId?.trim() || null;
+  const [eventSong, event, eventRole, sharedEventCount] = await Promise.all([
+    scopedEventId
+      ? prisma.eventSong.findUnique({
+          where: { eventId_songId: { eventId: scopedEventId, songId: id } },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    scopedEventId
+      ? prisma.event.findUnique({
+          where: { id: scopedEventId },
+          select: { accessClosedAt: true },
+        })
+      : Promise.resolve(null),
+    scopedEventId ? getEventRole(user, scopedEventId) : Promise.resolve(null),
+    prisma.eventSong.count({ where: { songId: id } }),
+  ]);
+  const decision = decideSongEdit({
+    globalAdmin: isAdmin(user),
+    eventRole,
+    accessClosed: Boolean(event?.accessClosedAt),
+    eventId: scopedEventId,
+    songLinkedToEvent: Boolean(eventSong && event),
+  });
+  if (!decision.ok) notFound();
+  const previewing =
+    Boolean(scopedEventId) &&
+    uiModeForEvent(
+      (await cookies()).get(UI_MODE_COOKIE)?.value,
+      scopedEventId ?? "",
+    ) === "preview" &&
+    (isAdmin(user) || canManageEvent(eventRole));
+  if (previewing) notFound();
+  const editorEventId = decision.scope === "event" ? scopedEventId ?? undefined : undefined;
+
+  const [sections, arrangements, charts, instrumentChart] = await Promise.all([
     listChartSections(id),
     listChartArrangements(id),
     listChordCharts(id),
+    getInstrumentChart(id),
   ]);
 
   const toSection = (section: {
@@ -66,6 +106,7 @@ export default async function ChartEditorPage({
         id: item.id,
         sectionId: item.sectionId,
         labelOverride: item.labelOverride,
+        modulationSemitones: item.modulationSemitones,
         section: toSection(item.section),
       })),
     }),
@@ -91,10 +132,17 @@ export default async function ChartEditorPage({
         <p className="text-sm text-zinc-500">
           Susun master bagian lagu, lalu buat aransemen dari bagian-bagian itu.
         </p>
+        {sharedEventCount > 1 ? (
+          <p className="mt-2 text-sm text-amber-800 dark:text-amber-300">
+            Lagu ini dipakai di {sharedEventCount} event. Perubahan chord,
+            bagian, dan aransemen ikut ke semua event tersebut.
+          </p>
+        ) : null}
       </div>
 
       <ChartArrangementEditor
         songId={song.id}
+        eventId={editorEventId}
         sections={sectionViews}
         arrangements={arrangementViews}
         initialArrangementId={requestedArrangementId}
@@ -103,6 +151,17 @@ export default async function ChartEditorPage({
             ? { label: activeLegacy.label ?? activeLegacy.originalKey }
             : null
         }
+      />
+      <InstrumentChartEditor
+        songId={song.id}
+        eventId={editorEventId}
+        sections={sectionViews.map((section) => ({
+          id: section.id,
+          label: section.label,
+          content: section.content,
+        }))}
+        initialCapo={instrumentChart.capo}
+        initialData={instrumentChart.data}
       />
     </div>
   );

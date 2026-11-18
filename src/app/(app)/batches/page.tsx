@@ -97,15 +97,15 @@ export default async function BatchesPage({
             }
           />
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visible.map((b) => (
               <li
                 key={b.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
               >
                 <Link
                   href={`/batches/${b.id}`}
-                  className="font-medium underline"
+                  className="min-w-0 flex-1 break-words font-medium underline"
                 >
                   {b.name}
                   <span className="block text-xs font-normal text-zinc-500 no-underline">
@@ -115,7 +115,7 @@ export default async function BatchesPage({
                     lagu
                   </span>
                 </Link>
-                <span className="flex items-center gap-2">
+                <span className="flex shrink-0 items-center gap-2">
                   <BatchStatusBadge status={b.status} />
                   {!observer && b.items.length === 0 ? (
                     <DeleteBatchButton batchId={b.id} batchName={b.name} />

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
+import { normalizeNotationInput } from "@/lib/jianpu";
 import {
   chordProToOverUnder,
   expandTabs,
@@ -22,6 +24,7 @@ export function ChordOverUnderEditor({
   rows = 14,
   heading,
   hint,
+  placeholder,
   onChange,
 }: {
   id: string;
@@ -30,6 +33,7 @@ export function ChordOverUnderEditor({
   rows?: number;
   heading: string;
   hint?: string;
+  placeholder?: string;
   onChange?: (chordPro: string) => void;
 }) {
   const [mode, setMode] = useState<EditMode>("stacked");
@@ -38,8 +42,14 @@ export function ChordOverUnderEditor({
   );
   const [source, setSource] = useState<string>(defaultValue);
 
+  // Satu sumber kebenaran untuk preview dan submit. Input (hasil paste dari
+  // WA/Word, sering punya NBSP/titik unicode) dan output sama-sama
+  // dinormalkan, khusus baris yang kelihatan not angka.
   const chordProValue = useMemo(
-    () => (mode === "stacked" ? overUnderToChordPro(stacked) : source),
+    () =>
+      mode === "stacked"
+        ? normalizeNotationInput(overUnderToChordPro(normalizeNotationInput(stacked)))
+        : normalizeNotationInput(source),
     [mode, stacked, source],
   );
 
@@ -122,7 +132,7 @@ export function ChordOverUnderEditor({
           rows={rows}
           onChange={(event) => setStacked(expandTabs(event.target.value))}
           onKeyDown={handleTab}
-          placeholder={"G        D/F#\nBapa sentuh hati-ku"}
+          placeholder={placeholder ?? "G        D/F#\nBapa sentuh hati-ku"}
           className={`${textareaClass} overflow-x-auto`}
         />
       ) : (
@@ -141,6 +151,7 @@ export function ChordOverUnderEditor({
         {" "}
         Tempel dari internet boleh dalam format ini maupun ChordPro.
       </p>
+      <NotationSymbolGuide />
       <input type="hidden" name={name} value={chordProValue} />
     </div>
   );

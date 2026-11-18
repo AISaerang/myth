@@ -143,7 +143,13 @@ export function UnassignButton({
   );
 }
 
-export function VersionForm({ songId }: { songId: string }) {
+export function VersionForm({
+  songId,
+  eventId,
+}: {
+  songId: string;
+  eventId?: string;
+}) {
   const [state, formAction, pending] = useActionState(createVersionAction, {
     ok: false,
   });
@@ -155,6 +161,7 @@ export function VersionForm({ songId }: { songId: string }) {
     <div className="flex flex-col gap-2">
       <form ref={formRef} action={formAction} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <input type="hidden" name="songId" value={songId} />
+        {eventId ? <input type="hidden" name="eventId" value={eventId} /> : null}
         <input
           name="versionLabel"
           aria-label="Label versi"
@@ -215,12 +222,14 @@ export function VersionForm({ songId }: { songId: string }) {
 
 export function VersionActions({
   songId,
+  eventId,
   eventSongId,
   versionId,
   isActive,
   isLocked,
 }: {
   songId: string;
+  eventId?: string;
   eventSongId: string;
   versionId: string;
   isActive: boolean;
@@ -238,6 +247,7 @@ export function VersionActions({
         <form action={actAction}>
           <input type="hidden" name="versionId" value={versionId} />
           <input type="hidden" name="songId" value={songId} />
+          {eventId ? <input type="hidden" name="eventId" value={eventId} /> : null}
           <Button type="submit" variant="secondary" size="sm" disabled={actPending}>
             Aktifkan
           </Button>
@@ -280,9 +290,11 @@ const CATEGORIES = Object.entries(MATERIAL_CATEGORY_LABEL);
 
 export function MaterialForm({
   songId,
+  eventId,
   versions,
 }: {
   songId: string;
+  eventId: string;
   versions: { id: string; versionLabel: string }[];
 }) {
   const [state, formAction, pending] = useActionState(addMaterialAction, {
@@ -296,6 +308,7 @@ export function MaterialForm({
     <div className="flex flex-col gap-2">
       <form ref={formRef} action={formAction} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <input
           name="title"
           aria-label="Judul materi"
@@ -355,10 +368,12 @@ export function MaterialForm({
 
 export function MaterialActions({
   songId,
+  eventId,
   materialId,
   isActive,
 }: {
   songId: string;
+  eventId: string;
   materialId: string;
   isActive: boolean;
 }) {
@@ -374,6 +389,7 @@ export function MaterialActions({
       <form action={toggleAction}>
         <input type="hidden" name="materialId" value={materialId} />
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <input type="hidden" name="isActive" value={String(!isActive)} />
         <Button type="submit" variant="secondary" size="sm" disabled={togglePending}>
           {isActive ? "Nonaktifkan" : "Aktifkan"}
@@ -382,6 +398,7 @@ export function MaterialActions({
       <form action={delAction}>
         <input type="hidden" name="materialId" value={materialId} />
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <Button type="submit" variant="danger" size="sm" disabled={delPending}>
           Hapus
         </Button>

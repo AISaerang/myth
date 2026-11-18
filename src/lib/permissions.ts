@@ -20,6 +20,53 @@ export function canWriteEventData(
   return globalAdmin || (canManageEvent(role) && !accessClosed);
 }
 
+// Edit lagu di satu event (chord, bagian chart, aransemen, metadata,
+// materi event, publikasi). Sama dengan canWriteEventData: global ADMIN,
+// atau EVENT_ADMIN saat akses event masih terbuka. MEMBER dan OBSERVER
+// tidak. Event lain ditolak di server lewat eventId + baris EventSong.
+export function canEditEventSong(
+  role: EventRole | null,
+  accessClosed: boolean,
+  globalAdmin: boolean,
+): boolean {
+  return canWriteEventData(role, accessClosed, globalAdmin);
+}
+
+export type SongEditDecision =
+  | { ok: true; scope: "event" | "library" }
+  | { ok: false; reason: "forbidden" | "not-in-event" };
+
+// Aturan lagu bersama (Pustaka):
+// - eventId wajib untuk EVENT_ADMIN. Lagu harus terhubung ke event itu.
+//   EVENT_ADMIN event lain, MEMBER, dan OBSERVER ditolak. Event tertutup
+//   menolak EVENT_ADMIN (global ADMIN tetap boleh).
+// - Tanpa eventId hanya global ADMIN (halaman Pustaka Lagu).
+// - Bila lagu dipakai banyak event, edit dari event yang dikelola tetap
+//   diizinkan. Chord, bagian, aransemen, dan metadata Song (judul, nada
+//   dasar, referensi) adalah satu record pustaka, jadi berubah di setiap
+//   event yang memakai lagu itu. Isolasi per event tetap di EventSong
+//   (eventKey, catatan, publish, kunci, materi ber-eventId, penugasan).
+export function decideSongEdit(input: {
+  globalAdmin: boolean;
+  eventRole: EventRole | null;
+  accessClosed: boolean;
+  eventId: string | null;
+  songLinkedToEvent: boolean;
+}): SongEditDecision {
+  if (!input.eventId) {
+    return input.globalAdmin
+      ? { ok: true, scope: "library" }
+      : { ok: false, reason: "forbidden" };
+  }
+  if (!input.songLinkedToEvent) {
+    return { ok: false, reason: "not-in-event" };
+  }
+  if (!canEditEventSong(input.eventRole, input.accessClosed, input.globalAdmin)) {
+    return { ok: false, reason: "forbidden" };
+  }
+  return { ok: true, scope: "event" };
+}
+
 export function canReadDrafts(role: EventRole | null): boolean {
   return role === "EVENT_ADMIN";
 }
@@ -108,4 +155,39 @@ export function canUpdateProgress(
 ): boolean {
   if (actor.role === "OBSERVER") return false;
   return actor.id === targetUserId || actor.role === "ADMIN";
+}
+
+// Catatan part (mirip komentar Word) pada lagu di satu event.
+// OBSERVER hanya membaca; MEMBER boleh menulis di lagu Publish;
+// EVENT_ADMIN juga boleh di draft; ADMIN selalu boleh (termasuk event
+// yang aksesnya sudah ditutup). Akses event tetap dicek di action.
+export function canWriteSongNotes(
+  actor: SessionUser,
+  eventRole: EventRole | null,
+  accessClosed: boolean,
+  isPublished: boolean,
+): boolean {
+  if (isObserver(actor) || eventRole === "OBSERVER") return false;
+  if (isAdmin(actor)) return true;
+  if (!eventRole || accessClosed) return false;
+  return isPublished || canReadDrafts(eventRole);
+}
+
+export function canManageSongNotes(
+  actor: SessionUser,
+  eventRole: EventRole | null,
+): boolean {
+  if (isObserver(actor) || eventRole === "OBSERVER") return false;
+  return isAdmin(actor) || canManageEvent(eventRole);
+}
+
+// Pemilik catatan boleh mengubah/menandai selesai; ADMIN memoderasi
+// semua catatan (hapus selalu diaudit).
+export function canModifySongNote(
+  actor: SessionUser,
+  authorUserId: string,
+  eventRole: EventRole | null = null,
+): boolean {
+  if (isObserver(actor) || eventRole === "OBSERVER") return false;
+  return canManageSongNotes(actor, eventRole) || actor.id === authorUserId;
 }

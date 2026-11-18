@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireActionAdmin } from "@/lib/auth";
+import { requireActionUser } from "@/lib/auth";
+import type { SessionUser } from "@/lib/permissions";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
   chartArrangementActivateSchema,
@@ -27,6 +28,11 @@ import {
   updateChartSection,
 } from "@server/services/chart-arrangement-service";
 import type { ActionState } from "./auth";
+import {
+  optionalEventId,
+  requireSongContentEditor,
+  type SongContentChild,
+} from "./event-authorization";
 
 function revalidateSong(songId: string): void {
   revalidatePath("/songs");
@@ -34,11 +40,32 @@ function revalidateSong(songId: string): void {
   revalidatePath(`/songs/${songId}/chart`);
 }
 
+function chartEditorPath(
+  songId: string,
+  arrangementId: string,
+  eventId: string | null,
+): string {
+  const params = new URLSearchParams({ arrangement: arrangementId });
+  if (eventId) params.set("eventId", eventId);
+  return `/songs/${songId}/chart?${params.toString()}`;
+}
+
+async function authorizeChartEdit(
+  formData: FormData,
+  songId: string,
+  child?: SongContentChild,
+): Promise<{ user: SessionUser; eventId: string | null }> {
+  const user = await requireActionUser();
+  const eventId = optionalEventId(formData.get("eventId"));
+  await requireSongContentEditor(user, songId, eventId, child);
+  return { user, eventId };
+}
+
 export async function createChartSectionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  await requireActionUser();
   const parsed = chartSectionCreateSchema.safeParse({
     songId: formData.get("songId"),
     type: formData.get("type"),
@@ -48,7 +75,8 @@ export async function createChartSectionAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await createChartSection(admin.id, parsed.data);
+  const { user } = await authorizeChartEdit(formData, parsed.data.songId);
+  const result = await createChartSection(user.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSong(parsed.data.songId);
   return { ok: true };
@@ -58,7 +86,7 @@ export async function updateChartSectionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  await requireActionUser();
   const parsed = chartSectionUpdateSchema.safeParse({
     songId: formData.get("songId"),
     sectionId: formData.get("sectionId"),
@@ -69,7 +97,11 @@ export async function updateChartSectionAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await updateChartSection(admin.id, parsed.data);
+  const { user } = await authorizeChartEdit(formData, parsed.data.songId, {
+    kind: "chartSection",
+    id: parsed.data.sectionId,
+  });
+  const result = await updateChartSection(user.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSong(parsed.data.songId);
   return { ok: true };
@@ -79,7 +111,7 @@ export async function deleteChartSectionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  await requireActionUser();
   const parsed = chartSectionDeleteSchema.safeParse({
     songId: formData.get("songId"),
     sectionId: formData.get("sectionId"),
@@ -87,8 +119,12 @@ export async function deleteChartSectionAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  const { user } = await authorizeChartEdit(formData, parsed.data.songId, {
+    kind: "chartSection",
+    id: parsed.data.sectionId,
+  });
   const result = await deleteChartSection(
-    admin.id,
+    user.id,
     parsed.data.songId,
     parsed.data.sectionId,
   );
@@ -101,7 +137,7 @@ export async function createChartArrangementAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  await requireActionUser();
   const parsed = chartArrangementCreateSchema.safeParse({
     songId: formData.get("songId"),
     name: formData.get("name"),
@@ -109,17 +145,18 @@ export async function createChartArrangementAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await createChartArrangement(admin.id, parsed.data);
+  const { user, eventId } = await authorizeChartEdit(formData, parsed.data.songId);
+  const result = await createChartArrangement(user.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSong(parsed.data.songId);
-  redirect(`/songs/${parsed.data.songId}/chart?arrangement=${result.id}`);
+  redirect(chartEditorPath(parsed.data.songId, result.id, eventId));
 }
 
 export async function updateChartArrangementAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  await requireActionUser();
   const parsed = chartArrangementUpdateSchema.safeParse({
     songId: formData.get("songId"),
     arrangementId: formData.get("arrangementId"),
@@ -128,7 +165,11 @@ export async function updateChartArrangementAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await updateChartArrangement(admin.id, parsed.data);
+  const { user } = await authorizeChartEdit(formData, parsed.data.songId, {
+    kind: "chartArrangement",
+    id: parsed.data.arrangementId,
+  });
+  const result = await updateChartArrangement(user.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSong(parsed.data.songId);
   return { ok: true };
@@ -138,7 +179,7 @@ export async function deleteChartArrangementAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  await requireActionUser();
   const parsed = chartArrangementDeleteSchema.safeParse({
     songId: formData.get("songId"),
     arrangementId: formData.get("arrangementId"),
@@ -146,8 +187,12 @@ export async function deleteChartArrangementAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  const { user } = await authorizeChartEdit(formData, parsed.data.songId, {
+    kind: "chartArrangement",
+    id: parsed.data.arrangementId,
+  });
   const result = await deleteChartArrangement(
-    admin.id,
+    user.id,
     parsed.data.songId,
     parsed.data.arrangementId,
   );
@@ -160,7 +205,7 @@ export async function activateChartArrangementAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  await requireActionUser();
   const parsed = chartArrangementActivateSchema.safeParse({
     songId: formData.get("songId"),
     arrangementId: formData.get("arrangementId"),
@@ -168,8 +213,12 @@ export async function activateChartArrangementAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  const { user } = await authorizeChartEdit(formData, parsed.data.songId, {
+    kind: "chartArrangement",
+    id: parsed.data.arrangementId,
+  });
   const result = await activateChartArrangement(
-    admin.id,
+    user.id,
     parsed.data.songId,
     parsed.data.arrangementId,
   );
@@ -182,7 +231,7 @@ export async function saveChartArrangementItemsAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  await requireActionUser();
   let items: unknown;
   try {
     items = JSON.parse(String(formData.get("items") ?? "[]"));
@@ -197,7 +246,11 @@ export async function saveChartArrangementItemsAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await saveChartArrangementItems(admin.id, parsed.data);
+  const { user } = await authorizeChartEdit(formData, parsed.data.songId, {
+    kind: "chartArrangement",
+    id: parsed.data.arrangementId,
+  });
+  const result = await saveChartArrangementItems(user.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSong(parsed.data.songId);
   return { ok: true };
@@ -207,7 +260,7 @@ export async function importLegacyChartAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  await requireActionUser();
   const parsed = legacyChartImportSchema.safeParse({
     songId: formData.get("songId"),
     name: formData.get("name") || undefined,
@@ -215,12 +268,13 @@ export async function importLegacyChartAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
+  const { user, eventId } = await authorizeChartEdit(formData, parsed.data.songId);
   const result = await importLegacyChart(
-    admin.id,
+    user.id,
     parsed.data.songId,
     parsed.data.name,
   );
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSong(parsed.data.songId);
-  redirect(`/songs/${parsed.data.songId}/chart?arrangement=${result.id}`);
+  redirect(chartEditorPath(parsed.data.songId, result.id, eventId));
 }

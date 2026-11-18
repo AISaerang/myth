@@ -162,6 +162,7 @@ model InstrumentSkill {
 
   people PersonSkill[]
   assignments SongAssignment[]
+  targetedNotes SongNote[] @relation("SongNoteTargetSkill")
 }
 
 model PersonSkill {
@@ -277,10 +278,19 @@ model Song {
   isFinalLocked            Boolean            @default(false)
   activeArrangementVersionId String?
   activeVersion            ArrangementVersion? @relation("SongActiveVersion", fields: [activeArrangementVersionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  // Kolom intro lama. UI tidak lagi mengeditnya: intro hidup sebagai
+  // ChartSection bertipe INTRO. Jangan di-drop; skrip
+  // scripts/migrate-intro-sections.ts menyalin isi ke bagian chart.
+  introChords         String?   // kunci intro, cth. "C F"
+  introNotation       String?   @db.Text  // not angka, cth. "6, 5, 1 2 3"
+  introNote           String?   @db.Text  // catatan bebas tentang intro
+  // Soft archive: null = aktif. Diisi waktu dan aktor saat diarsipkan.
+  archivedAt          DateTime?
+  archivedById        String?
   // Plain user id (no FK): preserves history even if accounts change.
-  createdById              String
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
+  createdById         String
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   versions    ArrangementVersion[] @relation("SongVersions")
   materials   SongMaterial[]
@@ -293,7 +303,9 @@ model Song {
   chordCharts ChordChart[]
   chartSections ChartSection[]
   chartArrangements ChartArrangement[]
+  instrumentChart SongInstrumentChart?
   eventSongs  EventSong[]
+  notes       SongNote[]
 
   @@index([eventId, status])
   @@index([eventId, isPublished])
@@ -325,6 +337,7 @@ model EventSong {
   progress    PracticeProgress[]
   batchItems  SongBatchItem[]
   rehearsalItems RehearsalSong[]
+  partNotes   SongNote[]
 
   @@unique([eventId, songId])
   @@index([eventId, sortOrder])
@@ -360,8 +373,33 @@ model SongBatchItem {
   // transisi (nilai lama di-backfill oleh migrasi song_library).
   eventSongId String?
   eventSong   EventSong? @relation(fields: [eventSongId], references: [id], onDelete: SetNull)
+  // Koridor medley di dalam batch ini (docs/08). Lagu dengan
+  // medleyGroupId sama, diurut sortOrder, adalah satu koridor.
+  // Bukan EventSong.sortOrder: badge pemusik tetap peringkat item batch.
+  medleyGroupId String? @db.VarChar(64)
+  medleyLabel   String? @db.VarChar(80)
+  transitionsFrom MedleyTransition[] @relation("MedleyTransitionFrom")
+  transitionsTo   MedleyTransition[] @relation("MedleyTransitionTo")
 
   @@id([songBatchId, songId])
+  @@index([medleyGroupId])
+}
+
+model MedleyTransition {
+  id          String        @id @default(cuid())
+  songBatchId String
+  fromSongId  String        @db.VarChar(191)
+  toSongId    String        @db.VarChar(191)
+  batchItem   SongBatchItem @relation("MedleyTransitionFrom", fields: [songBatchId, fromSongId], references: [songBatchId, songId], onDelete: Cascade)
+  toBatchItem SongBatchItem @relation("MedleyTransitionTo", fields: [songBatchId, toSongId], references: [songBatchId, songId], onDelete: Cascade)
+  content     String        @db.Text
+  notes       String?       @db.Text
+  createdById String        @db.VarChar(191)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([songBatchId, fromSongId])
+  @@index([songBatchId, toSongId])
 }
 
 model SongAssignment {
@@ -487,6 +525,7 @@ model ChartSection {
   updatedAt   DateTime         @updatedAt
 
   items ChartArrangementItem[]
+  notes SongNote[]
 
   @@unique([songId, label])
   @@index([songId, sortOrder])
@@ -518,10 +557,72 @@ model ChartArrangementItem {
   section       ChartSection    @relation(fields: [sectionId], references: [id], onDelete: Restrict)
   sortOrder     Int
   labelOverride String?
+  // Change applied after this section; subsequent items render in the new key.
+  modulationSemitones Int @default(0)
   createdAt     DateTime         @default(now())
 
   @@unique([arrangementId, sortOrder])
   @@index([arrangementId, sortOrder])
+}
+
+model SongInstrumentChart {
+  id          String   @id @default(cuid())
+  songId      String   @unique
+  song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  capo        Int      @default(0)
+  data        Json
+  updatedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Catatan per pemusik (POV part) pada satu lagu di satu event, mirip
+// komentar Microsoft Word: menempel ke bagian chart, punya balasan,
+// dan bisa ditandai selesai. eventSongId yang menentukan isolasi POV
+// per event; songId disimpan agar query/riwayat lagu tetap mudah.
+enum NoteStatus {
+  OPEN
+  RESOLVED
+}
+
+model SongNote {
+  id        String    @id @default(cuid())
+  eventSongId String
+  eventSong EventSong @relation(fields: [eventSongId], references: [id], onDelete: Cascade)
+  songId    String
+  song      Song      @relation(fields: [songId], references: [id], onDelete: Cascade)
+  // Jangkar bagian master lagu. Null = catatan level lagu. sectionLabel
+  // disimpan sebagai snapshot agar catatan tetap terbaca bila bagian dihapus.
+  sectionId String?
+  section   ChartSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  sectionLabel String?
+  // Balasan satu tingkat. Menghapus induk menghapus seluruh balasan.
+  parentId String?
+  parent   SongNote?  @relation("SongNoteReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  SongNote[] @relation("SongNoteReplies")
+  // Plain user id (no FK) + snapshot nama: histori tetap utuh saat akun berubah.
+  authorUserId String
+  authorName   String
+  // Part/instrumen dari POV penulis, cth. "Drum", "Keyboard", "Gitar".
+  partLabel String?  @db.VarChar(80)
+  // Null = berlaku untuk semua personel; terisi = khusus skill pada
+  // assignment lagu-event ini. Restrict mencegah penghapusan skill
+  // mengubah catatan target menjadi catatan umum.
+  targetInstrumentSkillId String?
+  targetInstrumentSkill InstrumentSkill? @relation("SongNoteTargetSkill", fields: [targetInstrumentSkillId], references: [id], onDelete: Restrict)
+  body      String   @db.Text
+  status    NoteStatus @default(OPEN)
+  resolvedAt DateTime?
+  resolvedByUserId String?
+  editedAt  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventSongId, status, createdAt])
+  @@index([songId, status])
+  @@index([sectionId])
+  @@index([parentId])
+  @@index([eventSongId, targetInstrumentSkillId])
 }
 
 enum PracticeStatus {

@@ -63,7 +63,7 @@ describe("event validation", () => {
     });
     expect(parsed.success).toBe(true);
     if (parsed.success) {
-      expect(parsed.data.eventDate).toBeInstanceOf(Date);
+      expect(parsed.data.eventDate?.toISOString()).toBe("2026-11-21T17:00:00.000Z");
       expect(parsed.data.targetDurationMinutes).toBe(180);
     }
   });

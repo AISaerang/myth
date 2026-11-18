@@ -2,6 +2,8 @@
 // Konten tiap bagian tetap ChordPro inline basis C; aransemen hanya mengatur
 // urutan dan repeat bagian saat ditampilkan.
 
+import { contentIsNotationSection } from "@/lib/jianpu-align";
+
 export const CHART_SECTION_TYPES = [
   "INTRO",
   "VERSE",
@@ -94,7 +96,28 @@ export interface ComposeItem {
   section: {
     label: string;
     content: string;
+    type?: string | null;
   };
+}
+
+const GENERIC_SECTION_LABEL = /^bagian(?:\s+\d+)?$/i;
+
+export function isGenericSectionLabel(label: string): boolean {
+  return GENERIC_SECTION_LABEL.test(label.trim());
+}
+
+// Label "Bagian n" adalah fallback parseLegacyChart untuk chart tanpa heading.
+// Bagian intro (tipe INTRO, atau isinya hanya not angka) harus tampil sebagai Intro.
+export function displaySectionLabel(
+  label: string,
+  options?: { type?: string | null; content?: string | null },
+): string {
+  const trimmed = label.trim();
+  if (/^intro$/i.test(trimmed)) return "Intro";
+  if (!isGenericSectionLabel(trimmed)) return trimmed;
+  if (options?.type === "INTRO") return "Intro";
+  if (options?.content && contentIsNotationSection(options.content)) return "Intro";
+  return trimmed;
 }
 
 const TYPE_PATTERNS: { pattern: RegExp; type: ChartSectionKind }[] = [
@@ -140,10 +163,14 @@ export function parseLegacyChart(content: string): ParsedChartSection[] {
     const body = currentLines.join("\n").trim();
     currentLines = [];
     if (!body) return;
-    const label = currentLabel?.trim() || `Bagian ${++unlabeled}`;
+    const written = currentLabel?.trim() || "";
+    // Chart lama sering menaruh intro not angka di atas tanpa {Intro}.
+    // Fallback "Bagian n" membuat heading tampil BAGIAN 1 (CSS uppercase).
+    const notationIntro = !written && contentIsNotationSection(body);
+    const label = written || (notationIntro ? "Intro" : `Bagian ${++unlabeled}`);
     sections.push({
       label,
-      type: inferSectionType(label),
+      type: notationIntro ? "INTRO" : inferSectionType(label),
       content: body,
     });
   };
@@ -167,7 +194,11 @@ export function parseLegacyChart(content: string): ParsedChartSection[] {
 export function composeArrangementContent(items: ComposeItem[]): string {
   return items
     .map((item) => {
-      const label = (item.labelOverride?.trim() || item.section.label).trim();
+      const stored = (item.labelOverride?.trim() || item.section.label).trim();
+      const label = displaySectionLabel(stored, {
+        type: item.section.type,
+        content: item.section.content,
+      });
       const content = item.section.content.trim();
       if (!content) return "";
       return label ? `{${label}}\n${content}` : content;

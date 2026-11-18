@@ -5,6 +5,8 @@ import { requireActionAdmin } from "@/lib/auth";
 import {
   createUserSchema,
   firstIssueMessage,
+  optionalAdminPassword,
+  passwordSchema,
   updateUserSchema,
 } from "@/lib/validation/auth";
 import {
@@ -32,6 +34,7 @@ export async function createUserAction(
     username: formData.get("username"),
     displayName: formData.get("displayName"),
     role: formData.get("role"),
+    password: optionalAdminPassword(formData.get("password")),
   });
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
@@ -54,7 +57,14 @@ export async function resetUserPasswordAction(
   const admin = await requireActionAdmin();
   const targetUserId = String(formData.get("userId") ?? "");
   if (!targetUserId) return { ok: false, error: "Akun tidak valid." };
-  const result = await resetUserPassword(admin.id, targetUserId);
+  const password = optionalAdminPassword(formData.get("password"));
+  if (password !== undefined) {
+    const parsed = passwordSchema.safeParse(password);
+    if (!parsed.success) {
+      return { ok: false, error: firstIssueMessage(parsed.error) };
+    }
+  }
+  const result = await resetUserPassword(admin.id, targetUserId, password);
   if (!result.ok) return { ok: false, error: result.error };
   revalidatePath("/people");
   return {

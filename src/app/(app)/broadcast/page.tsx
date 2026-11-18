@@ -1,6 +1,7 @@
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAdminUser } from "@/lib/auth";
 import { buildGroupMessage } from "@/lib/broadcast-messages";
+import { defaultTempPassword } from "@/lib/default-temp-password";
 import { getBroadcastRecipients } from "@server/services/broadcast-service";
 import { DirectMessageCard, GroupMessageCard } from "./BroadcastClient";
 
@@ -13,6 +14,7 @@ function appBaseUrl(): string {
 export default async function BroadcastPage() {
   await requireAdminUser();
   const appUrl = appBaseUrl();
+  const defaultPassword = defaultTempPassword();
   const recipients = await getBroadcastRecipients();
   return (
     <div className="flex flex-col gap-4">
@@ -21,15 +23,21 @@ export default async function BroadcastPage() {
       </h1>
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
         Pesan grup + japri per personel, terisi otomatis dari data. Link
-        undangan dibuat per orang (berlaku 7 hari, sekali pakai); password
-        sementara disalin dari halaman Personel &amp; Akses.
+        undangan tetap unik per orang (berlaku 7 hari, sekali pakai).
+        Password sementara default sudah terisi; pengguna wajib
+        menggantinya saat login pertama.
       </p>
       <GroupMessageCard message={buildGroupMessage(appUrl)} />
       {recipients.length === 0 ? (
         <EmptyState title="Belum ada akun aktif" />
       ) : (
         recipients.map((r) => (
-          <DirectMessageCard key={r.userId} recipient={r} appUrl={appUrl} />
+          <DirectMessageCard
+            key={r.userId}
+            recipient={r}
+            appUrl={appUrl}
+            defaultPassword={defaultPassword}
+          />
         ))
       )}
     </div>

@@ -12,15 +12,19 @@ import {
   batchSchema,
   batchStatusSchema,
   batchUpdateSchema,
+  medleyLabelSchema,
 } from "@/lib/validation/song";
 import {
   addSongToBatch,
   createBatch,
   getBatch,
   removeSongFromBatch,
+  saveMedleyTransition,
+  setBatchItemMedley,
   setBatchStatus,
   updateBatch,
 } from "@server/services/batch-service";
+import { medleyTransitionSchema } from "@/lib/validation/medley";
 import {
   assignBatchMembers,
   type BatchAssignResult,
@@ -230,4 +234,53 @@ export async function assignBatchAction(
   if (!result.ok) return { ok: false, error: result.error };
   revalidateBatches(batchId);
   return { ok: true, summary: result.results };
+}
+
+export async function saveMedleyTransitionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireActionUser();
+  const parsed = medleyTransitionSchema.safeParse({
+    batchId: formData.get("batchId"),
+    fromSongId: formData.get("fromSongId"),
+    toSongId: formData.get("toSongId"),
+    content: formData.get("content"),
+    notes: formData.get("notes") || undefined,
+    remove: formData.get("remove") === "true",
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  await requireEventManagerForEntity(user, "batch", parsed.data.batchId);
+  const result = await saveMedleyTransition(user.id, parsed.data);
+  if (!result.ok) return result;
+  revalidateBatches(parsed.data.batchId);
+  return { ok: true };
+}
+
+export async function setBatchItemMedleyAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireActionUser();
+  const parsed = medleyLabelSchema.safeParse({
+    batchId: formData.get("batchId"),
+    songId: formData.get("songId"),
+    label: formData.get("label") ?? "",
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  await requireEventManagerForEntity(user, "batch", parsed.data.batchId);
+  const result = await setBatchItemMedley(
+    user.id,
+    parsed.data.batchId,
+    parsed.data.songId,
+    parsed.data.label,
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateBatches(parsed.data.batchId);
+  revalidatePath(`/songs/${parsed.data.songId}`);
+  return { ok: true };
 }

@@ -29,11 +29,13 @@ export function SongForm({
   eventId,
   songId,
   defaults,
+  sharedEventCount = 1,
 }: {
   mode: "create" | "edit";
   eventId?: string;
   songId?: string;
   defaults?: SongFormDefaults;
+  sharedEventCount?: number;
 }) {
   const [state, formAction, pending] = useActionState(
     mode === "create" ? createSongAction : updateSongAction,
@@ -43,6 +45,14 @@ export function SongForm({
 
   return (
     <Card title={mode === "create" ? "Tambah lagu" : "Ubah lagu"}>
+      {mode === "edit" && sharedEventCount > 1 ? (
+        <p className="mb-3 text-sm text-amber-800 dark:text-amber-300">
+          Lagu ini dipakai di {sharedEventCount} event. Judul, artis, nada
+          dasar, tempo, birama, durasi, dan referensi ikut berubah di event
+          lain. Catatan aransemen, fungsi liturgi, dan status tetap untuk
+          event ini.
+        </p>
+      ) : null}
       <form action={formAction} className="flex flex-col gap-4">
         {mode === "create" ? (
           <input type="hidden" name="eventId" value={eventId} />

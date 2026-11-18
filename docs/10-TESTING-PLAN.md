@@ -5,6 +5,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 
 ## Unit tests
 - Username normalization/uniqueness.
+- New/changed passwords reject only empty input (minimum 1, maximum 256). Admin create accepts an explicit password such as `1234567890ais`, and a blank password field is omitted so the server generates one. `mustChangePassword` stays set for both. `DEFAULT_TEMP_PASSWORD` overrides the shared fallback; missing, empty, or over-long values use `1234567890ais`. Direct invite messages include that password and still keep `[LINK UNDANGAN]` until a per-user link is inserted.
 - Inactive account rejection.
 - Temporary password forces change.
 - Role/ownership permission helpers.
@@ -13,8 +14,21 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Chart legacy parser recognizes section headings (Verse/Chorus/Reff/Tagline/Prechorus/Interlude/Bridge/Modulation→Key Change/Coda/Outro/Intro, plus Post-Chorus/Solo/Hook/Breakdown/Vamp/Turnaround/Ad-lib/Spoken/Transition/Reprise), keeps repeated sections, and ignores empty blocks.
 - Chart stage helpers keep repeated sections, clamp text size, and prevent prev/next navigation from leaving section bounds.
 - Arrangement composition keeps item order/duplicates and applies label overrides.
+- Medley runs split on non-consecutive legacy members and on hidden/archived items; singleton runs are not medleys. A reorder recalculates runs from batch order.
+- Medley transition validation rejects malformed notation, same-song endpoints, and writes whose songs are not currently adjacent in one medley group.
+- Arrangement modulation defaults to zero, is limited to ±12 semitones, applies after the marked section, and transposes chords but not not-angka.
+- Key display derives from the event song key and persists display mode/transpose preferences locally.
 - Chart section/arrangement validation rejects empty labels/content, duplicate labels, invalid item payloads, and over-limit sequences.
 - Setlist lyric seed keeps unique labels, non-empty content, and arrangement items that reference existing sections.
+- Intro-column migration builds a ChordPro Intro section (chords over not angka, note as a `#` comment), skips songs that already have an Intro section, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
+- Event brief date inputs use the Asia/Jakarta calendar day (midnight WIB round-trips; a UTC date slice does not). Saving the brief keeps the stored confirmation status unless the status field was changed.
+- Membership backfill selects only active users with zero event memberships for the newest non-cancelled regional event, leaves anyone who already belongs to an event untouched, and blocks `--apply` when the DB user prefix is `rGq` unless prod is explicitly allowed.
+- Chart viewer renders not angka in one arrangement body and shows the transpose formula once, next to the transpose controls.
+- An Intro of three chord+notation lines, the last with `Csus4` and trailing `| |`, renders every line at the lyric size (`text-sm` / `leading-6`) in Lirik+Chord, Lirik saja, and Chord saja; transpose changes chords only.
+- Not angka parser accepts comma and leading-dot lower octaves, chromatic prefixes, beam groups `[ ]` / `[[ ]]`, and slurs `( )`. CSS markup draws octave dots, a slash or backslash through the digit, and beams/slurs above the group. Chords stay on the same column. A notation section labeled `Bagian 1` displays Intro. `canonicalizeNotationText` rewrites `.6` to `6,` and leaves lyric lines alone. `planNotationNormalization` prints a per-song diff and is a no-op when nothing changed.
+- Adding a rehearsal recording stores the song page's event id. Omitting the event id stores `null` (library), never the string `library`. A database or authorization failure on that action returns a form error instead of throwing.
+- Catatan part: body 2–2000 karakter, POV part maks. 80, balasan wajib punya induk top-level di event yang sama dan mewarisi section/audiens induk. MEMBER hanya menulis di lagu publish; EVENT_ADMIN di draft; OBSERVER read-only; ADMIN menulis walau akses event ditutup. Audiens member dibatasi ke catatan umum, target assignment cocok, dan catatan target yang ditulis sendiri; OBSERVER hanya mendapat catatan umum; admin event/global melihat semua. Target skill wajib punya assignment pada EventSong. Hanya penulis/admin yang boleh edit/hapus/resolve; hapus oleh admin atas catatan orang lain menulis audit log.
+- Chart notes: section aransemen berulang memakai ID master section yang sama dan menampilkan anotasi di setiap kemunculan; target tampil di callout section, umum di panel desktop dan bertumpuk pada mobile; section tanpa catatan hanya menampilkan disclosure composer ringkas bagi penulis yang berizin. Chart legacy dipetakan ke section master berdasarkan label bila cocok.
 - Final lock requires intentional authorized action.
 - Overdue task and equipment blocker aggregation.
 - Cancelled rehearsal excluded from upcoming list.
@@ -28,7 +42,10 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - User cannot update another person's progress.
 - Rehearsal/attendance persists.
 - Admin imports a legacy chart, reviews sections, saves an arrangement, activates it, and the song page renders the active arrangement instead of the legacy chart.
-- Non-admin cannot create/edit sections, arrangements, or import legacy charts.
+- A joined medley sheet displays active arrangements (then legacy charts) in batch order, with transitions only on current adjacent pairs; restricted readers see published, non-archived songs only. Event admins can edit transitions only while the event is open.
+- MEMBER, OBSERVER, and an EVENT_ADMIN of another event cannot create/edit sections, arrangements, chords, or song metadata. An EVENT_ADMIN of the song's event can while access is open, including when the song is also used by another event. Omitting eventId is global ADMIN only. A closed event blocks the event admin. Archive/restore stays global ADMIN. The audit actor is the signed-in user.
+- Proxy: `GET /songs/[id]/chart?eventId=` is allowed for an EVENT_ADMIN of that open event when the song is on the setlist (including an arrangement query). MEMBER, OBSERVER, a non-member, a closed event, a song that is not on the setlist, and a missing eventId are the plain-text 404. Global ADMIN skips the filter. `GET /event/[id]` follows event membership instead of rejecting every non-admin.
+- Catatan umum di chart ("Semua personel" / "Tambah catatan umum") tampil untuk EVENT_ADMIN mode Edit walau id bagian chart bukan master section, dan tanpa flag admin global. Catatan per instrumen ikut tampil bila lagu punya assignment. MEMBER pada lagu publish tetap melihat panel bagian yang id-nya cocok, tanpa kotak editor tambahan di atas chart. OBSERVER tidak melihat tombol tambah. Materi pustaka pada lagu setlist boleh dikelola EVENT_ADMIN bila `eventId` dikirim; tanpa `eventId` tetap admin global.
 - Audit log records role change, reset, final lock, chart section/arrangement changes, and legacy import.
 
 ## E2E critical flows

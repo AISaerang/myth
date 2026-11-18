@@ -19,7 +19,10 @@
     "onboard:personnel": "tsx --env-file=.env scripts/bulk-create-personnel.ts",
     "onboard:observers": "tsx --env-file=.env scripts/onboard-observers.ts",
     "import:charts": "node --conditions=react-server --import tsx --env-file=.env scripts/import-legacy-charts.ts",
+    "import:intro-sections": "node --conditions=react-server --import tsx --env-file=.env scripts/migrate-intro-sections.ts",
+    "normalize:notation": "node --conditions=react-server --import tsx --env-file=.env scripts/normalize-notation.ts",
     "import:lyrics": "node --conditions=react-server --import tsx --env-file=.env scripts/import-setlist-lyrics.ts",
+    "backfill:memberships": "node --conditions=react-server --import tsx --env-file=.env scripts/backfill-memberships.ts",
     "seed:event": "tsx --env-file=.env prisma/seed-event.ts"
   },
   "dependencies": {
@@ -28,7 +31,7 @@
     "argon2": "^0.45.1",
     "dotenv": "^18.0.7",
     "mariadb": "^3.5.4",
-    "next": "16.4.4",
+    "next": "16.4.6",
     "prisma": "^7.10.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -42,7 +45,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.4",
+    "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.0.4"

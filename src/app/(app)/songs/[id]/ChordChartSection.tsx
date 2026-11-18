@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { parseLegacyChart } from "@/lib/chart-arrangement";
+import type { InstrumentChartData } from "@/lib/validation/instrument-chart";
+import type { SongNoteTargetOption, SongNoteView } from "@/lib/song-note";
 import { formatJakarta } from "@/lib/format";
 import {
   deleteChordChartAction,
@@ -16,10 +19,24 @@ import {
 } from "@server/actions/chords";
 import type { ActionState } from "@server/actions/auth";
 import { ChordOverUnderEditor } from "./ChordOverUnderEditor";
-import { ChordViewer } from "./ChordViewer";
+import {
+  ChordViewer,
+  type ChartDisplaySection,
+  type SectionNoteAnnotations,
+} from "./ChordViewer";
+import {
+  SectionGeneralNotePanel,
+  SectionTargetNoteCallout,
+  type NoteSectionOption,
+} from "./SongNotes";
 
 const inputClass =
   "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900";
+
+const EMPTY_INSTRUMENT_DATA: InstrumentChartData = {
+  sections: {},
+  voicings: {},
+};
 
 export interface ChartView {
   id: string;
@@ -34,33 +51,142 @@ export interface ChartView {
 export function ChordChartSection({
   songId,
   eventId,
+  songKey,
+  defaultCapo = 0,
+  instrumentData = EMPTY_INSTRUMENT_DATA,
+  eventSongId,
   admin,
   charts,
   arrangement,
+  sections,
+  notes,
+  noteTargetOptions,
+  canWriteNotes,
+  canModerateNotes,
+  currentUserId,
+  defaultPart,
 }: {
   songId: string;
   eventId: string;
+  songKey?: string | null;
+  defaultCapo?: number;
+  instrumentData?: InstrumentChartData;
+  eventSongId: string;
   admin: boolean;
   charts: ChartView[];
-  arrangement: { name: string; content: string } | null;
+  arrangement: {
+    name: string;
+    content: string;
+    sections: ChartDisplaySection[];
+  } | null;
+  sections: NoteSectionOption[];
+  notes: SongNoteView[];
+  noteTargetOptions: SongNoteTargetOption[];
+  canWriteNotes: boolean;
+  canModerateNotes: boolean;
+  currentUserId: string;
+  defaultPart: string | null;
 }) {
   const active = charts.find((c) => c.isActive) ?? null;
   const history = charts.filter((c) => !c.isActive);
+  const displaySections =
+    arrangement?.sections ??
+    (active
+      ? parseLegacyChart(active.content).map((section, index) => {
+          const matchingSection = sections.find(
+            (item) =>
+              item.label.trim().toLocaleLowerCase("id") ===
+              section.label.trim().toLocaleLowerCase("id"),
+          );
+          return {
+            id: matchingSection?.id ?? `${active.id}-section-${index}`,
+            label: section.label,
+            content: section.content,
+          };
+        })
+      : []);
+  const noteProps = {
+    songId,
+    eventSongId,
+    sections,
+    targetOptions: noteTargetOptions,
+    defaultPart,
+    canWrite: canWriteNotes,
+    canModerate: canModerateNotes,
+    currentUserId,
+  };
+  const getSectionAnnotations = (
+    sectionId: string,
+  ): SectionNoteAnnotations | undefined => {
+    // A legacy chart can invent a section id that is not a master
+    // ChartSection. Still show the general-note box; only a real section
+    // id is stored on the note.
+    const section = sections.find((item) => item.id === sectionId);
+    if (!section) {
+      // Legacy ids are not master sections. Event editors still get the
+      // general-note box; members keep the previous "no panel" result.
+      if (!canModerateNotes) return undefined;
+      return {
+        targeted: null,
+        general: (
+          <SectionGeneralNotePanel {...noteProps} sectionId="" notes={[]} />
+        ),
+      };
+    }
+    const sectionNotes = notes.filter((note) => note.sectionId === section.id);
+    const props = {
+      ...noteProps,
+      sectionId: section.id,
+      notes: sectionNotes,
+    };
+    return {
+      targeted: <SectionTargetNoteCallout {...props} />,
+      general: <SectionGeneralNotePanel {...props} />,
+    };
+  };
 
   const legacyAdmin = (
-    <LegacyChartAdmin songId={songId} active={active} history={history} />
+    <LegacyChartAdmin
+      songId={songId}
+      eventId={eventId}
+      active={active}
+      history={history}
+    />
   );
 
   return (
     <Card title="Lirik & Chord">
       {admin ? (
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex flex-wrap justify-end gap-x-3 gap-y-1">
+          <Link
+            href={`/songs/${songId}/chart?eventId=${eventId}#instrument-chart`}
+            className="text-sm font-medium underline"
+          >
+            Kelola data instrumen
+          </Link>
           <Link
             href={`/songs/${songId}/chart?eventId=${eventId}`}
             className="text-sm font-medium underline"
           >
             Kelola bagian & aransemen
           </Link>
+        </div>
+      ) : null}
+
+      {canModerateNotes ? (
+        <div className="mb-4 flex flex-col gap-3">
+          <SectionGeneralNotePanel
+            {...noteProps}
+            sectionId=""
+            notes={notes.filter((note) => !note.sectionId)}
+          />
+          {noteTargetOptions.length > 0 ? (
+            <SectionTargetNoteCallout
+              {...noteProps}
+              sectionId=""
+              notes={notes.filter((note) => !note.sectionId)}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -72,7 +198,21 @@ export function ChordChartSection({
               {arrangement.name}
             </span>
           </p>
-          <ChordViewer content={arrangement.content} baseKey="C" />
+          <ChordViewer
+            content={arrangement.content}
+            baseKey={songKey || "C"}
+            songId={songId}
+            defaultCapo={defaultCapo}
+            instrumentData={instrumentData}
+            preferenceKey={`myth_chart_view:${songId}`}
+            legacyPreferenceKey={`myth-chart:${songId}`}
+            sections={displaySections.map((section) => ({
+              ...section,
+              baseKey: songKey || "C",
+              songId,
+            }))}
+            getSectionAnnotations={getSectionAnnotations}
+          />
         </div>
       ) : active ? (
         <div className="flex flex-col gap-2">
@@ -81,7 +221,17 @@ export function ChordChartSection({
             {active.originalKey ? ` (dari ${active.originalKey})` : ""}
             {active.label ? ` · ${active.label}` : ""}
           </p>
-          <ChordViewer content={active.content} baseKey={active.baseKey} />
+          <ChordViewer
+            content={active.content}
+            baseKey={songKey || active.baseKey}
+            songId={songId}
+            defaultCapo={defaultCapo}
+            instrumentData={instrumentData}
+            preferenceKey={`myth_chart_view:${songId}`}
+            legacyPreferenceKey={`myth-chart:${songId}`}
+            sections={displaySections}
+            getSectionAnnotations={getSectionAnnotations}
+          />
         </div>
       ) : (
         <EmptyState
@@ -115,19 +265,23 @@ export function ChordChartSection({
 
 function LegacyChartAdmin({
   songId,
+  eventId,
   active,
   history,
 }: {
   songId: string;
+  eventId: string;
   active: ChartView | null;
   history: ChartView[];
 }) {
   return (
     <>
-      {active ? <ChartEditPanel songId={songId} chart={active} /> : null}
+      {active ? (
+        <ChartEditPanel songId={songId} eventId={eventId} chart={active} />
+      ) : null}
       <div className="mt-4 flex flex-col gap-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
         <p className="text-sm font-medium">Tambah versi baru</p>
-        <ChartInputForm songId={songId} />
+        <ChartInputForm songId={songId} eventId={eventId} />
         {history.length > 0 ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium">Riwayat (nonaktif)</p>
@@ -146,7 +300,11 @@ function LegacyChartAdmin({
                   </span>
                   <span className="flex items-center gap-2">
                     <Badge tone="neutral">Arsip</Badge>
-                    <ChartRowActions songId={songId} chartId={c.id} />
+                    <ChartRowActions
+                      songId={songId}
+                      eventId={eventId}
+                      chartId={c.id}
+                    />
                   </span>
                 </li>
               ))}
@@ -160,9 +318,11 @@ function LegacyChartAdmin({
 
 function ChartEditPanel({
   songId,
+  eventId,
   chart,
 }: {
   songId: string;
+  eventId: string;
   chart: ChartView;
 }) {
   const [editing, setEditing] = useState(false);
@@ -178,16 +338,20 @@ function ChartEditPanel({
           {editing ? "Tutup editor" : "Edit chart aktif"}
         </Button>
       </div>
-      {editing ? <ChartEditForm songId={songId} chart={chart} /> : null}
+      {editing ? (
+        <ChartEditForm songId={songId} eventId={eventId} chart={chart} />
+      ) : null}
     </div>
   );
 }
 
 function ChartEditForm({
   songId,
+  eventId,
   chart,
 }: {
   songId: string;
+  eventId: string;
   chart: ChartView;
 }) {
   const [state, formAction, pending] = useActionState(updateChordChartAction, {
@@ -197,6 +361,7 @@ function ChartEditForm({
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="songId" value={songId} />
+      <input type="hidden" name="eventId" value={eventId} />
       <input type="hidden" name="chartId" value={chart.id} />
       <div className="flex flex-col gap-1">
         <label
@@ -245,7 +410,13 @@ function ChartEditForm({
   );
 }
 
-function ChartInputForm({ songId }: { songId: string }) {
+function ChartInputForm({
+  songId,
+  eventId,
+}: {
+  songId: string;
+  eventId: string;
+}) {
   const formRef = useRef<HTMLFormElement>(null);
   const [content, setContent] = useState("");
   const [originalKey, setOriginalKey] = useState("");
@@ -269,6 +440,7 @@ function ChartInputForm({ songId }: { songId: string }) {
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="songId" value={songId} />
+      <input type="hidden" name="eventId" value={eventId} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="chart-key" className="text-sm font-medium">
@@ -336,9 +508,11 @@ function ChartInputForm({ songId }: { songId: string }) {
 
 function ChartRowActions({
   songId,
+  eventId,
   chartId,
 }: {
   songId: string;
+  eventId: string;
   chartId: string;
 }) {
   const [actState, actAction, actPending] = useActionState(
@@ -354,6 +528,7 @@ function ChartRowActions({
       <form action={actAction}>
         <input type="hidden" name="chartId" value={chartId} />
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="eventId" value={eventId} />
         <Button type="submit" variant="secondary" size="sm" disabled={actPending}>
           Aktifkan
         </Button>
@@ -361,9 +536,10 @@ function ChartRowActions({
       <form action={delAction}>
         <input type="hidden" name="chartId" value={chartId} />
         <input type="hidden" name="songId" value={songId} />
-        <Button type="submit" variant="danger" size="sm" disabled={delPending}>
-          Hapus
-        </Button>
+        <input type="hidden" name="eventId" value={eventId} />
+          <Button type="submit" variant="danger" size="sm" disabled={delPending}>
+            Hapus versi chart ini
+          </Button>
       </form>
       {!actState.ok && actState.error ? (
         <Alert tone="danger">{actState.error}</Alert>

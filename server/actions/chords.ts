@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireActionAdmin } from "@/lib/auth";
+import { requireActionUser } from "@/lib/auth";
 import { firstIssueMessage } from "@/lib/validation/auth";
 import {
   chordChartSchema,
@@ -14,6 +14,10 @@ import {
   updateChordChart,
 } from "@server/services/chord-service";
 import type { ActionState } from "./auth";
+import {
+  optionalEventId,
+  requireSongContentEditor,
+} from "./event-authorization";
 
 function revalidateSong(songId?: string): void {
   revalidatePath("/songs");
@@ -24,7 +28,7 @@ export async function saveChordChartAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const user = await requireActionUser();
   const parsed = chordChartSchema.safeParse({
     songId: formData.get("songId"),
     content: formData.get("content"),
@@ -34,7 +38,12 @@ export async function saveChordChartAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await saveChordChart(admin.id, parsed.data);
+  await requireSongContentEditor(
+    user,
+    parsed.data.songId,
+    optionalEventId(formData.get("eventId")),
+  );
+  const result = await saveChordChart(user.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSong(parsed.data.songId);
   return { ok: true };
@@ -44,7 +53,7 @@ export async function updateChordChartAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const user = await requireActionUser();
   const parsed = chordChartUpdateSchema.safeParse({
     songId: formData.get("songId"),
     chartId: formData.get("chartId"),
@@ -54,7 +63,13 @@ export async function updateChordChartAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await updateChordChart(admin.id, parsed.data);
+  await requireSongContentEditor(
+    user,
+    parsed.data.songId,
+    optionalEventId(formData.get("eventId")),
+    { kind: "chordChart", id: parsed.data.chartId },
+  );
+  const result = await updateChordChart(user.id, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
   revalidateSong(parsed.data.songId);
   return { ok: true };
@@ -64,13 +79,19 @@ export async function setChordChartActiveAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const admin = await requireActionAdmin();
+  const user = await requireActionUser();
   const chartId = String(formData.get("chartId") ?? "");
   const songId = String(formData.get("songId") ?? "");
-  if (!chartId) return { ok: false, error: "Chart tidak valid." };
-  const result = await setChordChartActive(admin.id, chartId);
+  if (!chartId || !songId) return { ok: false, error: "Chart tidak valid." };
+  await requireSongContentEditor(
+    user,
+    songId,
+    optionalEventId(formData.get("eventId")),
+    { kind: "chordChart", id: chartId },
+  );
+  const result = await setChordChartActive(user.id, chartId);
   if (!result.ok) return { ok: false, error: result.error };
-  revalidateSong(songId || undefined);
+  revalidateSong(songId);
   return { ok: true };
 }
 
@@ -78,12 +99,18 @@ export async function deleteChordChartAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireActionAdmin();
+  const user = await requireActionUser();
   const chartId = String(formData.get("chartId") ?? "");
   const songId = String(formData.get("songId") ?? "");
-  if (!chartId) return { ok: false, error: "Chart tidak valid." };
+  if (!chartId || !songId) return { ok: false, error: "Chart tidak valid." };
+  await requireSongContentEditor(
+    user,
+    songId,
+    optionalEventId(formData.get("eventId")),
+    { kind: "chordChart", id: chartId },
+  );
   const result = await deleteChordChart(chartId);
   if (!result.ok) return { ok: false, error: result.error };
-  revalidateSong(songId || undefined);
+  revalidateSong(songId);
   return { ok: true };
 }

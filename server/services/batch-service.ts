@@ -1,9 +1,52 @@
 import "server-only";
 import type { BatchStatus } from "@/generated/prisma/client";
 import { AuditAction, writeAudit } from "@/lib/audit";
+import type { BatchCatalog } from "@/lib/batch-badge";
+import { isAdjacentMedleyPair } from "@/lib/medley-groups";
 import { canTransitionBatch } from "@/lib/batch-status";
+import type { MedleyTransitionInput } from "@/lib/validation/medley";
 import { prisma } from "@/lib/db";
 import type { BatchInput } from "@/lib/validation/song";
+
+// Katalog badge untuk POV pemusik. Peringkat dihitung dari seluruh
+// SongBatchItem.sortOrder di batch (termasuk lagu yang belum publish),
+// supaya nomor 1…N sama dengan daftar admin — bukan EventSong.sortOrder.
+export async function listEventBatchCatalog(
+  eventId: string,
+): Promise<BatchCatalog[]> {
+  const batches = await prisma.songBatch.findMany({
+    where: { eventId },
+    include: {
+      items: {
+        select: {
+          songId: true,
+          sortOrder: true,
+          medleyGroupId: true,
+          medleyLabel: true,
+          eventSong: { select: { isPublished: true } },
+          song: { select: { title: true, archivedAt: true } },
+        },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  return batches.map((batch) => ({
+    id: batch.id,
+    name: batch.name,
+    status: batch.status,
+    createdAt: batch.createdAt,
+    items: batch.items.map((item) => ({
+      songId: item.songId,
+      title: item.song.title,
+      sortOrder: item.sortOrder,
+      isPublished: item.eventSong?.isPublished ?? false,
+      archived: item.song.archivedAt != null,
+      medleyGroupId: item.medleyGroupId,
+      medleyLabel: item.medleyLabel,
+    })),
+  }));
+}
 
 export async function listBatches(eventId: string) {
   const batches = await prisma.songBatch.findMany({
@@ -26,6 +69,7 @@ export async function listBatches(eventId: string) {
               eventId: true,
               status: true,
               isPublished: true,
+              eventKey: true,
               _count: { select: { assignments: true } },
             },
           },
@@ -77,6 +121,7 @@ export async function getBatch(id: string) {
               eventId: true,
               status: true,
               isPublished: true,
+              eventKey: true,
               _count: { select: { assignments: true } },
             },
           },
@@ -297,6 +342,197 @@ export async function deleteBatch(
     entityId: batchId,
     summary: `Batch kosong "${batch.name}" dihapus permanen.`,
     metadata: { name: batch.name },
+  });
+  return { ok: true };
+}
+
+// Label medley kosong melepas lagu dari koridor. Label yang sama di
+// dalam satu batch berbagi medleyGroupId; urutan koridor = sortOrder.
+export async function setBatchItemMedley(
+  actorUserId: string,
+  batchId: string,
+  songId: string,
+  label: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const [item, orderedItems] = await Promise.all([
+    prisma.songBatchItem.findUnique({
+      where: { songBatchId_songId: { songBatchId: batchId, songId } },
+      include: {
+        song: { select: { title: true } },
+        batch: { select: { name: true } },
+      },
+    }),
+    prisma.songBatchItem.findMany({
+      where: { songBatchId: batchId },
+      orderBy: [{ sortOrder: "asc" }, { songId: "asc" }],
+      select: {
+        songId: true,
+        sortOrder: true,
+        medleyGroupId: true,
+        medleyLabel: true,
+      },
+    }),
+  ]);
+  if (!item) return { ok: false, error: "Lagu tidak ditemukan di batch." };
+  const trimmed = label.trim();
+  const index = orderedItems.findIndex((row) => row.songId === songId);
+  if (!trimmed) {
+    await prisma.songBatchItem.update({
+      where: { songBatchId_songId: { songBatchId: batchId, songId } },
+      data: { medleyGroupId: null, medleyLabel: null },
+    });
+    await writeAudit({
+      actorUserId,
+      action: AuditAction.BATCH_UPDATED,
+      entityType: "SongBatch",
+      entityId: batchId,
+      summary: `"${item.song.title}" dikeluarkan dari medley di batch "${item.batch.name}".`,
+      metadata: { songId, batch: item.batch.name },
+    });
+    return { ok: true };
+  }
+
+  const normalized = trimmed.toLocaleLowerCase("id");
+  const adjacent = [orderedItems[index - 1], orderedItems[index + 1]].filter(
+    (row) =>
+      row &&
+      row.medleyGroupId &&
+      row.medleyLabel?.trim().toLocaleLowerCase("id") === normalized,
+  );
+  const medleyLabel = adjacent[0]?.medleyLabel?.trim() || trimmed;
+  const groupId = adjacent[0]?.medleyGroupId ?? crypto.randomUUID();
+  const rightGroupId = adjacent[1]?.medleyGroupId;
+  await prisma.$transaction(async (tx) => {
+    await tx.songBatchItem.update({
+      where: { songBatchId_songId: { songBatchId: batchId, songId } },
+      data: { medleyGroupId: groupId, medleyLabel },
+    });
+    if (rightGroupId && rightGroupId !== groupId) {
+      let cursor = index + 1;
+      while (
+        cursor < orderedItems.length &&
+        orderedItems[cursor]?.medleyGroupId === rightGroupId &&
+        orderedItems[cursor]?.medleyLabel?.trim().toLocaleLowerCase("id") ===
+          normalized
+      ) {
+        const row = orderedItems[cursor];
+        if (row) {
+          await tx.songBatchItem.update({
+            where: {
+              songBatchId_songId: { songBatchId: batchId, songId: row.songId },
+            },
+            data: { medleyGroupId: groupId, medleyLabel },
+          });
+        }
+        cursor += 1;
+      }
+    }
+  });
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.BATCH_UPDATED,
+    entityType: "SongBatch",
+    entityId: batchId,
+    summary: `"${item.song.title}" masuk medley "${medleyLabel}" di batch "${item.batch.name}".`,
+    metadata: { songId, batch: item.batch.name, medley: medleyLabel },
+  });
+  return { ok: true };
+}
+
+export async function listMedleyTransitions(batchId: string) {
+  return prisma.medleyTransition.findMany({
+    where: { songBatchId: batchId },
+    select: {
+      id: true,
+      fromSongId: true,
+      toSongId: true,
+      content: true,
+      notes: true,
+    },
+  });
+}
+
+export async function saveMedleyTransition(
+  actorUserId: string,
+  input: MedleyTransitionInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const items = await prisma.songBatchItem.findMany({
+    where: { songBatchId: input.batchId },
+    include: { song: { select: { title: true, archivedAt: true } } },
+    orderBy: [{ sortOrder: "asc" }, { songId: "asc" }],
+  });
+  const index = items.findIndex((item) => item.songId === input.fromSongId);
+  const from = items[index];
+  const to = items[index + 1];
+  if (
+    !isAdjacentMedleyPair(
+      items.map((item) => ({
+        songId: item.songId,
+        sortOrder: item.sortOrder,
+        medleyGroupId: item.medleyGroupId,
+        archived: item.song.archivedAt !== null,
+        isPublished: true,
+      })),
+      input.fromSongId,
+      input.toSongId,
+    ) ||
+    !from ||
+    !to
+  ) {
+    return {
+      ok: false,
+      error: "Transisi hanya dapat disimpan di antara dua lagu berurutan dalam medley yang sama.",
+    };
+  }
+
+  if (input.remove) {
+    const deleted = await prisma.medleyTransition.deleteMany({
+      where: {
+        songBatchId: input.batchId,
+        fromSongId: input.fromSongId,
+      },
+    });
+    if (deleted.count > 0) {
+      await writeAudit({
+        actorUserId,
+        action: "MEDLEY_TRANSITION_DELETED",
+        entityType: "SongBatch",
+        entityId: input.batchId,
+        summary: `Transisi "${from.song.title}" → "${to.song.title}" dihapus.`,
+        metadata: { fromSongId: from.songId, toSongId: to.songId },
+      });
+    }
+    return { ok: true };
+  }
+
+  await prisma.medleyTransition.upsert({
+    where: {
+      songBatchId_fromSongId: {
+        songBatchId: input.batchId,
+        fromSongId: input.fromSongId,
+      },
+    },
+    create: {
+      songBatchId: input.batchId,
+      fromSongId: input.fromSongId,
+      toSongId: input.toSongId,
+      content: input.content,
+      notes: input.notes?.trim() || null,
+      createdById: actorUserId,
+    },
+    update: {
+      toSongId: input.toSongId,
+      content: input.content,
+      notes: input.notes?.trim() || null,
+    },
+  });
+  await writeAudit({
+    actorUserId,
+    action: "MEDLEY_TRANSITION_SAVED",
+    entityType: "SongBatch",
+    entityId: input.batchId,
+    summary: `Transisi "${from.song.title}" → "${to.song.title}" disimpan.`,
+    metadata: { fromSongId: from.songId, toSongId: to.songId },
   });
   return { ok: true };
 }

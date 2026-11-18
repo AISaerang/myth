@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BatchOrderBadge } from "@/components/BatchOrderBadge";
 import { Card } from "@/components/ui/Card";
+import { prisma } from "@/lib/db";
+import { visibleMedleyItems } from "@/lib/medley-groups";
+import { badgeFromSortOrders, batchBadgeAnchor } from "@/lib/batch-badge";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { canReadDrafts, canWriteEventData, isAdmin } from "@/lib/permissions";
 import { formatJakarta } from "@/lib/format";
-import { getBatch } from "@server/services/batch-service";
+import { getBatch, listMedleyTransitions } from "@server/services/batch-service";
 import { listSongs } from "@server/services/song-service";
 import {
   listPersonnelForAdmin,
@@ -15,6 +19,8 @@ import { BatchForm } from "../BatchForm";
 import { BatchStatusBadge } from "../BatchStatusBadge";
 import { getEventRole } from "@server/services/event-access";
 import { BatchItemMover } from "@/components/ui/MoveButtons";
+import { MedleyLabelForm } from "../MedleyLabelForm";
+import { MedleyGroupCards } from "../MedleyGroupCards";
 import {
   AddSongForm,
   AssignBatchForm,
@@ -33,8 +39,40 @@ export default async function BatchDetailPage({
   const { id } = await params;
   const batch = await getBatch(id);
   if (!batch) notFound();
-  if (!(await getEventRole(user, batch.eventId))) notFound();
+  const [eventRole, event, transitions] = await Promise.all([
+    getEventRole(user, batch.eventId),
+    prisma.event.findUnique({
+      where: { id: batch.eventId },
+      select: { accessClosedAt: true },
+    }),
+    listMedleyTransitions(batch.id),
+  ]);
+  if (!eventRole || !event) notFound();
+  const canWriteMedley = canWriteEventData(
+    eventRole,
+    Boolean(event.accessClosedAt),
+    isAdmin(user),
+  );
+  const medleyItems = visibleMedleyItems(
+    batch.items.map((item) => ({
+      ...item,
+      title: item.song.title,
+      isPublished: item.song.isPublished,
+      archived: item.song.archivedAt !== null,
+    })),
+    !canReadDrafts(eventRole),
+  );
+  const medleyCard = (
+    <MedleyGroupCards
+      batchId={batch.id}
+      eventId={batch.eventId}
+      items={medleyItems}
+      transitions={transitions}
+      canWrite={canWriteMedley}
+    />
+  );
 
+  const sortOrders = batch.items.map((item) => item.sortOrder);
   if (observer) {
     const published = batch.items.filter((i) => i.song.isPublished);
     return (
@@ -63,27 +101,30 @@ export default async function BatchDetailPage({
             </span>
           ) : null}
         </div>
+        {medleyCard}
         <Card title={`Lagu publish dalam batch (${published.length})`}>
           {published.length === 0 ? (
             <p className="text-sm text-zinc-500">Belum ada lagu publish di batch ini.</p>
           ) : (
-            <ul className="flex flex-col gap-1">
-              {published.map((item, index) => (
+            <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {published.map((item) => {
+                const badge = badgeFromSortOrders(item.sortOrder, sortOrders);
+                return (
                 <li
                   key={item.songId}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  id={batchBadgeAnchor(batch.id, badge)}
+                  className="flex w-full min-w-0 scroll-mt-24 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
-                  <span className="flex items-center gap-2">
-                    <span className="w-6 text-center text-xs text-zinc-500">
-                      {index + 1}
-                    </span>
-                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <BatchOrderBadge badge={badge} />
+                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}&batchId=${batch.id}`} className="min-w-0 break-words font-medium underline">
                       {item.song.title}
                     </Link>
                   </span>
                   <SongStatusBadge status={item.song.status} />
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </Card>
@@ -132,6 +173,7 @@ export default async function BatchDetailPage({
           </span>
         ) : null}
       </div>
+      {medleyCard}
 
       <Card title="Status batch">
         <BatchStatusChanger batchId={batch.id} current={batch.status} />
@@ -142,36 +184,46 @@ export default async function BatchDetailPage({
           {batch.items.length === 0 ? (
             <p className="text-sm text-zinc-500">Belum ada lagu.</p>
           ) : (
-            <ul className="flex flex-col gap-1">
-              {batch.items.map((item, index) => (
+            <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {batch.items.map((item, index) => {
+                const badge = badgeFromSortOrders(item.sortOrder, sortOrders);
+                return (
                 <li
                   key={item.songId}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                  id={batchBadgeAnchor(batch.id, badge)}
+                  className="flex w-full min-w-0 scroll-mt-24 flex-col gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
                 >
-                  <span className="flex items-center gap-2">
-                    <span className="w-6 text-center text-xs text-zinc-500">
-                      {index + 1}
+                  <span className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <BatchOrderBadge badge={badge} />
+                      <Link href={`/songs/${item.songId}?eventId=${batch.eventId}&batchId=${batch.id}`} className="min-w-0 break-words font-medium underline">
+                        {item.song.title}
+                      </Link>
                     </span>
-                    <Link href={`/songs/${item.songId}?eventId=${batch.eventId}`} className="font-medium underline">
-                      {item.song.title}
-                    </Link>
+                    <span className="flex items-center gap-2">
+                      <BatchItemMover
+                        batchId={batch.id}
+                        orderedIds={batch.items.map((i) => i.songId)}
+                        index={index}
+                        title={item.song.title}
+                      />
+                      <SongStatusBadge status={item.song.status} />
+                      <RemoveSongButton
+                        batchId={batch.id}
+                        songId={item.songId}
+                        title={item.song.title}
+                      />
+                    </span>
                   </span>
-                  <span className="flex items-center gap-2">
-                    <BatchItemMover
-                      batchId={batch.id}
-                      orderedIds={batch.items.map((i) => i.songId)}
-                      index={index}
-                      title={item.song.title}
-                    />
-                    <SongStatusBadge status={item.song.status} />
-                    <RemoveSongButton
-                      batchId={batch.id}
-                      songId={item.songId}
-                      title={item.song.title}
-                    />
-                  </span>
+                  <MedleyLabelForm
+                    batchId={batch.id}
+                    songId={item.songId}
+                    songTitle={item.song.title}
+                    label={item.medleyLabel}
+                  />
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
           <AddSongForm batchId={batch.id} songs={available} />

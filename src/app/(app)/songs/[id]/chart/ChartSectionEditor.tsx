@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import {
@@ -29,10 +30,12 @@ export interface SectionData {
 
 export function ChartSectionEditor({
   songId,
+  eventId,
   section,
   onDone,
 }: {
   songId: string;
+  eventId?: string;
   section?: SectionData;
   onDone: () => void;
 }) {
@@ -43,10 +46,16 @@ export function ChartSectionEditor({
     section ? updateChartSectionAction : createChartSectionAction,
     { ok: false },
   );
+  const router = useRouter();
 
   useEffect(() => {
-    if (state.ok) onDone();
-  }, [state.ok, onDone]);
+    if (state.ok) {
+      // Ambil ulang data server supaya daftar bagian/ChordBody langsung
+      // menampilkan isi terbaru (mencegah "beda dari preview saat simpan").
+      router.refresh();
+      onDone();
+    }
+  }, [state.ok, onDone, router]);
 
   return (
     <form
@@ -54,6 +63,7 @@ export function ChartSectionEditor({
       className="flex flex-col gap-4 rounded-xl border border-sky-300 bg-sky-50/60 p-4 dark:border-sky-800 dark:bg-sky-950/30"
     >
       <input type="hidden" name="songId" value={songId} />
+      {eventId ? <input type="hidden" name="eventId" value={eventId} /> : null}
       {section ? (
         <input type="hidden" name="sectionId" value={section.id} />
       ) : null}
@@ -98,14 +108,19 @@ export function ChartSectionEditor({
           <ChordOverUnderEditor
             id="section-content"
             name="content"
-            heading="Kunci & lirik — basis C"
+            heading={
+              type === "INTRO" ? "Kunci & not angka — basis C" : "Kunci & lirik — basis C"
+            }
             defaultValue={section?.content ?? ""}
             rows={16}
             onChange={setContent}
+            placeholder={type === "INTRO" ? "C   G\n1' 2 3 .6 5,  [5 6]" : undefined}
             hint={
-              section
-                ? "Kunci di baris atas, lirik di baris bawah; atur posisi pakai spasi atau Tab."
-                : undefined
+              type === "INTRO"
+                ? "Kunci di baris atas, not angka di bawah. ' titik di atas angka; , atau .6 titik di bawah (beberapa tanda = beberapa titik). #4 garis / menembus angka, b7 garis \\. [5 6] satu garis di atas, [[5 6]] dua garis, (5 6) busur. / ketukan, - tahan, | birama. Spasi menentukan kolom. Transpose menggeser kunci saja."
+                : section
+                  ? "Kunci di baris atas, lirik di baris bawah; atur posisi pakai spasi atau Tab."
+                  : undefined
             }
           />
         </div>

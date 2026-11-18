@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isAdmin } from "@/lib/permissions";
+import { decideSongEdit, isAdmin, type SessionUser } from "@/lib/permissions";
 import { SESSION_COOKIE_NAME } from "@/lib/session-token";
 import { getEventRole } from "@server/services/event-access";
 import { findSessionUser } from "@server/services/session-service";
@@ -10,6 +10,37 @@ function notFound(): NextResponse {
     status: 404,
     headers: { "content-type": "text/plain; charset=utf-8" },
   });
+}
+
+// Chart editor is not a read page. Non-admins reach it only with an
+// eventId for an open event they administer, and only when that song is
+// on the setlist. Missing eventId, another event, MEMBER, OBSERVER, and
+// a closed event stay a plain 404 here, before the page runs.
+async function allowChartEditor(
+  user: SessionUser,
+  songId: string,
+  eventId: string | null,
+): Promise<boolean> {
+  if (!eventId) return false;
+  const [eventSong, event] = await Promise.all([
+    prisma.eventSong.findUnique({
+      where: { eventId_songId: { eventId, songId } },
+      select: { id: true },
+    }),
+    prisma.event.findUnique({
+      where: { id: eventId },
+      select: { accessClosedAt: true },
+    }),
+  ]);
+  const eventRole =
+    eventSong && event ? await getEventRole(user, eventId) : null;
+  return decideSongEdit({
+    globalAdmin: false,
+    eventRole,
+    accessClosed: Boolean(event?.accessClosedAt),
+    eventId,
+    songLinkedToEvent: Boolean(eventSong && event),
+  }).ok;
 }
 
 export async function proxy(request: NextRequest) {
@@ -34,7 +65,7 @@ export async function proxy(request: NextRequest) {
   ) {
     eventId = request.nextUrl.searchParams.get("eventId");
   } else if (segments.length === 2 && segments[0] === "event") {
-    return notFound();
+    eventId = segments[1];
   } else if (
     segments.length === 2 &&
     segments[0] === "songs"
@@ -63,7 +94,15 @@ export async function proxy(request: NextRequest) {
     segments[0] === "songs" &&
     segments[2] === "chart"
   ) {
-    return notFound();
+    const requestedEventId =
+      request.nextUrl.searchParams.get("eventId")?.trim() || null;
+    const allowed = await allowChartEditor(
+      user,
+      segments[1],
+      requestedEventId,
+    );
+    if (!allowed) return notFound();
+    return NextResponse.next();
   } else if (segments.length === 2 && segments[0] === "batches") {
     const batch = await prisma.songBatch.findUnique({
       where: { id: segments[1] },

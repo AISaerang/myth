@@ -23,24 +23,11 @@ export default function RootLayout({
         >
           Lewati ke konten
         </a>
-        <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
-            <p className="text-sm font-semibold tracking-tight">
-              Music Youth Team Hub
-            </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Portal privat tim musik
-            </p>
-          </div>
-        </header>
-        <main
-          id="konten"
-          className="mx-auto w-full max-w-5xl flex-1 px-4 py-6"
-        >
+        <div className="flex w-full flex-1 flex-col">
           {children}
-        </main>
+        </div>
         <footer className="border-t border-zinc-200 py-4 dark:border-zinc-800">
-          <p className="mx-auto w-full max-w-5xl px-4 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mx-auto w-full max-w-screen-2xl px-3 text-xs text-zinc-500 dark:text-zinc-400 sm:px-4 lg:px-6 xl:px-8">
             Data draft tidak boleh tampak final. Zona waktu: Asia/Jakarta.
           </p>
         </footer>

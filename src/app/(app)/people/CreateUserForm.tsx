@@ -4,9 +4,18 @@ import { useActionState, useEffect, useRef } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { PasswordField } from "@/components/ui/PasswordField";
+import {
+  DEFAULT_TEMP_PASSWORD_HELPER,
+  PASSWORD_MAX_LENGTH,
+} from "@/lib/password-policy";
 import { createUserAction } from "@server/actions/admin-users";
 
-export function CreateUserForm() {
+export function CreateUserForm({
+  defaultPassword,
+}: {
+  defaultPassword: string;
+}) {
   const [state, formAction, pending] = useActionState(createUserAction, {
     ok: false,
   });
@@ -66,6 +75,15 @@ export function CreateUserForm() {
             <option value="ADMIN">ADMIN — pengelola/MD</option>
           </select>
         </div>
+        <PasswordField
+          id="temporaryPassword"
+          name="password"
+          label="Password sementara (opsional)"
+          autoComplete="new-password"
+          maxLength={PASSWORD_MAX_LENGTH}
+          defaultValue={defaultPassword}
+          helper={`${DEFAULT_TEMP_PASSWORD_HELPER} Kosongkan untuk password acak.`}
+        />
         {!state.ok && state.error ? (
           <Alert tone="danger">{state.error}</Alert>
         ) : null}

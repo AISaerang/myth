@@ -19,11 +19,17 @@ InstrumentSkill: `id`, `name`. PersonSkill: `personId`, `instrumentSkillId`, `pr
 ### Song
 `id`, `eventId`, `title`, `artistOrAuthor?`, `liturgicalFunction?`, `key?`, `bpm?`, `timeSignature?`, `estimatedDurationSeconds?`, `originalReferenceUrl?`, `arrangementNotes?`, `status`, `isPublished`, `isFinalLocked`, `activeArrangementVersionId?`, `createdById`, timestamps.
 
+Legacy columns `introChords`, `introNotation`, and `introNote` stay on `Song` and are no longer edited from the song form. Intro is a `ChartSection` of type `INTRO` in the active arrangement. `scripts/migrate-intro-sections.ts` copies those columns forward; it does not drop or null them. `scripts/normalize-notation.ts` rewrites leading-dot octave marks to the comma form inside those strings and chart section content, and renames a generic `Bagian n` intro label to `Intro`. It does not change the schema.
+
 Song status: `DRAFT|SOURCE_SHARED|ARRANGEMENT_IN_PROGRESS|REFERENCE_READY|PRACTICING|NEEDS_REVIEW|READY_FOR_REHEARSAL|REHEARSAL_READY|FINAL_LOCKED`.
 
 ### SongBatch / SongBatchItem
 SongBatch: `id`, `eventId`, `name`, `description?`, `releaseAt?`, `targetReviewAt?`, `status` (`DRAFT|PUBLISHED|REVIEWING|COMPLETED|ARCHIVED`), `createdById`, timestamps.  
-SongBatchItem: `songBatchId`, `songId`, `sortOrder`; unique pair. Enforce one active batch per song if product rule requires it.
+SongBatchItem: `songBatchId`, `songId`, `sortOrder`, optional `medleyGroupId`, optional `medleyLabel`; unique pair `(songBatchId, songId)`. The musician-facing batch badge is the 1-based rank of `SongBatchItem.sortOrder` inside that batch (1…N, same order as the admin batch list). It is not `EventSong.sortOrder` (setlist order) and not the song status badge. Anchor on the published list: `#badge-{batchId}-{n}`.
+
+A medley corridor is the set of items in one batch that share `medleyGroupId`, ordered by `sortOrder`. `medleyLabel` is the display name; an empty label clears both fields. The corridor lives on the batch item (not `EventSong`) so “next song” follows the same badge order musicians see. The same label inside one batch reuses one `medleyGroupId`. Enforce one active batch per song if product rule requires it.
+
+Readers split a legacy medley group into consecutive runs after sorting by `sortOrder`; hidden or archived items break a run. `MedleyTransition` stores optional ChordPro/not-angka notes between adjacent songs in the same run. Its composite foreign key ties the source to a batch item; the service validates the destination and current adjacency before writes.
 
 ### SongAssignment
 `id`, `songId`, `personId`, `instrumentSkillId?`, `assignmentNote?`, `isPrimary`, timestamps. Define uniqueness according to assignment semantics.
@@ -36,15 +42,20 @@ ChartSection: `id`, `songId`, `type` (`INTRO|VERSE|PRE_CHORUS|CHORUS|POST_CHORUS
 
 ChartArrangement: `id`, `songId`, `name`, `isActive`, `createdById`, timestamps; unique `songId+name`; at most one active arrangement per song. A named arrangement orders/repeats master sections independently of `ArrangementVersion`.
 
-ChartArrangementItem: `id`, `arrangementId`, `sectionId`, `sortOrder`, `labelOverride?`, `createdAt`; unique `arrangementId+sortOrder`. Recomposition uses section content, so editing a master section updates every arrangement that uses it.
+ChartArrangementItem: `id`, `arrangementId`, `sectionId`, `sortOrder`, `labelOverride?`, `modulationSemitones` (default 0, applied after this item), `createdAt`; unique `arrangementId+sortOrder`. Recomposition uses section content, so editing a master section updates every arrangement that uses it.
 
-Legacy `ChordChart` remains as fallback/history. Public display precedence: active structured arrangement → active legacy `ChordChart` → empty. Legacy charts can be imported into sections/arrangement by an admin and then reviewed before saving. All chart mutations are admin-only and audited.
+Legacy `ChordChart` remains as fallback/history. Public display precedence: active structured arrangement → active legacy `ChordChart` → empty. Legacy charts can be imported into sections/arrangement by an admin and then reviewed before saving. All chart mutations are authorized server-side and audited.
+
+`SongInstrumentChart` is an additive 1:1 library record for instrument guidance: `songId` (unique), `capo` (default 0, validated 0–11), validated `data` JSON keyed by `ChartSection.id` and base-C chord symbol, `updatedById`, and timestamps. Its JSON holds section dynamics/rhythm and optional guitar/piano voicing overrides. Missing rows mean no overrides and capo 0; there is no event-data backfill. Writes use the existing `requireSongContentEditor` authorization and are audited against the `Song`.
 
 ### SongMaterial
-`id`, `songId`, `arrangementVersionId?`, `title`, `category`, `url`, `versionLabel?`, `description?`, `isActive`, `createdById`, timestamps. Categories: `ORIGINAL|ARRANGEMENT_REFERENCE|PART_GUIDE|CHORD_CHART|LYRICS|CLICK_CUE|SEQUENCER|REHEARSAL_RECORDING|FINAL_ASSET|OTHER`.
+`id`, `songId`, `eventId?`, `arrangementVersionId?`, `title`, `category`, `url`, `versionLabel?`, `description?`, `isActive`, `createdById`, timestamps. Categories: `ORIGINAL|ARRANGEMENT_REFERENCE|PART_GUIDE|CHORD_CHART|LYRICS|CLICK_CUE|SEQUENCER|REHEARSAL_RECORDING|FINAL_ASSET|OTHER`. `eventId` null = materi pustaka (tampil di setiap event yang memakai lagu). Terisi = materi khusus event itu. Kolom ini foreign key ke `Event`; jangan isi sentinel.
 
 ### PracticeProgress
 `id`, `songId`, `personId`, `status` (`NOT_STARTED|LEARNING|TRIED_WITH_REFERENCE|NEEDS_HELP|READY_FOR_REHEARSAL`), `note?`, `updatedById`, `updatedAt`; unique song/person.
+
+### SongNote
+Catatan part per pemusik (POV) pada satu lagu di satu event. `id`, `eventSongId` (scope event; cascade), `songId` (cascade), `sectionId?` (ChartSection; set null saat bagian dihapus), `sectionLabel?` (snapshot), `parentId?` (balasan satu tingkat; cascade), `authorUserId` (plain, histori), `authorName` (snapshot), `partLabel?` (POV penulis, maks. 80), `targetInstrumentSkillId?` (audiens; null = semua personel, selain itu skill yang memiliki assignment pada EventSong), `body` (maks. 2000 saat validasi), `status` (`OPEN|RESOLVED`), `resolvedAt?`, `resolvedByUserId?`, `editedAt?`, timestamps. Hanya top-level yang dapat di-resolve. Balasan mewarisi bagian dan audiens induk. MEMBER menulis di lagu publish; EVENT_ADMIN juga di draft; ADMIN selalu menulis kecuali dibatasi akses event untuk non-admin. Catatan bertarget dibatasi di service server kepada assignment cocok, penulis, dan admin event; OBSERVER hanya membaca catatan umum. Semua mutasi catatan divalidasi di server; penghapusan oleh admin atas catatan orang lain dicatat di audit log.
 
 ### Task
 `id`, `eventId`, `title`, `description?`, `status` (`TODO|IN_PROGRESS|BLOCKED|DONE|CANCELLED`), `priority` (`LOW|MEDIUM|HIGH|CRITICAL`), `dueAt?`, `assigneePersonId?`, `relatedSongId?`, `relatedRehearsalId?`, `createdById`, timestamps.
@@ -69,7 +80,7 @@ Event has songs, batches, tasks, rehearsals, equipment, decisions. Song has assi
 Use transactions for version activation; archive rather than delete referenced songs; preserve user history after deactivation; validate BPM/duration and date ranges; normalize usernames; restrict contact fields.
 
 ## Indexes
-Unique username; indexes for event/status/published songs, batch status, progress person/song, task status/due/assignee, rehearsal starts/status, equipment status, audit entity/date.
+Unique username; indexes for event/status/published songs, batch status, progress person/song, task status/due/assignee, rehearsal starts/status, equipment status, audit entity/date, and `SongNote(eventSongId, targetInstrumentSkillId)`.
 
 ## Authorization
 Admin can manage event records. User sees published/relevant data, assigned songs/tasks, and own progress. Observer (`OBSERVER`, label UI "Pantau") sees all published data and all personnel progress on published songs plus publish-scoped tasks, and may create suggestions (Task `TODO` without PIC, moderated by MD). Observer cannot see DRAFT songs, contacts, or manage anything. User cannot change other users' progress or roles. Enforce server-side.

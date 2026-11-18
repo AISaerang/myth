@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CHART_SECTION_TYPES } from "@/lib/chart-arrangement";
+import { normalizeNotationInput } from "@/lib/jianpu";
 
 const songId = z.string().min(1, "Lagu tidak valid.");
 
@@ -21,7 +22,9 @@ const sectionContent = z
   .refine(
     (v) => !/^\s*\{[^}]+\}\s*$/.test(v),
     "Label bagian diisi di kolom label, bukan {...} di konten.",
-  );
+  )
+  // Baris not angka: unicode whitespace/titik dinormalkan sebelum masuk DB.
+  .transform(normalizeNotationInput);
 
 export const chartSectionCreateSchema = z.object({
   songId,
@@ -73,6 +76,7 @@ export const chartArrangementActivateSchema = z.object({
 export const chartArrangementItemSchema = z.object({
   sectionId: z.string().min(1, "Bagian tidak valid."),
   labelOverride: z.string().trim().max(50).optional().nullable(),
+  modulationSemitones: z.number().int().min(-12).max(12).default(0),
 });
 
 export const chartArrangementItemsSchema = z.object({

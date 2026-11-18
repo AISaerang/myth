@@ -4,6 +4,8 @@ import { useActionState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { PasswordField } from "@/components/ui/PasswordField";
+import { PASSWORD_MAX_LENGTH } from "@/lib/password-policy";
 import { changePasswordAction } from "@server/actions/auth";
 
 export function ChangePasswordForm({ isFirstLogin }: { isFirstLogin: boolean }) {
@@ -20,47 +22,32 @@ export function ChangePasswordForm({ isFirstLogin }: { isFirstLogin: boolean }) 
         </p>
       ) : null}
       <form action={formAction} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="currentPassword" className="text-sm font-medium">
-            Password saat ini
-          </label>
-          <input
-            id="currentPassword"
-            name="currentPassword"
-            type="password"
-            autoComplete="current-password"
-            required
-            className="h-11 rounded-lg border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="newPassword" className="text-sm font-medium">
-            Password baru
-          </label>
-          <input
-            id="newPassword"
-            name="newPassword"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={1}
-            className="h-11 rounded-lg border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="confirmPassword" className="text-sm font-medium">
-            Konfirmasi password baru
-          </label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={12}
-            className="h-11 rounded-lg border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </div>
+        <PasswordField
+          id="currentPassword"
+          name="currentPassword"
+          label="Password saat ini"
+          autoComplete="current-password"
+          required
+        />
+        <PasswordField
+          id="newPassword"
+          name="newPassword"
+          label="Password baru"
+          autoComplete="new-password"
+          required
+          minLength={1}
+          maxLength={PASSWORD_MAX_LENGTH}
+          helper="Wajib diisi. Minimal 1 karakter, maksimal 256."
+        />
+        <PasswordField
+          id="confirmPassword"
+          name="confirmPassword"
+          label="Konfirmasi password baru"
+          autoComplete="new-password"
+          required
+          minLength={1}
+          maxLength={PASSWORD_MAX_LENGTH}
+        />
         {!state.ok && state.error ? (
           <Alert tone="danger">{state.error}</Alert>
         ) : null}

@@ -1,8 +1,25 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import type { SessionUser } from "@/lib/permissions";
-import { canManageEvent, canWriteEventData, isAdmin } from "@/lib/permissions";
+import {
+  canManageEvent,
+  canWriteEventData,
+  decideSongEdit,
+  isAdmin,
+} from "@/lib/permissions";
 import { getEventRole } from "@server/services/event-access";
+
+export type SongContentChild =
+  | { kind: "chordChart"; id: string }
+  | { kind: "chartSection"; id: string }
+  | { kind: "chartArrangement"; id: string }
+  | { kind: "arrangementVersion"; id: string };
+
+export function optionalEventId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 type EventScopedEntity =
   | "batch"
@@ -128,6 +145,92 @@ export async function requireEventManagerForSong(
   return eventSong;
 }
 
+async function songContentChildSongId(
+  child: SongContentChild,
+): Promise<string | null> {
+  if (child.kind === "chordChart") {
+    const row = await prisma.chordChart.findUnique({
+      where: { id: child.id },
+      select: { songId: true },
+    });
+    return row?.songId ?? null;
+  }
+  if (child.kind === "chartSection") {
+    const row = await prisma.chartSection.findUnique({
+      where: { id: child.id },
+      select: { songId: true },
+    });
+    return row?.songId ?? null;
+  }
+  if (child.kind === "chartArrangement") {
+    const row = await prisma.chartArrangement.findUnique({
+      where: { id: child.id },
+      select: { songId: true },
+    });
+    return row?.songId ?? null;
+  }
+  const row = await prisma.arrangementVersion.findUnique({
+    where: { id: child.id },
+    select: { songId: true },
+  });
+  return row?.songId ?? null;
+}
+
+// Editor konten lagu. Lihat decideSongEdit untuk aturan event vs pustaka
+// dan lagu yang dipakai lebih dari satu event. child memastikan chart,
+// bagian, aransemen, atau versi yang dikirim benar-benar milik songId.
+export async function requireSongContentEditor(
+  user: SessionUser,
+  songId: string,
+  eventId: string | null,
+  child?: SongContentChild,
+): Promise<void> {
+  const scopedEventId = eventId?.trim() || null;
+  let songLinkedToEvent = false;
+  let accessClosed = false;
+  let eventRole: Awaited<ReturnType<typeof getEventRole>> = null;
+  if (scopedEventId) {
+    const [eventSong, event] = await Promise.all([
+      prisma.eventSong.findUnique({
+        where: { eventId_songId: { eventId: scopedEventId, songId } },
+        select: { id: true },
+      }),
+      prisma.event.findUnique({
+        where: { id: scopedEventId },
+        select: { accessClosedAt: true },
+      }),
+    ]);
+    songLinkedToEvent = Boolean(eventSong && event);
+    accessClosed = Boolean(event?.accessClosedAt);
+    if (songLinkedToEvent) {
+      eventRole = await getEventRole(user, scopedEventId);
+    }
+  } else if (!isAdmin(user)) {
+    throw new Error("Forbidden");
+  } else {
+    const song = await prisma.song.findUnique({
+      where: { id: songId },
+      select: { id: true },
+    });
+    if (!song) throw new Error("Not found");
+  }
+
+  const decision = decideSongEdit({
+    globalAdmin: isAdmin(user),
+    eventRole,
+    accessClosed,
+    eventId: scopedEventId,
+    songLinkedToEvent,
+  });
+  if (!decision.ok) {
+    throw new Error(decision.reason === "not-in-event" ? "Not found" : "Forbidden");
+  }
+
+  if (!child) return;
+  const ownerSongId = await songContentChildSongId(child);
+  if (ownerSongId !== songId) throw new Error("Not found");
+}
+
 export async function requireGlobalAdmin(user: SessionUser): Promise<void> {
   if (!isAdmin(user)) throw new Error("Forbidden");
 }
@@ -135,15 +238,23 @@ export async function requireGlobalAdmin(user: SessionUser): Promise<void> {
 export async function requireMaterialManager(
   user: SessionUser,
   materialId: string,
+  eventId?: string | null,
 ): Promise<void> {
   const material = await prisma.songMaterial.findUnique({
     where: { id: materialId },
-    select: { eventId: true },
+    select: { eventId: true, songId: true },
   });
   if (!material) throw new Error("Not found");
-  if (!material.eventId) {
+  if (material.eventId) {
+    await requireEventManager(user, material.eventId);
+    return;
+  }
+  // Library material on a setlist song: EVENT_ADMIN of the open event in
+  // context may manage it. Without eventId, only global ADMIN (Pustaka).
+  const scopedEventId = eventId?.trim() || "";
+  if (!scopedEventId) {
     await requireGlobalAdmin(user);
     return;
   }
-  await requireEventManager(user, material.eventId);
+  await requireEventManagerForSong(user, material.songId, scopedEventId);
 }

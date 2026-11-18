@@ -65,7 +65,9 @@ export async function updateEventAction(
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };
   }
-  const result = await updateEvent(admin.id, id, parsed.data);
+  const result = await updateEvent(admin.id, id, parsed.data, {
+    statusFieldChanged: formData.get("eventStatusChanged") === "1",
+  });
   if (!result.ok) return { ok: false, error: result.error };
   revalidatePath("/event");
   revalidatePath(`/event/${id}`);

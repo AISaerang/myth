@@ -152,7 +152,8 @@ Expand → migrate → contract. This plan covers **expand + migrate** only. Con
 1. `prisma migrate dev --name event_type_membership` locally. SQL only `ADD COLUMN` / `CREATE TABLE` / `CREATE INDEX`. No drop.
 2. Membership backfill (idempotent, `INSERT ... SELECT ... ON DUPLICATE KEY UPDATE`):
    - Every existing event → `eventType = REGIONAL`, `region = 'JABODETABEK_BANDUNG'`.
-   - Every active user → membership only on the current regional event (same newest non-`CANCELLED` selection as `getCurrentEvent()`, the 14 Nov event): `ADMIN` → `EVENT_ADMIN`, `USER` → `MEMBER`, `OBSERVER` → `OBSERVER`. Do not grant membership automatically to older regional events.
+   - Historical one-time fill (already applied): every then-active user → membership only on the current regional event (same newest non-`CANCELLED` selection as `getCurrentEvent()`, the 14 Nov event): `ADMIN` → `EVENT_ADMIN`, `USER` → `MEMBER`, `OBSERVER` → `OBSERVER`. Do not grant membership automatically to older regional events.
+   - **Do not re-run that migration SQL.** Re-running the `INSERT` adds every active user who is missing from the newest regional event, including `INTERNAL_GEHC`-only accounts (PROD, 4 Nov 2026) and breaks per-event POV isolation. Further repair is only `npm run backfill:memberships` (dry-run by default; see docs/12, "Operasi: backfill membership"). It adds the newest non-cancelled REGIONAL event solely for active users with **zero** `EventMembership` rows. A user who already belongs to any event is never auto-added to another.
    - Owner `aisaerang` (global ADMIN) gets `EVENT_ADMIN` on every GEHC event he creates (Q1). Do this in the "create event" action, not in the backfill.
 3. Library migration `song_library` (Q5), idempotent:
    - Every existing `Song` stays as the library row (same `id`) → chart sections, arrangements, versions, chords in C and original key are untouched.
@@ -166,7 +167,7 @@ Expand → migrate → contract. This plan covers **expand + migrate** only. Con
    Rules:
    - Migrations must be **additive and safe**: add column (nullable or with default), add table, add index. No drop/rename in the same release as code that still uses the old shape (expand → migrate → contract over 2 releases).
    - A failed `migrate deploy` fails the build, so the old deployment stays live. Good.
-   - Backfill is **idempotent** (`upsert`). Run it as a separate step (`npm run backfill:membership`) or inside the migration SQL (`INSERT ... SELECT ... ON DUPLICATE KEY UPDATE`). Prefer SQL in the migration so it runs in the same build.
+   - The membership `INSERT` already shipped inside migration `20261103000010_event_type_membership` and must not be run again. Later backfill is `npm run backfill:memberships` only. Account creation does not auto-join any event; an admin assigns the account to the event they choose. Creating an event still adds the creator as `EVENT_ADMIN` of that new event.
    - **Preview vs production DB:** Vercel Preview builds also run `vercel-build`. If Preview uses the production `DATABASE_URL`, a PR branch can migrate production. Set a separate Preview `DATABASE_URL` (TiDB branch/dev DB), or skip `migrate deploy` when `VERCEL_ENV !== "production"`.
    - Back up / snapshot TiDB before the first release with this change.
 
@@ -251,18 +252,21 @@ async function getActiveEventFor(user, requestedId?) {
 ### 6.1 Two levels
 | Level | Who | Power |
 |---|---|---|
-| Global `ADMIN` (super admin) | Owner / MD (`aisaerang`) | All events; **only role that creates/resets/deactivates accounts** (Q4); create events; assign event admins; manage Pustaka Lagu. |
-| `EVENT_ADMIN` | e.g. admin GEHC | Full music/ops CRUD **in that event only**; add/remove/change role of **existing** accounts in that event (Q4). No account create/reset. Owner is currently EVENT_ADMIN of the GEHC event (Q1). |
+| Global `ADMIN` (super admin) | `User.role = ADMIN` (operational account `alvandi`, not a username check) | All events; **only role that creates/resets/deactivates accounts** (Q4); create events; assign event admins; manage Pustaka Lagu. |
+| `EVENT_ADMIN` | Membership on that event (operational account `aisaerang` is global `USER` + `EVENT_ADMIN` only where assigned) | Full music/ops CRUD **in that event only**; add/remove/change role of **existing** accounts in that event (Q4). No account create/reset. |
 | `MEMBER` | Pemusik | Same as current USER, scoped to the event. |
 | `OBSERVER` | Pantau | Same as current OBSERVER, scoped to the event. |
 | No membership | — | Event is invisible (404). With zero memberships: empty state only (Q7). |
+
+Correction 6 Nov 2026: Q1 named `aisaerang` as global ADMIN. That account identity is superseded. `alvandi` is the global ADMIN; `aisaerang` stays `USER` and receives `EVENT_ADMIN` only through event membership. Do not hardcode either username into a privilege check. Preview mode (docs/06) does not change this matrix.
 
 ### 6.2 Access matrix (per event)
 | Area | Global ADMIN | EVENT_ADMIN | MEMBER | OBSERVER | Not assigned |
 |---|---|---|---|---|---|
 | See event in switcher | ✓ | ✓ | ✓ | ✓ | ✗ |
 | Event brief edit | ✓ | ✓ | ✗ | ✗ | ✗ |
-| Pustaka Lagu: create/edit library song, chords (C), original key, credits | ✓ | ✗ (see §6.4) | ✗ | ✗ | ✗ |
+| Pustaka Lagu page, create library song, archive/restore, library materials | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Edit chords/sections/arrangements of a song on this event's setlist | ✓ | ✓ while access is open (shared Song record; see §6.4) | ✗ | ✗ | ✗ |
 | Setlist: add/remove/order EventSong, event key/notes/status/publish | ✓ | ✓ | ✗ | ✗ | ✗ |
 | Batches/assignments in event | ✓ | ✓ | ✗ | ✗ | ✗ |
 | Pustaka Lagu read (to pick songs) | ✓ | ✓ | ✗ | ✗ | ✗ |
@@ -293,8 +297,8 @@ async function getActiveEventFor(user, requestedId?) {
 - `Song` = library item. It holds title, credits (artist, arranger), **chords stored transposed to C**, **original key** in `Song.key`, chart sections/arrangements, library materials.
 - `EventSong` = the song inside one event setlist. It holds order, event key (`eventKey`), notes, status, publish, final lock, and links to batch, assignments, progress, rehearsal.
 - Display key = `EventSong.eventKey ?? Song.key`; chart renders from C to that key.
-- Editing library chords changes the chart for **every** event that uses the song. Show a warning: "Lagu ini dipakai di N event."
-- Library edit = global ADMIN only (assumption; EVENT_ADMIN may be allowed later). EVENT_ADMIN picks from the library and edits only `EventSong` fields.
+- Editing library chords changes the chart for **every** event that uses the song. The chart editor and song form warn: "Lagu ini dipakai di N event."
+- Update 9 Nov 2026: an `EVENT_ADMIN` may edit chords, chart sections, arrangements, and the song form (nada dasar, referensi, catatan, publish, materi event) for a song linked to **their** event, while access is open. The mutation requires that `eventId`. An event admin of a different event, a member, and an observer are rejected. A song in several events is still one library `Song`: the edit is allowed from any event they manage, and the shared chart/metadata changes everywhere that song is used. Creating a library song, the Pustaka page, archive/restore, and materials with `eventId` null stay global ADMIN. EVENT_ADMIN still picks existing songs onto the setlist.
 - Members see a library song only through an `EventSong` of an event they belong to, and only when `EventSong.isPublished` (or they are admin). No direct library browsing for MEMBER/OBSERVER.
 - Removing a song from a setlist deletes the `EventSong` (with its event data, after confirm); never deletes the library `Song` (`onDelete: Restrict`).
 
@@ -330,7 +334,7 @@ P8 implementation (release prep, branch `feature/gehc-events`, owner merge pendi
 - Integration: user in regional only → GEHC song URL returns 404; dashboard lists only regional.
 - Integration: EVENT_ADMIN GEHC → can CRUD GEHC songs; regional song action is rejected.
 - Integration: OBSERVER in GEHC → sees published only; no mutation.
-- Migration: run backfill twice → no duplicate rows.
+- Do not re-run migration `20261103000010` SQL. `npm run backfill:memberships` twice adds no further rows: users who already have any membership are excluded. A GEHC-only user is not added to the regional event.
 - Regression: existing flows in docs/10 pass for the 14 Nov event with no data change.
 - Empty state: user with zero memberships → dashboard shows only empty message; `/songs`, `/rehearsals` etc. show no data / 404.
 - Close access: EVENT_ADMIN closes → MEMBER/OBSERVER lose access; EVENT_ADMIN + global ADMIN still see it; reopen restores; 2 audit rows. MEMBER calling close action → rejected. Setting `COMPLETED` does not close access.
@@ -346,6 +350,7 @@ P8 implementation (release prep, branch `feature/gehc-events`, owner merge pendi
 | Risk | Mitigation |
 |---|---|
 | Code deployed before migration/backfill → crash or nobody sees data | `migrate deploy` runs before `next build`; failed migration fails build. |
+| Re-running the membership migration SQL attaches GEHC-only users to the regional event | Do not re-run that SQL. Use `npm run backfill:memberships`, which only fills active users with zero memberships. |
 | Library chord edit affects all events | Warning with usage count; audit. |
 | Data loss in song move | Same Song ids kept; additive columns; count checks; no drop until P9. |
 | Preview build migrates production DB | Separate Preview `DATABASE_URL` or skip migrate outside production. |
@@ -363,4 +368,4 @@ P8 implementation (release prep, branch `feature/gehc-events`, owner merge pendi
 - [x] **Q7** No membership → **empty state, no data** (global ADMIN excepted). No auto-join. *Resolved 2 Nov 2026.* See §5.3.
 - [x] **Q8** Completed events → access closes **only** via manual "Tutup akses" by the event's EVENT_ADMIN or global ADMIN, audited; visible until then; admins can view/reopen. *Resolved 2 Nov 2026.* See §6.3.
 
-Remaining assumptions (confirm during build): library edit is global ADMIN only; `SongMaterial` rows stay library-level by default.
+Remaining assumptions (confirm during build): library edit is global ADMIN only. Materi yang ditambah dari halaman lagu event menyertakan `eventId` event itu. `eventId` yang dikosongkan (seed/pustaka) disimpan `null`, bukan id palsu.

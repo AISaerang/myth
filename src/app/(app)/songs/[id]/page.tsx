@@ -1,22 +1,47 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import { ArchiveSongButton, RestoreSongButton } from "@/components/SongArchiveButtons";
+import { SetlistNav } from "@/components/SetlistNav";
+import { BatchOrderBadge } from "@/components/BatchOrderBadge";
 import { Badge } from "@/components/ui/Badge";
+import { badgesForSong } from "@/lib/batch-badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { canReadEventSong, isAdmin, isObserver } from "@/lib/permissions";
-import { getSong } from "@server/services/song-service";
+import { resolveSetlistNav } from "@/lib/setlist-nav";
+import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
+import {
+  canManageEvent,
+  canManageSongNotes,
+  canReadDrafts,
+  canReadEventSong,
+  canWriteEventData,
+  canWriteSongNotes,
+  isAdmin,
+  isObserver,
+} from "@/lib/permissions";
+import { listEventBatchCatalog } from "@server/services/batch-service";
+import { getSong, listEventAssignablePeople } from "@server/services/song-service";
 import { getCurrentEvent } from "@server/services/event-service";
 import { getEventRole } from "@server/services/event-access";
 import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-service";
 import { getMyProgress, getSongProgress } from "@server/services/progress-service";
 import { listChordCharts } from "@server/services/chord-service";
-import { getActiveArrangementContent } from "@server/services/chart-arrangement-service";
+import {
+  getActiveArrangementContent,
+  listChartSections,
+} from "@server/services/chart-arrangement-service";
+import { getInstrumentChart } from "@server/services/instrument-chart-service";
+import {
+  listSongNotes,
+} from "@server/services/note-service";
 import { listSongTasks } from "@server/services/task-service";
 import { listRehearsals } from "@server/services/rehearsal-service";
 import { prisma } from "@/lib/db";
 import { formatJakarta } from "@/lib/format";
 import { isTaskOverdue } from "@/lib/task-status";
+import { MedleyLabelForm } from "../../batches/MedleyLabelForm";
 import { SongForm } from "../SongForm";
 import { SongStatusBadge } from "../SongStatusBadge";
 import { MATERIAL_CATEGORY_LABEL } from "../material-labels";
@@ -26,6 +51,7 @@ import {
 } from "./ProgressForms";
 import { CreateSuggestionForm } from "../../tasks/TaskForms";
 import { ChordChartSection } from "./ChordChartSection";
+import { SongNotes } from "./SongNotes";
 import {
   OverdueBadge,
   PracticeStatusBadge,
@@ -48,7 +74,7 @@ function Meta({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <dt className="text-zinc-500 dark:text-zinc-400">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+      <dd className="font-medium break-words">{value}</dd>
     </div>
   );
 }
@@ -58,11 +84,11 @@ export default async function SongDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ eventId?: string }>;
+  searchParams: Promise<{ eventId?: string; batchId?: string }>;
 }) {
   const user = await requireFreshUser();
   const { id } = await params;
-  const { eventId: requestedEventId } = await searchParams;
+  const { eventId: requestedEventId, batchId } = await searchParams;
   const legacySong = requestedEventId
     ? null
     : await prisma.song.findUnique({
@@ -74,11 +100,42 @@ export default async function SongDetailPage({
     legacySong?.eventId ??
     (await getCurrentEvent(user))?.id;
   if (!eventId) notFound();
-  const song = await getSong(id, eventId);
+  const [song, catalog] = await Promise.all([
+    getSong(id, eventId),
+    listEventBatchCatalog(eventId),
+  ]);
   if (!song) notFound();
   const eventRole = await getEventRole(user, song.eventId);
   const admin = isAdmin(user);
   const observer = isObserver(user);
+  const eventAccess = await prisma.event.findUnique({
+    where: { id: song.eventId },
+    select: { accessClosedAt: true },
+  });
+  const canWrite = canWriteEventData(
+    eventRole,
+    Boolean(eventAccess?.accessClosedAt),
+    admin,
+  );
+  const previewing =
+    uiModeForEvent((await cookies()).get(UI_MODE_COOKIE)?.value, song.eventId) ===
+      "preview" &&
+    (admin || canManageEvent(eventRole));
+  const publishedOnly =
+    previewing || !(admin || canReadDrafts(eventRole));
+  const batchBadges = badgesForSong(song.id, catalog, { publishedOnly });
+  const canEditSong = canWrite && !previewing;
+  const setlistNav = resolveSetlistNav(song.id, catalog, {
+    publishedOnly,
+    batchId,
+  });
+  const medleyLabels = [
+    ...new Set(
+      batchBadges
+        .map((badge) => badge.medleyLabel)
+        .filter((label): label is string => Boolean(label)),
+    ),
+  ];
   if (
     !canReadEventSong(
       user,
@@ -90,8 +147,9 @@ export default async function SongDetailPage({
   ) {
     notFound();
   }
+  if (previewing && !song.isPublished) notFound();
   let myAssignment: (typeof song.assignments)[number] | undefined;
-  if (!admin && !observer) {
+  if (!canEditSong && !observer) {
     const person = await prisma.person.findUnique({
       where: { userId: user.id },
     });
@@ -100,95 +158,229 @@ export default async function SongDetailPage({
       : undefined;
   }
 
+  const assignedInstrumentSkillIds =
+    myAssignment?.instrumentSkillId
+      ? [myAssignment.instrumentSkillId]
+      : [];
+  const [songNotes, chartSections, skillRows] = await Promise.all([
+    listSongNotes(song.eventSongId, {
+      userId: user.id,
+      eventRole,
+      globalAdmin: admin,
+      observer,
+      assignedInstrumentSkillIds,
+    }),
+    listChartSections(song.id),
+    prisma.instrumentSkill.findMany({
+      select: { name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  const noteTargetOptions = [
+    ...new Map(
+      song.assignments
+        .filter((assignment) => assignment.instrumentSkill)
+        .map((assignment) => [
+          assignment.instrumentSkill!.id,
+          {
+            id: assignment.instrumentSkill!.id,
+            name: assignment.instrumentSkill!.name,
+          },
+        ]),
+    ).values(),
+  ];
+  const canWriteNotes =
+    !previewing &&
+    canWriteSongNotes(
+      user,
+      eventRole,
+      Boolean(eventAccess?.accessClosedAt),
+      song.isPublished,
+    );
+  const sharedEventCount = canEditSong
+    ? await prisma.eventSong.count({ where: { songId: song.id } })
+    : 0;
+  const songEventId = song.eventId;
+  function canManageThisMaterial(materialEventId: string | null): boolean {
+    if (!canEditSong) return false;
+    // Event materials and library materials shown on this setlist song.
+    // Archive of the library song itself stays global-admin only.
+    return materialEventId === songEventId || materialEventId == null;
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+    <div className="flex w-full min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <h1 className="min-w-0 break-words text-xl font-bold tracking-tight sm:text-2xl">
           {song.title}
         </h1>
-        <SongStatusBadge status={song.status} />
         {song.isPublished ? (
-          <Badge tone="success">Publikasi</Badge>
+          <span title="Status kerja = tahap persiapan lagu. Publikasi = terlihat oleh pemusik.">
+            <Badge tone="success">Publikasi: Dipublikasi</Badge>
+          </span>
         ) : (
-          <Badge tone="neutral">Draft internal</Badge>
+          <span title="Status kerja = tahap persiapan lagu. Publikasi = terlihat oleh pemusik.">
+            <Badge tone="neutral">Publikasi: Draft internal</Badge>
+          </span>
         )}
+        <span title="Status kerja = tahap persiapan lagu. Publikasi = terlihat oleh pemusik.">
+          <SongStatusBadge status={song.status} />
+        </span>
+        {batchBadges.map((badge) => (
+          <BatchOrderBadge
+            key={badge.anchorId}
+            badge={badge.badge}
+            batchName={badge.batchName}
+          />
+        ))}
+        {medleyLabels.length > 0 ? (
+          <span className="text-sm text-zinc-500">
+            Medley: {medleyLabels.join(" · ")}
+          </span>
+        ) : null}
         {song.isFinalLocked ? <Badge tone="danger">Final terkunci</Badge> : null}
       </div>
 
-      <Card title="Overview">
-        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <Meta label="Fungsi liturgi" value={song.liturgicalFunction} />
-          <Meta label="Artis/pencipta" value={song.artistOrAuthor} />
-          <Meta label="Key" value={song.key} />
-          <Meta label="Tempo" value={song.bpm ? `${song.bpm} BPM` : null} />
-          <Meta label="Birama" value={song.timeSignature} />
-          <Meta
-            label="Estimasi durasi"
-            value={
-              song.estimatedDurationSeconds
-                ? `${Math.floor(song.estimatedDurationSeconds / 60)}:${String(song.estimatedDurationSeconds % 60).padStart(2, "0")}`
-                : null
+      <SetlistNav songId={song.id} eventId={song.eventId} nav={setlistNav} />
+
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <aside className="order-2 min-w-0 space-y-4 lg:order-none lg:col-start-2 lg:row-start-1">
+          <Card title="Overview">
+            <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
+              <Meta label="Fungsi liturgi" value={song.liturgicalFunction} />
+              <Meta label="Artis/pencipta" value={song.artistOrAuthor} />
+              <Meta label="Key" value={song.key} />
+              <Meta label="Tempo" value={song.bpm ? `${song.bpm} BPM` : null} />
+              <Meta label="Birama" value={song.timeSignature} />
+              <Meta
+                label="Estimasi durasi"
+                value={
+                  song.estimatedDurationSeconds
+                    ? `${Math.floor(song.estimatedDurationSeconds / 60)}:${String(song.estimatedDurationSeconds % 60).padStart(2, "0")}`
+                    : null
+                }
+              />
+              <Meta label="Event" value={song.event.name} />
+              <Meta
+                label="Batch"
+                value={song.batchItems.map((b) => b.batch.name).join(", ") || null}
+              />
+            </dl>
+            {song.originalReferenceUrl ? (
+              <p className="mt-3 text-sm">
+                <a
+                  href={song.originalReferenceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline"
+                >
+                  Buka referensi original
+                </a>
+              </p>
+            ) : null}
+            {song.arrangementNotes ? (
+              <div className="mt-3 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
+                <p className="font-medium">Arah aransemen (MD)</p>
+                <p className="text-zinc-600 break-words dark:text-zinc-400">
+                  {song.arrangementNotes}
+                </p>
+              </div>
+            ) : null}
+          </Card>
+
+          {canWrite && !previewing && batchBadges.length > 0 ? (
+            <Card title="Medley">
+              <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+                Isi label yang sama pada lagu berurutan di satu batch untuk membuat koridor.
+                Di tengah medley, pemusik melihat lagu berikutnya. Kembali ke badge hanya
+                muncul di lagu terakhir medley atau lagu di luar medley.
+              </p>
+              <div className="flex flex-col gap-3">
+                {batchBadges.map((badge) => (
+                  <div key={badge.batchId} className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">
+                      {badge.batchName} · badge {badge.badge}
+                    </p>
+                    <MedleyLabelForm
+                      batchId={badge.batchId}
+                      songId={song.id}
+                      songTitle={song.title}
+                      label={badge.medleyLabel}
+                    />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
+
+          {!canEditSong && myAssignment ? (
+            <Card title="Tugasmu">
+              <p className="text-sm">
+                {myAssignment.instrumentSkill
+                  ? `Part: ${myAssignment.instrumentSkill.name}`
+                  : "Part: sesuai arahan MD"}
+                {myAssignment.assignmentNote ? ` — ${myAssignment.assignmentNote}` : ""}
+              </p>
+            </Card>
+          ) : null}
+
+          {canEditSong || observer || myAssignment ? (
+            <SongProgress
+              songId={song.id}
+              eventSongId={song.eventSongId}
+              admin={canEditSong}
+              observer={observer && !previewing}
+              userId={user.id}
+            />
+          ) : (
+            <Card title="Progres latihan">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Kamu dapat melihat lagu ini. Update progres tersedia setelah lagu
+                ditugaskan kepadamu.
+              </p>
+            </Card>
+          )}
+
+          <SongNotes
+            songId={song.id}
+            eventSongId={song.eventSongId}
+            notes={songNotes}
+            sections={chartSections.map((section) => ({
+              id: section.id,
+              label: section.label,
+              type: section.type,
+            }))}
+            partOptions={skillRows.map((row) => row.name)}
+            defaultPart={myAssignment?.instrumentSkill?.name ?? null}
+            canWrite={canWriteNotes}
+            currentUserId={user.id}
+            canModerate={!previewing && canManageSongNotes(user, eventRole)}
+          />
+        </aside>
+
+        <div className="order-1 min-w-0 max-w-full lg:order-none lg:col-start-1 lg:row-start-1">
+          <SongChordChart
+            songId={song.id}
+            eventId={song.eventId}
+            songKey={song.key}
+            eventSongId={song.eventSongId}
+            admin={canEditSong}
+            sections={chartSections.map((section) => ({
+              id: section.id,
+              label: section.label,
+              type: section.type,
+            }))}
+            notes={songNotes}
+            noteTargetOptions={noteTargetOptions}
+            canWriteNotes={canWriteNotes}
+            canModerateNotes={
+              !previewing && canManageSongNotes(user, eventRole)
             }
+            currentUserId={user.id}
+            defaultPart={myAssignment?.instrumentSkill?.name ?? null}
           />
-          <Meta label="Event" value={song.event.name} />
-          <Meta
-            label="Batch"
-            value={song.batchItems.map((b) => b.batch.name).join(", ") || null}
-          />
-        </dl>
-        {song.originalReferenceUrl ? (
-          <p className="mt-3 text-sm">
-            <a
-              href={song.originalReferenceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium underline"
-            >
-              Buka referensi original
-            </a>
-          </p>
-        ) : null}
-        {song.arrangementNotes ? (
-          <div className="mt-3 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
-            <p className="font-medium">Arah aransemen (MD)</p>
-            <p className="text-zinc-600 dark:text-zinc-400">{song.arrangementNotes}</p>
-          </div>
-        ) : null}
-      </Card>
-
-      {!admin && myAssignment ? (
-        <Card title="Tugasmu">
-          <p className="text-sm">
-            {myAssignment.instrumentSkill
-              ? `Part: ${myAssignment.instrumentSkill.name}`
-              : "Part: sesuai arahan MD"}
-            {myAssignment.assignmentNote ? ` — ${myAssignment.assignmentNote}` : ""}
-          </p>
-        </Card>
-      ) : null}
-
-      {admin || observer || myAssignment ? (
-        <SongProgress
-          songId={song.id}
-          eventSongId={song.eventSongId}
-          admin={admin}
-          observer={observer}
-          userId={user.id}
-        />
-      ) : (
-        <Card title="Progres latihan">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Kamu dapat melihat lagu ini. Update progres tersedia setelah lagu
-            ditugaskan kepadamu.
-          </p>
-        </Card>
-      )}
-
-      <SongChordChart
-        songId={song.id}
-        eventId={song.eventId}
-        admin={admin}
-      />
+        </div>
+      </div>
 
       <Card title="Materi aktif">
         {song.materials.filter((m) => m.isActive).length === 0 ? (
@@ -217,12 +409,13 @@ export default async function SongDetailPage({
                     {m.versionLabel ? ` · ${m.versionLabel}` : ""}
                   </p>
                   {m.description ? (
-                    <p className="text-zinc-600 dark:text-zinc-400">{m.description}</p>
+                    <p className="text-zinc-600 break-words dark:text-zinc-400">{m.description}</p>
                   ) : null}
-                  {admin ? (
+                  {canManageThisMaterial(m.eventId) ? (
                     <div className="mt-2">
                       <MaterialActions
                         songId={song.id}
+                        eventId={song.eventId}
                         materialId={m.id}
                         isActive={m.isActive}
                       />
@@ -234,12 +427,13 @@ export default async function SongDetailPage({
         )}
       </Card>
 
-      {admin ? (
+      {canEditSong ? (
         <>
           <SongForm
             mode="edit"
             eventId={song.eventId}
             songId={song.id}
+            sharedEventCount={sharedEventCount}
             defaults={{
               title: song.title,
               artistOrAuthor: song.artistOrAuthor,
@@ -268,10 +462,12 @@ export default async function SongDetailPage({
             songId={song.id}
             eventId={song.eventId}
             assignments={song.assignments}
+            globalDirectory={admin}
           />
           <Card title="Tambah materi">
             <MaterialForm
               songId={song.id}
+              eventId={song.eventId}
               versions={song.versions.map((v) => ({
                 id: v.id,
                 versionLabel: v.versionLabel,
@@ -293,21 +489,31 @@ export default async function SongDetailPage({
                         {MATERIAL_CATEGORY_LABEL[m.category]}
                         {m.versionLabel ? ` · ${m.versionLabel}` : ""}
                       </p>
-                      <div className="mt-2">
-                        <MaterialActions
-                          songId={song.id}
-                          materialId={m.id}
-                          isActive={m.isActive}
-                        />
-                      </div>
+                      {canManageThisMaterial(m.eventId) ? (
+                        <div className="mt-2">
+                          <MaterialActions
+                            songId={song.id}
+                            eventId={song.eventId}
+                            materialId={m.id}
+                            isActive={m.isActive}
+                          />
+                        </div>
+                      ) : null}
                     </li>
                   ))}
               </ul>
             </Card>
           ) : null}
           <Card title="Buat versi aransemen">
-            <VersionForm songId={song.id} />
+            <VersionForm songId={song.id} eventId={song.eventId} />
           </Card>
+          {admin ? (
+            song.archivedAt ? (
+              <RestoreSongButton songId={song.id} eventId={song.eventId} />
+            ) : (
+              <ArchiveSongButton songId={song.id} eventId={song.eventId} />
+            )
+          ) : null}
         </>
       ) : null}
 
@@ -329,17 +535,19 @@ export default async function SongDetailPage({
                     <Badge tone="neutral">Digantikan/arsip</Badge>
                   ) : null}
                 </div>
-                <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                <p className="mt-1 text-zinc-600 break-words dark:text-zinc-400">
                   {v.changeSummary}
                 </p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-zinc-500 break-words">
                   {[v.key ? `Key ${v.key}` : null, v.bpm ? `${v.bpm} BPM` : null]
                     .filter(Boolean)
                     .join(" · ")}
                   {v.grooveNotes ? ` · Groove: ${v.grooveNotes}` : ""}
                 </p>
                 {v.structureNotes ? (
-                  <p className="text-xs text-zinc-500">Struktur: {v.structureNotes}</p>
+                  <p className="text-xs text-zinc-500 break-words">
+                    Struktur: {v.structureNotes}
+                  </p>
                 ) : null}
                 {v.referenceUrl ? (
                   <p className="text-xs">
@@ -353,10 +561,11 @@ export default async function SongDetailPage({
                     </a>
                   </p>
                 ) : null}
-                {admin ? (
+                {canEditSong ? (
                   <div className="mt-2">
                     <VersionActions
                       songId={song.id}
+                      eventId={song.eventId}
                       eventSongId={song.eventSongId}
                       versionId={v.id}
                       isActive={v.isActive}
@@ -372,7 +581,7 @@ export default async function SongDetailPage({
 
       <SongTasks songId={song.id} eventId={song.eventId} />
 
-      {!admin ? (
+      {!canEditSong ? (
         <SongSuggestion
           eventId={song.eventId}
           songId={song.id}
@@ -386,23 +595,57 @@ export default async function SongDetailPage({
 async function SongChordChart({
   songId,
   eventId,
+  songKey,
+  eventSongId,
   admin,
+  sections,
+  notes,
+  noteTargetOptions,
+  canWriteNotes,
+  canModerateNotes,
+  currentUserId,
+  defaultPart,
 }: {
   songId: string;
   eventId: string;
+  songKey: string | null;
+  eventSongId: string;
   admin: boolean;
+  sections: {
+    id: string;
+    label: string;
+    type: string;
+  }[];
+  notes: Awaited<ReturnType<typeof listSongNotes>>;
+  noteTargetOptions: { id: string; name: string }[];
+  canWriteNotes: boolean;
+  canModerateNotes: boolean;
+  currentUserId: string;
+  defaultPart: string | null;
 }) {
-  const [charts, arrangement] = await Promise.all([
+  const [charts, arrangement, instrumentChart] = await Promise.all([
     listChordCharts(songId),
     getActiveArrangementContent(songId),
+    getInstrumentChart(songId),
   ]);
   return (
     <ChordChartSection
       songId={songId}
       eventId={eventId}
+      songKey={songKey}
+      defaultCapo={instrumentChart.capo}
+      instrumentData={instrumentChart.data}
+      eventSongId={eventSongId}
       admin={admin}
       charts={charts}
       arrangement={arrangement}
+      sections={sections}
+      notes={notes}
+      noteTargetOptions={noteTargetOptions}
+      canWriteNotes={canWriteNotes}
+      canModerateNotes={canModerateNotes}
+      currentUserId={currentUserId}
+      defaultPart={defaultPart}
     />
   );
 }
@@ -572,16 +815,27 @@ async function AdminPersonnel({
   songId,
   eventId,
   assignments,
+  globalDirectory,
 }: {
   songId: string;
   eventId: string;
   assignments: NonNullable<Awaited<ReturnType<typeof getSong>>>["assignments"];
+  globalDirectory: boolean;
 }) {
   const [people, skills] = await Promise.all([
-    listPersonnelForAdmin(),
+    globalDirectory
+      ? listPersonnelForAdmin().then((rows) =>
+          rows
+            .filter((person) => person.isActive)
+            .map((person) => ({
+              id: person.id,
+              displayName: person.displayName,
+            })),
+        )
+      : listEventAssignablePeople(eventId),
     listSkills(),
   ]);
-  const activePeople = people.filter((p) => p.isActive);
+  const activePeople = people;
   const assignedIds = new Set(assignments.map((a) => a.personId));
   return (
     <Card title={`Personel (${assignments.length})`}>

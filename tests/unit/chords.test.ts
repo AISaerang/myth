@@ -15,6 +15,7 @@ import {
   transposeChord,
   transposeContent,
   transposeRoot,
+  transposeSpacedChords,
 } from "@/lib/chords";
 import type { ChordLyricLayout } from "@/lib/chords";
 
@@ -257,8 +258,63 @@ describe("over-under editor format", () => {
     expect(isOverUnderFormat("Bapa sentuh hatiku tanpa chord")).toBe(false);
   });
 
+  it("keeps notation beams in the lyric line and out of the chord list", () => {
+    const line = "[C]1 [5 6] [[1 2 3 4]]";
+    const layout = layoutChordLine(line);
+    expect(layout.lyricLine.trimEnd()).toBe("1 [5 6] [[1 2 3 4]]");
+    expect(layout.chordLine.trim()).toBe("C");
+    expect(extractChordLines(line)).toEqual(["C"]);
+    expect(stripChords(line)).toBe("1 [5 6] [[1 2 3 4]]");
+    expect(transposeContent("[C].7 [5 6] [[1 2]]", 2)).toBe("[D].7 [5 6] [[1 2]]");
+    expect(overUnderToChordPro(chordProToOverUnder(line))).toBe(line);
+  });
+
   it("leaves non-chord bracket tokens untouched", () => {
     const pro = "[?] halo [G]tuhan";
     expect(overUnderToChordPro(chordProToOverUnder(pro))).toBe(pro);
+  });
+
+  it("roundtrips an intro not-angka line without moving chord columns", () => {
+    const editor = "C   G\n1' 2 3 4 5";
+    const pro = "[C]1' 2[G] 3 4 5";
+    expect(overUnderToChordPro(editor)).toBe(pro);
+    expect(chordProToOverUnder(pro)).toBe(editor);
+  });
+
+  it("transposes a spaced chord line without swallowing the next column", () => {
+    expect(transposeSpacedChords("C   G", 2)).toBe("D   A");
+    expect(transposeSpacedChords("C   G", 1)).toBe("C#  G#");
+    expect(transposeSpacedChords("C   G", 1, true)).toBe("Db  Ab");
+    expect(transposeSpacedChords("C   G", 0)).toBe("C   G");
+  });
+
+  it("treats [[ ]] as literal text, not chords", () => {
+    expect(listChords("[[5 6]] [G]")).toEqual(["G"]);
+    expect(stripChords("[[5 6]] Bapa [G]sentuh")).toBe("[[5 6]] Bapa sentuh");
+    expect(extractChordLines("[G][[5 6]]")).toEqual(["G"]);
+    expect(transposeContent("[[5 6]] [C]", 1)).toBe("[[5 6]] [C#]");
+    const layout = layoutChordLine("[[5 6]] [C]");
+    expect(layout.lyricLine.startsWith("[[5 6]]")).toBe(true);
+    expect(layout.chordLine.trimEnd().endsWith("C")).toBe(true);
+  });
+
+  it("roundtrips the Sukacitaku outro slur lines through ChordPro", () => {
+    const stacked = "G/B\n(2 3 2)\nBb\n(.5 .6)";
+    const pro = overUnderToChordPro(stacked);
+    expect(pro).toBe("[G/B](2 3 2)\n[Bb](.5 .6)");
+    // Buka ulang editor: textarea sama dengan yang diketik.
+    expect(chordProToOverUnder(pro)).toBe(stacked);
+    // Simpan ulang tanpa perubahan: ChordPro identik.
+    expect(overUnderToChordPro(chordProToOverUnder(pro))).toBe(pro);
+  });
+
+  it("snaps chord columns off notation tokens and group parens", () => {
+    // Chord tepat di awal baris tetap di luar kurung.
+    expect(overUnderToChordPro("Bb\n(.5 .6)")).toBe("[Bb](.5 .6)");
+    // Chord sejajar di dalam kurung "(" kolom-1 tidak menghasilkan "([Bb]...":
+    // disnap keluar ke batas token.
+    expect(overUnderToChordPro(" Bb\n(.5 .6)")).toBe("[Bb](.5 .6)");
+    // Chord di tengah token ".5" disnap ke batas token, bukan membelah token.
+    expect(overUnderToChordPro("  Bb\n(.5 .6)")).toBe("(.5[Bb] .6)");
   });
 });

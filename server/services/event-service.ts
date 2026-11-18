@@ -5,7 +5,10 @@ import { AuditAction, writeAudit } from "@/lib/audit";
 import { ACTIVE_EVENT_COOKIE } from "@/lib/event-context";
 import { prisma } from "@/lib/db";
 import type { SessionUser } from "@/lib/permissions";
-import type { EventInput } from "@/lib/validation/event";
+import {
+  resolveEventStatusUpdate,
+  type EventInput,
+} from "@/lib/validation/event";
 import { getAccessibleEvent, listAccessibleEvents } from "./event-access";
 
 // Contact PIC panitia hanya untuk admin: bangun objek publik eksplisit
@@ -167,9 +170,16 @@ export async function updateEvent(
   actorUserId: string,
   id: string,
   input: EventInput,
+  options?: { statusFieldChanged?: boolean },
 ): Promise<{ ok: true; event: Event } | { ok: false; error: string }> {
   const existing = await prisma.event.findUnique({ where: { id } });
   if (!existing) return { ok: false, error: "Event tidak ditemukan." };
+
+  const eventStatus = resolveEventStatusUpdate(
+    existing.eventStatus,
+    input.eventStatus,
+    options?.statusFieldChanged === true,
+  );
 
   const event = await prisma.event.update({
     where: { id },
@@ -182,7 +192,7 @@ export async function updateEvent(
       venue: input.venue || null,
       theme: input.theme || null,
       targetDurationMinutes: input.targetDurationMinutes,
-      eventStatus: input.eventStatus as EventStatus,
+      eventStatus,
       liturgicalFlowUrl: input.liturgicalFlowUrl,
       committeePicName: input.committeePicName || null,
       committeePicContact: input.committeePicContact || null,

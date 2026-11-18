@@ -1,10 +1,15 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { connection } from "next/server";
+import { BatchOrderBadge } from "@/components/BatchOrderBadge";
+import { BatchSongGroups } from "./BatchSongGroups";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EventTypeBadge } from "@/components/ui/EventTypeBadge";
+import { badgesForSong, groupSongsByBatchBadge, withBadges } from "@/lib/batch-badge";
+import { UI_MODE_COOKIE, showMusicianSongView, uiModeForEvent } from "@/lib/ui-mode";
 import { requireFreshUser } from "@/lib/auth";
 import {
   canManageEvent,
@@ -12,16 +17,19 @@ import {
   isAdmin,
   isObserver,
 } from "@/lib/permissions";
+import { listEventBatchCatalog } from "@server/services/batch-service";
 import { getEventRole } from "@server/services/event-access";
 import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import {
   listAvailableSongsForEvent,
+  listEventAssignablePeople,
   listPublishedSongsForMember,
   listPublishedSongsForObserver,
   listSongLibrary,
   listSongs,
 } from "@server/services/song-service";
 import { notFound } from "next/navigation";
+import { BulkAssignPanel } from "./BulkAssignPanel";
 import { EventPicker } from "./EventPicker";
 import { SongForm } from "./SongForm";
 import { SongLibraryPicker } from "./SongLibraryPicker";
@@ -47,16 +55,18 @@ async function SongsContent({
         />
       );
     }
-    const songs = await listPublishedSongsForObserver(current.id);
+    const [songs, catalog] = await Promise.all([
+      listPublishedSongsForObserver(current.id),
+      listEventBatchCatalog(current.id),
+    ]);
+    const groups = groupSongsByBatchBadge(songs, catalog);
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           Lagu
         </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {isObserver(user)
-            ? "Mode pantau: hanya lagu yang sudah publish. Klik lagu untuk melihat progres semua personel dan memberi usulan."
-            : "Semua lagu yang sudah publish. Klik lagu untuk lirik, chord, referensi, dan update status latihanmu."}
+          Mode pantau: hanya lagu yang sudah publish, diurut badge batch. Klik lagu untuk melihat progres semua personel dan memberi usulan.
         </p>
         {songs.length === 0 ? (
           <EmptyState
@@ -64,25 +74,7 @@ async function SongsContent({
             description="Lagu yang sudah dipublish akan tampil di sini."
           />
         ) : (
-          <ul className="flex flex-col gap-2">
-            {songs.map((s) => (
-              <li key={s.id}>
-                <Link
-                  href={`/songs/${s.id}?eventId=${current.id}`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-                >
-                  <span>
-                    <span className="font-medium">{s.title}</span>
-                    <span className="block text-xs text-zinc-500">
-                      {[s.key ? `Key ${s.key}` : null, s.bpm ? `${s.bpm} BPM` : null, s.liturgicalFunction].filter(Boolean).join(" · ") ||
-                        `${s.assignments.length} personel`}
-                    </span>
-                  </span>
-                  <SongStatusBadge status={s.status} />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <BatchSongGroups eventId={current.id} groups={groups} />
         )}
       </div>
     );
@@ -110,47 +102,44 @@ async function SongsContent({
     Boolean(current?.accessClosedAt),
     isAdmin(user),
   );
-  if (!manager) {
-    const songs = await listPublishedSongsForMember(eventId);
+  const uiMode = uiModeForEvent(
+    (await cookies()).get(UI_MODE_COOKIE)?.value,
+    eventId,
+  );
+  const musicianView = showMusicianSongView(manager, uiMode);
+  if (musicianView) {
+    const [songs, catalog] = await Promise.all([
+      listPublishedSongsForMember(eventId),
+      listEventBatchCatalog(eventId),
+    ]);
+    const groups = groupSongsByBatchBadge(songs, catalog);
     return (
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Lagu Saya</h1>
           <EventTypeBadge type={current.eventType} />
         </div>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {manager
+            ? "Mode Preview: daftar publish dan badge batch seperti pemusik. Sesi dan hak akses tidak berubah."
+            : "Nomor di kiri adalah badge batch (urutan lagu di dalam batch), bukan status latihan."}
+        </p>
         {songs.length === 0 ? (
           <EmptyState
             title="Belum ada lagu publish"
             description="Lagu yang sudah dipublish di event ini akan tampil di sini."
           />
         ) : (
-          <ul className="flex flex-col gap-2">
-            {songs.map((song) => (
-              <li key={song.id}>
-                <Link
-                  href={`/songs/${song.id}?eventId=${current.id}`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-                >
-                  <span>
-                    <span className="font-medium">{song.title}</span>
-                    {song.liturgicalFunction ? (
-                      <span className="block text-xs text-zinc-500">
-                        {song.liturgicalFunction}
-                      </span>
-                    ) : null}
-                  </span>
-                  <SongStatusBadge status={song.status} />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <BatchSongGroups eventId={current.id} groups={groups} />
         )}
       </div>
     );
   }
-  const [songs, availableLibrarySongs] = await Promise.all([
+  const [songs, availableLibrarySongs, catalog, assignablePeople] = await Promise.all([
     listSongs(eventId),
     listAvailableSongsForEvent(eventId),
+    listEventBatchCatalog(eventId),
+    listEventAssignablePeople(eventId),
   ]);
   const librarySongs = isAdmin(user) ? await listSongLibrary() : [];
   const activeEvent = events.find((e) => e.id === eventId);
@@ -178,6 +167,40 @@ async function SongsContent({
           <SongLibraryPicker eventId={eventId} songs={availableLibrarySongs} />
         </Card>
       ) : null}
+      {canWrite ? (
+        <Card title="Tugaskan sekaligus">
+          <BulkAssignPanel
+            eventId={eventId}
+            people={assignablePeople.map((person) => ({
+              id: person.id,
+              displayName: person.displayName,
+              skills: person.skills.map((skill) => skill.name),
+            }))}
+            batches={catalog
+              .filter((batch) => batch.status !== "ARCHIVED")
+              .map((batch) => ({
+                id: batch.id,
+                name: batch.name,
+                songs: withBadges(batch)
+                  .filter((item) => songs.some((song) => song.id === item.songId))
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .map((item) => ({
+                    id: item.songId,
+                    title: item.title ?? songs.find((song) => song.id === item.songId)?.title ?? "Lagu",
+                    badge: item.badge,
+                  })),
+              }))}
+            songs={songs.map((song) => {
+              const badges = badgesForSong(song.id, catalog);
+              return {
+                id: song.id,
+                title: song.title,
+                badgeLabel: badges.map((badge) => `${badge.batchName} ${badge.badge}`).join(", "),
+              };
+            })}
+          />
+        </Card>
+      ) : null}
       {isAdmin(user) && librarySongs.length === 0 ? (
         <p className="text-sm text-zinc-500">Pustaka belum memiliki lagu master.</p>
       ) : null}
@@ -186,17 +209,32 @@ async function SongsContent({
           <EmptyState title="Belum ada lagu di event ini" />
         ) : (
           <ul className="flex flex-col gap-2">
-            {songs.map((s) => (
+            {songs.map((s) => {
+              const badges = badgesForSong(s.id, catalog);
+              return (
               <li key={s.id}>
                 <Link
                   href={`/songs/${s.id}?eventId=${eventId}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                 >
-                  <span>
-                    <span className="font-medium">{s.title}</span>
-                    <span className="block text-xs text-zinc-500">
-                      {[s.key ? `Key ${s.key}` : null, s.bpm ? `${s.bpm} BPM` : null, s.liturgicalFunction].filter(Boolean).join(" · ") ||
-                        "—"}
+                  <span className="flex min-w-0 items-center gap-2">
+                    {badges.length > 0 ? (
+                      <span className="flex flex-wrap gap-1">
+                        {badges.map((badge) => (
+                          <BatchOrderBadge
+                            key={badge.anchorId}
+                            badge={badge.badge}
+                            batchName={badges.length > 1 ? badge.batchName : null}
+                          />
+                        ))}
+                      </span>
+                    ) : null}
+                    <span className="min-w-0">
+                      <span className="font-medium">{s.title}</span>
+                      <span className="block text-xs text-zinc-500">
+                        {[s.key ? `Key ${s.key}` : null, s.bpm ? `${s.bpm} BPM` : null, s.liturgicalFunction].filter(Boolean).join(" · ") ||
+                          "—"}
+                      </span>
                     </span>
                   </span>
                   <span className="flex items-center gap-1">
@@ -205,7 +243,8 @@ async function SongsContent({
                   </span>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </Card>
