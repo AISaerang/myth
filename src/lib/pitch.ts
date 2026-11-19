@@ -3,7 +3,7 @@ import { transposeRoot } from "@/lib/chords";
 export const RH_MIN = "A3";
 export const RH_MAX = "C5";
 export const LH_MIN = "E1";
-export const LH_MAX = "C3";
+export const LH_MAX = "E3";
 
 interface ParsedPitch {
   midi: number;

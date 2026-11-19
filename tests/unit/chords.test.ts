@@ -109,6 +109,8 @@ describe("view modes", () => {
 
   it("lists unique valid chords", () => {
     expect(listChords(sample)).toEqual(["G", "D"]);
+    expect(listChords("[Bm C (Bm C)] [Am] [(G)] [N.C.] [2x] [A/C#] [A#maj7]"))
+      .toEqual(["Am", "A/C#", "A#maj7"]);
   });
 });
 
