@@ -18,6 +18,10 @@ import {
   updateChordChartAction,
 } from "@server/actions/chords";
 import type { ActionState } from "@server/actions/auth";
+import {
+  duplicateChartArrangementAction,
+  setEventSongArrangementAction,
+} from "@server/actions/chart-arrangements";
 import { ChordOverUnderEditor } from "./ChordOverUnderEditor";
 import {
   ChordViewer,
@@ -65,6 +69,10 @@ export function ChordChartSection({
   canModerateNotes,
   currentUserId,
   defaultPart,
+  roleTabs = [],
+  arrangements = [],
+  selectedArrangementId = null,
+  sharedEventCount = 0,
 }: {
   songId: string;
   eventId: string;
@@ -86,8 +94,18 @@ export function ChordChartSection({
   canModerateNotes: boolean;
   currentUserId: string;
   defaultPart: string | null;
+  roleTabs?: readonly { role: string; data: unknown }[];
+  arrangements?: readonly { id: string; name: string; isActive: boolean }[];
+  selectedArrangementId?: string | null;
+  sharedEventCount?: number;
 }) {
   const active = charts.find((c) => c.isActive) ?? null;
+  const [arrangementQuery, setArrangementQuery] = useState("");
+  const [duplicateName, setDuplicateName] = useState("");
+  const [setArrangementState, setArrangementAction, setArrangementPending] =
+    useActionState(setEventSongArrangementAction, { ok: false });
+  const [duplicateState, duplicateAction, duplicatePending] =
+    useActionState(duplicateChartArrangementAction, { ok: false });
   const history = charts.filter((c) => !c.isActive);
   const displaySections =
     arrangement?.sections ??
@@ -193,17 +211,85 @@ export function ChordChartSection({
       {arrangement ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-zinc-500">
-            Aransemen aktif:{" "}
+            Aransemen:{" "}
             <span className="font-medium text-zinc-700 dark:text-zinc-300">
               {arrangement.name}
             </span>
           </p>
+          {admin ? (
+            <div className="flex min-w-0 flex-col gap-2 rounded-lg border p-3">
+              {sharedEventCount > 1 ? (
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  Aransemen ini dipakai di {sharedEventCount} event. Edit akan terlihat di semua event itu. Duplikat dulu jika ini khusus event ini.
+                </p>
+              ) : null}
+              <input
+                type="search"
+                value={arrangementQuery}
+                onChange={(event) => setArrangementQuery(event.target.value)}
+                placeholder="Cari aransemen"
+                aria-label="Cari aransemen"
+                className={`${inputClass} max-w-sm`}
+              />
+              <div className="flex flex-wrap gap-2">
+                {arrangements
+                  .filter((item) =>
+                    item.name
+                      .toLocaleLowerCase("id")
+                      .includes(arrangementQuery.toLocaleLowerCase("id")),
+                  )
+                  .map((item) => (
+                    <form key={item.id} action={setArrangementAction}>
+                      <input type="hidden" name="eventId" value={eventId} />
+                      <input type="hidden" name="songId" value={songId} />
+                      <input type="hidden" name="arrangementId" value={item.id} />
+                      <Button
+                        type="submit"
+                        variant={item.id === selectedArrangementId ? "primary" : "secondary"}
+                        size="sm"
+                        disabled={setArrangementPending}
+                      >
+                        {item.id === selectedArrangementId ? "✓ " : ""}
+                        Pakai aransemen ini: {item.name}
+                      </Button>
+                    </form>
+                  ))}
+              </div>
+              <form action={duplicateAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="eventId" value={eventId} />
+                <input type="hidden" name="songId" value={songId} />
+                <input type="hidden" name="arrangementId" value={selectedArrangementId ?? ""} />
+                <label className="flex flex-col gap-1 text-xs font-medium">
+                  Nama aransemen
+                  <input
+                    name="name"
+                    value={duplicateName}
+                    onChange={(event) => setDuplicateName(event.target.value)}
+                    maxLength={60}
+                    required
+                    className={inputClass}
+                  />
+                </label>
+                <Button type="submit" variant="secondary" size="sm" disabled={duplicatePending}>
+                  Duplikat aransemen
+                </Button>
+              </form>
+              {!setArrangementState.ok && setArrangementState.error ? (
+                <Alert tone="danger">{setArrangementState.error}</Alert>
+              ) : null}
+              {!duplicateState.ok && duplicateState.error ? (
+                <Alert tone="danger">{duplicateState.error}</Alert>
+              ) : null}
+            </div>
+          ) : null}
           <ChordViewer
             content={arrangement.content}
             baseKey={songKey || "C"}
             songId={songId}
             defaultCapo={defaultCapo}
             instrumentData={instrumentData}
+            roleTabs={roleTabs}
+            defaultPart={defaultPart}
             preferenceKey={`myth_chart_view:${songId}`}
             legacyPreferenceKey={`myth-chart:${songId}`}
             sections={displaySections.map((section) => ({
@@ -227,6 +313,8 @@ export function ChordChartSection({
             songId={songId}
             defaultCapo={defaultCapo}
             instrumentData={instrumentData}
+            roleTabs={roleTabs}
+            defaultPart={defaultPart}
             preferenceKey={`myth_chart_view:${songId}`}
             legacyPreferenceKey={`myth-chart:${songId}`}
             sections={displaySections}

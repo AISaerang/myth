@@ -15,7 +15,10 @@ import {
   chartSectionDeleteSchema,
   chartSectionUpdateSchema,
   legacyChartImportSchema,
+  chartArrangementDuplicateSchema,
+  setEventSongArrangementSchema,
 } from "@/lib/validation/chart-arrangement";
+import { saveArrangementRoleTabSchema } from "@/lib/validation/arrangement-role";
 import {
   activateChartArrangement,
   createChartArrangement,
@@ -26,10 +29,14 @@ import {
   saveChartArrangementItems,
   updateChartArrangement,
   updateChartSection,
+  duplicateChartArrangement,
+  setEventSongArrangement,
+  saveArrangementRoleTab,
 } from "@server/services/chart-arrangement-service";
 import type { ActionState } from "./auth";
 import {
   optionalEventId,
+  requireEventManagerForSong,
   requireSongContentEditor,
   type SongContentChild,
 } from "./event-authorization";
@@ -152,6 +159,95 @@ export async function createChartArrangementAction(
   redirect(chartEditorPath(parsed.data.songId, result.id, eventId));
 }
 
+export async function duplicateChartArrangementAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = chartArrangementDuplicateSchema.safeParse({
+    songId: formData.get("songId"),
+    arrangementId: formData.get("arrangementId"),
+    name: formData.get("name"),
+    eventId: optionalEventId(formData.get("eventId")),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  const { user, eventId } = await authorizeChartEdit(
+    formData,
+    parsed.data.songId,
+    { kind: "chartArrangement", id: parsed.data.arrangementId },
+  );
+  const result = await duplicateChartArrangement(
+    user.id,
+    parsed.data.arrangementId,
+    parsed.data.name,
+    eventId,
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateSong(parsed.data.songId);
+  redirect(chartEditorPath(parsed.data.songId, result.id, eventId));
+}
+
+export async function setEventSongArrangementAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireActionUser();
+  const parsed = setEventSongArrangementSchema.safeParse({
+    eventId: formData.get("eventId"),
+    songId: formData.get("songId"),
+    arrangementId: formData.get("arrangementId"),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  await requireEventManagerForSong(
+    user,
+    parsed.data.songId,
+    parsed.data.eventId,
+  );
+  const result = await setEventSongArrangement(
+    user.id,
+    parsed.data.eventId,
+    parsed.data.songId,
+    parsed.data.arrangementId,
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateSong(parsed.data.songId);
+  revalidatePath(`/event/${parsed.data.eventId}`);
+  return { ok: true };
+}
+
+export async function saveArrangementRoleTabAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  let data: unknown;
+  try {
+    data = JSON.parse(String(formData.get("data") ?? "{}"));
+  } catch {
+    return { ok: false, error: "Data tab peran tidak valid." };
+  }
+  const parsed = saveArrangementRoleTabSchema.safeParse({
+    songId: formData.get("songId"),
+    arrangementId: formData.get("arrangementId"),
+    role: formData.get("role"),
+    data,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: firstIssueMessage(parsed.error) };
+  }
+  const { user } = await authorizeChartEdit(
+    formData,
+    parsed.data.songId,
+    { kind: "chartArrangement", id: parsed.data.arrangementId },
+  );
+  const result = await saveArrangementRoleTab(user.id, parsed.data);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateSong(parsed.data.songId);
+  return { ok: true };
+}
+
 export async function updateChartArrangementAction(
   _prev: ActionState,
   formData: FormData,
@@ -161,6 +257,7 @@ export async function updateChartArrangementAction(
     songId: formData.get("songId"),
     arrangementId: formData.get("arrangementId"),
     name: formData.get("name"),
+    defaultKey: formData.get("defaultKey") || null,
   });
   if (!parsed.success) {
     return { ok: false, error: firstIssueMessage(parsed.error) };

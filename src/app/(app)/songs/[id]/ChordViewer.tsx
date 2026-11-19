@@ -34,6 +34,11 @@ import {
 } from "@/lib/instrument-voicings";
 import type { InstrumentChartData } from "@/lib/validation/instrument-chart";
 import {
+  preferredInstrumentPov,
+  roleTabVisible,
+  type ArrangementRoleSlug,
+} from "@/lib/arrangement-roles";
+import {
   alignChordsToNotation,
   contentHasNotation,
   formatTransposeFormula,
@@ -44,7 +49,7 @@ import { clampTextSize, getStageSections, moveStageSection } from "@/lib/chart-s
 type ViewMode = "both" | "lyrics" | "chords";
 
 class SafeVoicingBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; fallback?: string },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -57,7 +62,9 @@ class SafeVoicingBoundary extends Component<
 
   render() {
     return this.state.failed ? (
-      <span className="px-2 py-4 text-zinc-500">Voicing belum ada</span>
+      <span className="px-2 py-4 text-zinc-500">
+        {this.props.fallback ?? "Voicing belum ada"}
+      </span>
     ) : (
       this.props.children
     );
@@ -127,7 +134,12 @@ export function ChartViewPreferenceProvider({
           if (
             prefs.instrumentPov === "chart" ||
             prefs.instrumentPov === "guitar" ||
-            prefs.instrumentPov === "piano"
+            prefs.instrumentPov === "piano" ||
+            prefs.instrumentPov === "drum" ||
+            prefs.instrumentPov === "guitar_lead" ||
+            prefs.instrumentPov === "piano_layer" ||
+            prefs.instrumentPov === "bass" ||
+            prefs.instrumentPov === "vocal"
           ) {
             savedInstrumentPov = prefs.instrumentPov;
           }
@@ -442,6 +454,8 @@ export function ChordViewer({
   showPovControls,
   showKeyControls,
   showCapoControls,
+  roleTabs = [],
+  defaultPart = null,
 }: {
   content: string;
   baseKey: string;
@@ -459,6 +473,8 @@ export function ChordViewer({
   showPovControls?: boolean;
   showKeyControls?: boolean;
   showCapoControls?: boolean;
+  roleTabs?: readonly { role: string; data: unknown }[];
+  defaultPart?: string | null;
 }) {
   const sharedPreferences = useContext(ChartViewPreferencesContext);
   const hasSharedPreferences = Boolean(sharedPreferences);
@@ -493,6 +509,26 @@ export function ChordViewer({
     sharedPreferences?.instrumentPov ?? localInstrumentPov;
   const setInstrumentPov =
     sharedPreferences?.setInstrumentPov ?? setLocalInstrumentPov;
+  const visibleRoleTabs = useMemo(
+    () =>
+      roleTabs
+        .filter((tab) => roleTabVisible(tab.data))
+        .map((tab) => tab.role)
+        .filter((role): role is ArrangementRoleSlug =>
+          ["drum", "guitar_lead", "piano_layer", "bass", "vocal"].includes(role),
+        ),
+    [roleTabs],
+  );
+  useEffect(() => {
+    const isVisible =
+      instrumentPov === "chart" ||
+      instrumentPov === "guitar" ||
+      instrumentPov === "piano" ||
+      visibleRoleTabs.includes(instrumentPov);
+    if (!isVisible) {
+      setInstrumentPov(preferredInstrumentPov(defaultPart, visibleRoleTabs));
+    }
+  }, [defaultPart, instrumentPov, setInstrumentPov, visibleRoleTabs]);
   const capo = capoOverride ?? defaultCapo;
   const showPOV = showPovControls ?? Boolean(songId);
   const showKey = showKeyControls ?? Boolean(songId);
@@ -548,7 +584,12 @@ export function ChordViewer({
           if (
             prefs.instrumentPov === "chart" ||
             prefs.instrumentPov === "guitar" ||
-            prefs.instrumentPov === "piano"
+            prefs.instrumentPov === "piano" ||
+            prefs.instrumentPov === "drum" ||
+            prefs.instrumentPov === "guitar_lead" ||
+            prefs.instrumentPov === "piano_layer" ||
+            prefs.instrumentPov === "bass" ||
+            prefs.instrumentPov === "vocal"
           ) {
             savedInstrumentPov = prefs.instrumentPov;
           }
@@ -831,6 +872,7 @@ export function ChordViewer({
         <InstrumentPovBar
           instrumentPov={instrumentPov}
           onInstrumentPov={setInstrumentPov}
+          visibleRoleTabs={visibleRoleTabs}
           resetToC={resetToC}
           onResetToC={resetViewerToC}
           onReturnToSongKey={returnToSongKey}
@@ -881,6 +923,7 @@ export function ChordViewer({
           <InstrumentPovBar
             instrumentPov={instrumentPov}
             onInstrumentPov={setInstrumentPov}
+            visibleRoleTabs={visibleRoleTabs}
             resetToC={resetToC}
             onResetToC={resetViewerToC}
             onReturnToSongKey={returnToSongKey}
@@ -942,6 +985,21 @@ export function ChordViewer({
                   ? sectionMetadata?.rhythm?.piano?.trim()
                   : null,
               ].filter((part): part is string => Boolean(part));
+              const roleTab =
+                visibleRoleTabs.includes(instrumentPov as ArrangementRoleSlug)
+                  ? roleTabs.find((tab) => tab.role === instrumentPov)?.data
+                  : null;
+              const roleSection =
+                roleTab && typeof roleTab === "object"
+                  ? (
+                      roleTab as {
+                        sections?: Record<
+                          string,
+                          { notes?: string; pattern?: string; dynamic?: string; content?: string }
+                        >;
+                      }
+                    ).sections?.[section.id]
+                  : null;
               const openDisplayedChord = (symbol: string) => {
                 try {
                   const baseSymbol = transposeChord(
@@ -976,6 +1034,33 @@ export function ChordViewer({
                     <h3 className="text-xs font-semibold tracking-wide text-zinc-500">
                       {section.label}
                     </h3>
+                    {roleSection ? (
+                      <SafeVoicingBoundary fallback="Konten tab belum bisa ditampilkan">
+                        <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm dark:border-sky-900 dark:bg-sky-950/30">
+                          {instrumentPov === "drum" ? (
+                            <div className="grid gap-1">
+                              {roleSection.pattern ? <p><span className="font-semibold">Pola drum:</span> {roleSection.pattern}</p> : null}
+                              {roleSection.dynamic ? <p><span className="font-semibold">Dinamika:</span> {roleSection.dynamic}</p> : null}
+                              {roleSection.notes ? <p className="whitespace-pre-wrap">{roleSection.notes}</p> : null}
+                            </div>
+                          ) : instrumentPov === "guitar_lead" ? (
+                            roleSection.content ? (
+                              <ChartBody
+                                content={transposeContent(roleSection.content, sectionOffset, useFlats)}
+                                mode={mode}
+                                renderKey={`${sectionOffset}-${useFlats}-role-${instrumentPov}-${section.id}-${index}`}
+                              />
+                            ) : roleSection.notes ? (
+                              <p className="whitespace-pre-wrap">{roleSection.notes}</p>
+                            ) : null
+                          ) : (
+                            roleSection.notes ? (
+                              <p className="whitespace-pre-wrap">{roleSection.notes}</p>
+                            ) : null
+                          )}
+                        </div>
+                      </SafeVoicingBoundary>
+                    ) : null}
                     <div className="flex flex-wrap items-center gap-2">
                       {sectionMetadata?.dynamic ? (
                         <Badge

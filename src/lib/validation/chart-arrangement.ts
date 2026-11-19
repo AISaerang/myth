@@ -61,6 +61,20 @@ export const chartArrangementUpdateSchema = z.object({
   songId,
   arrangementId: z.string().min(1, "Aransemen tidak valid."),
   name: arrangementName,
+  defaultKey: z.string().trim().max(16).optional().nullable(),
+});
+
+export const chartArrangementDuplicateSchema = z.object({
+  songId,
+  arrangementId: z.string().min(1, "Aransemen tidak valid."),
+  name: arrangementName,
+  eventId: z.string().optional().nullable(),
+});
+
+export const setEventSongArrangementSchema = z.object({
+  eventId: z.string().min(1, "Event tidak valid."),
+  songId,
+  arrangementId: z.string().min(1, "Aransemen tidak valid."),
 });
 
 export const chartArrangementDeleteSchema = z.object({

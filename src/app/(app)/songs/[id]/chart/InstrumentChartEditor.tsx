@@ -34,12 +34,14 @@ export interface InstrumentEditorSection {
 
 export function InstrumentChartEditor({
   songId,
+  arrangementId,
   eventId,
   sections,
   initialCapo,
   initialData,
 }: {
   songId: string;
+  arrangementId: string;
   eventId?: string;
   sections: InstrumentEditorSection[];
   initialCapo: number;
@@ -123,11 +125,12 @@ export function InstrumentChartEditor({
       <div>
         <h2 className="text-lg font-semibold">Data instrumen</h2>
         <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
-          Aransemen dan data instrumen dipakai di semua event yang memakai lagu ini.
+          Data instrumen dan tab peran milik aransemen yang dipilih. Pemilihan aransemen dapat berbeda antar event.
         </p>
       </div>
       <form action={formAction} className="flex min-w-0 flex-col gap-4">
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="arrangementId" value={arrangementId} />
         {eventId ? <input type="hidden" name="eventId" value={eventId} /> : null}
         <input type="hidden" name="capo" value={capo} />
         <input type="hidden" name="data" value={JSON.stringify(data)} />

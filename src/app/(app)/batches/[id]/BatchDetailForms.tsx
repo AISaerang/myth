@@ -11,6 +11,7 @@ import {
   removeSongFromBatchAction,
   setBatchStatusAction,
 } from "@server/actions/batches";
+import { setEventSongArrangementAction } from "@server/actions/chart-arrangements";
 
 const inputClass =
   "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900";
@@ -125,6 +126,59 @@ export function RemoveSongButton({
         keluarkan
       </button>
     </form>
+  );
+}
+
+export function BatchArrangementPicker({
+  eventId,
+  songId,
+  currentArrangementId,
+  arrangements,
+}: {
+  eventId: string;
+  songId: string;
+  currentArrangementId: string | null;
+  arrangements: { id: string; name: string }[];
+}) {
+  const [query, setQuery] = useState("");
+  const [state, formAction, pending] = useActionState(
+    setEventSongArrangementAction,
+    { ok: false },
+  );
+  const filtered = arrangements.filter((item) =>
+    item.name.toLocaleLowerCase("id").includes(query.toLocaleLowerCase("id")),
+  );
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <input
+        type="search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Cari aransemen"
+        aria-label="Cari aransemen"
+        className={`${inputClass} w-full max-w-sm`}
+      />
+      <div className="flex flex-wrap gap-2">
+        {filtered.map((arrangement) => (
+          <form key={arrangement.id} action={formAction}>
+            <input type="hidden" name="eventId" value={eventId} />
+            <input type="hidden" name="songId" value={songId} />
+            <input type="hidden" name="arrangementId" value={arrangement.id} />
+            <Button
+              type="submit"
+              variant={arrangement.id === currentArrangementId ? "primary" : "secondary"}
+              size="sm"
+              disabled={pending}
+            >
+              {arrangement.id === currentArrangementId ? "✓ " : ""}
+              {arrangement.name}
+            </Button>
+          </form>
+        ))}
+      </div>
+      {!state.ok && state.error ? <Alert tone="danger">{state.error}</Alert> : null}
+      {state.ok ? <Alert tone="info">Aransemen event diperbarui.</Alert> : null}
+    </div>
   );
 }
 

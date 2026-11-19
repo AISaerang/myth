@@ -51,9 +51,15 @@ export default async function JoinedMedleyPage({
   if (!run || run.kind !== "medley") notFound();
 
   const songIds = run.items.map((item) => item.songId);
-  const [arrangements, legacyCharts, instrumentCharts] = await Promise.all([
+  const arrangementIds = run.items
+    .map((item) => item.eventSong?.chartArrangementId)
+    .filter((id): id is string => Boolean(id));
+  const [arrangements, legacyCharts, instrumentCharts, roleTabs] = await Promise.all([
     prisma.chartArrangement.findMany({
-      where: { songId: { in: songIds }, isActive: true },
+      where: {
+        id: { in: arrangementIds },
+        songId: { in: songIds },
+      },
       include: {
         items: {
           orderBy: { sortOrder: "asc" },
@@ -71,7 +77,17 @@ export default async function JoinedMedleyPage({
       },
       orderBy: { createdAt: "desc" },
     }),
-    Promise.all(songIds.map((songId) => getInstrumentChart(songId))),
+    Promise.all(
+      run.items.map((item) =>
+        item.eventSong?.chartArrangementId
+          ? getInstrumentChart(item.eventSong.chartArrangementId)
+          : getInstrumentChart(""),
+      ),
+    ),
+    prisma.arrangementRoleTab.findMany({
+      where: { arrangementId: { in: arrangementIds } },
+      select: { role: true, data: true, arrangementId: true },
+    }),
   ]);
   const arrangementBySong = new Map(
     arrangements.map((arrangement) => [arrangement.songId, arrangement]),
@@ -86,12 +102,21 @@ export default async function JoinedMedleyPage({
   const instrumentChartBySong = new Map(
     songIds.map((songId, index) => [songId, instrumentCharts[index]!]),
   );
+  const arrangementById = new Map(arrangements.map((item) => [item.id, item]));
+  const roleTabsBySong = new Map<string, { role: string; data: unknown }[]>();
+  for (const tab of roleTabs) {
+    const arrangement = arrangementById.get(tab.arrangementId);
+    if (!arrangement) continue;
+    const current = roleTabsBySong.get(arrangement.songId) ?? [];
+    current.push({ role: tab.role, data: tab.data });
+    roleTabsBySong.set(arrangement.songId, current);
+  }
   const songs = run.items.map((item, index) => {
+    const arrangement = arrangementBySong.get(item.songId);
     const key = eventSongDisplayKey(
       item.eventSong?.eventKey ?? null,
-      item.song.key,
+      arrangement?.defaultKey ?? item.song.key,
     ) || "C";
-    const arrangement = arrangementBySong.get(item.songId);
     const instrumentChart = instrumentChartBySong.get(item.songId);
     const savedTransition = transitionBySong.get(item.songId);
     const arrangementSections =
@@ -131,6 +156,7 @@ export default async function JoinedMedleyPage({
         sections: {},
         voicings: {},
       },
+      roleTabs: roleTabsBySong.get(item.songId) ?? [],
       content:
         sections.length > 0
           ? null

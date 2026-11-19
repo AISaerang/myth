@@ -21,6 +21,7 @@ interface SheetSong {
   content: string | null;
   defaultCapo: number;
   instrumentData: InstrumentChartData;
+  roleTabs?: readonly { role: string; data: unknown }[];
   transition: { content: string; notes: string | null } | null;
 }
 
@@ -95,6 +96,7 @@ export function MedleyJoinedSheet({
                     songId={song.id}
                     defaultCapo={song.defaultCapo}
                     instrumentData={song.instrumentData}
+                    roleTabs={song.roleTabs}
                     songPreferenceKey={`myth_chart_view:${song.id}`}
                     legacyPreferenceKey={`myth-chart:${song.id}`}
                     showPovControls={false}
@@ -108,6 +110,7 @@ export function MedleyJoinedSheet({
                     songId={song.id}
                     defaultCapo={song.defaultCapo}
                     instrumentData={song.instrumentData}
+                    roleTabs={song.roleTabs}
                     songPreferenceKey={`myth_chart_view:${song.id}`}
                     legacyPreferenceKey={`myth-chart:${song.id}`}
                     showPovControls={false}
