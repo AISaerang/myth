@@ -29,7 +29,6 @@ import { listPersonnelForAdmin, listSkills } from "@server/services/personnel-se
 import { getMyProgress, getSongProgress } from "@server/services/progress-service";
 import { listChordCharts } from "@server/services/chord-service";
 import {
-  getActiveArrangementContent,
   getEventArrangementContent,
   listChartSections,
   listArrangementRoleTabs,

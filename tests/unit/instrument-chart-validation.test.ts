@@ -6,6 +6,7 @@ import {
 
 const validPayload = {
   songId: "song-1",
+  arrangementId: "arrangement-1",
   capo: 2,
   data: {
     sections: {
