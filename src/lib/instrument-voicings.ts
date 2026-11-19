@@ -208,7 +208,8 @@ function createShapeDict() {
   const dictionary: Record<string, InstrumentVoicing> = {};
   for (const root of ROOTS) {
     for (const definition of DEFINITIONS) {
-      for (const spelling of [root, transposeRoot(root, 0, true)]) {
+      const aliases = [root, transposeRoot(root, 0, false), transposeRoot(root, 0, true)];
+      for (const spelling of [...new Set(aliases)]) {
         const symbol = `${spelling}${definition.suffix}`;
         dictionary[symbol] = {
           guitar: buildGuitarShape(spelling, definition.guitarIntervals),
@@ -347,14 +348,25 @@ export function resolveInstrumentVoicing({
     STANDARD_DICTIONARY[lookupKey]?.guitar ??
     STANDARD_DICTIONARY[chordOnlyLookup]?.guitar;
   const pianoOverride = findOverride(override, baseKey, useFlats)?.piano;
-  const piano = pianoOverride
+  const resolvedPiano = pianoOverride
     ? transposeAndClampPiano(pianoOverride, sectionOffset, useFlats)
-    : STANDARD_DICTIONARY[dictionaryKey(sounding, useFlats) ?? ""]?.piano ??
-      buildPianoVoicing(
-        transposeRoot(root, sectionOffset, useFlats),
-        bass ? transposeRoot(bass, sectionOffset, useFlats) : null,
-        definition,
-      );
+    : STANDARD_DICTIONARY[dictionaryKey(sounding, useFlats) ?? ""]?.piano
+      ? transposeAndClampPiano(
+          STANDARD_DICTIONARY[dictionaryKey(sounding, useFlats) ?? ""]!.piano!,
+          0,
+          useFlats,
+        )
+      : buildPianoVoicing(
+          transposeRoot(root, sectionOffset, useFlats),
+          bass ? transposeRoot(bass, sectionOffset, useFlats) : null,
+          definition,
+        );
+  const piano = resolvedPiano
+    ? {
+        lh: resolvedPiano.lh.map((note) => clampPitch(note, LH_MIN, LH_MAX)),
+        rh: resolvedPiano.rh.map((note) => clampPitch(note, RH_MIN, RH_MAX)),
+      }
+    : null;
   return {
     sounding,
     shape,

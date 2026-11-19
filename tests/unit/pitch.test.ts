@@ -34,9 +34,11 @@ describe("scientific pitch helpers", () => {
 
   it("clamps by octaves into the piano registers", () => {
     expect(clampPitch("C0", LH_MIN, LH_MAX)).toBe("C2");
-    expect(clampPitch("D4", LH_MIN, LH_MAX)).toBe("D2");
+    expect(clampPitch("D4", LH_MIN, LH_MAX)).toBe("D3");
     expect(clampPitch("C2", RH_MIN, RH_MAX)).toBe("C4");
     expect(clampPitch("D6", RH_MIN, RH_MAX)).toBe("D4");
     expect(clampPitch("F3", "C4", "D4")).toBe("D4");
+    expect(clampPitch("E3", LH_MIN, LH_MAX)).toBe("E3");
+    expect(clampPitch("F3", LH_MIN, LH_MAX)).toBe("F2");
   });
 });

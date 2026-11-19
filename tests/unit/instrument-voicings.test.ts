@@ -89,6 +89,41 @@ describe("standard instrument voicings", () => {
     expect(slash?.sounding).toBe("G/B");
   });
 
+  it("indexes sharp and flat aliases and clamps resolved piano seeds", () => {
+    for (const pair of [
+      ["A#", "Bb"],
+      ["D#", "Eb"],
+      ["G#", "Ab"],
+    ] as const) {
+      for (const symbol of pair) {
+        expect(frets(getStandardVoicing(symbol)?.guitar)).not.toBeNull();
+        expect(getStandardVoicing(symbol)?.piano).not.toBeNull();
+        for (const offset of [0, 5]) {
+          const resolved = resolveInstrumentVoicing({
+            baseSymbol: symbol,
+            sectionOffset: offset,
+            capo: 0,
+            capoMode: "sounding",
+          });
+          expect(resolved?.guitar).not.toBeNull();
+          expect(resolved?.piano).not.toBeNull();
+        }
+      }
+    }
+    expect(STANDARD_DICTIONARY.Am?.piano).toEqual({
+      lh: ["A2", "E3"],
+      rh: ["C4", "E4", "A4"],
+    });
+    expect(
+      resolveInstrumentVoicing({
+        baseSymbol: "Am",
+        sectionOffset: 0,
+        capo: 0,
+        capoMode: "sounding",
+      })?.piano?.lh,
+    ).toEqual(["A2", "E3"]);
+  });
+
   it("uses the looked-up shape for capo mode, without shifting a diagram", () => {
     expect(shapeChord("A", 2)).toBe("G");
     const shapeMode = resolveInstrumentVoicing({
@@ -148,7 +183,7 @@ describe("standard instrument voicings", () => {
       },
     });
     expect(pianoOverride?.piano).toEqual({
-      lh: ["G2", "D2"],
+      lh: ["G2", "D3"],
       rh: ["G4", "B4", "D4"],
     });
   });
