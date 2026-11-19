@@ -99,7 +99,7 @@ export function AssignForm({
         <input
           name="assignmentNote"
           aria-label="Catatan assignment"
-          placeholder="Catatan (opsional)"
+          placeholder="Catatan pribadi (capo, datang lebih awal)"
           maxLength={500}
           className={`${inputClass} min-w-40 flex-1`}
         />

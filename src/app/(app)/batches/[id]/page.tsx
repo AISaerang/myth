@@ -24,6 +24,7 @@ import { MedleyGroupCards } from "../MedleyGroupCards";
 import {
   AddSongForm,
   AssignBatchForm,
+  BatchArrangementPicker,
   BatchStatusChanger,
   RemoveSongButton,
 } from "./BatchDetailForms";
@@ -146,6 +147,11 @@ export default async function BatchDetailPage({
       displayName: p.displayName,
       skills: p.skills.map((s) => s.name),
     }));
+  const arrangements = await prisma.chartArrangement.findMany({
+    where: { songId: { in: batch.items.map((item) => item.songId) } },
+    select: { id: true, name: true, songId: true },
+    orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -220,6 +226,16 @@ export default async function BatchDetailPage({
                     songId={item.songId}
                     songTitle={item.song.title}
                     label={item.medleyLabel}
+                  />
+                  <BatchArrangementPicker
+                    eventId={batch.eventId}
+                    songId={item.songId}
+                    currentArrangementId={
+                      item.eventSong?.chartArrangementId ?? null
+                    }
+                    arrangements={arrangements
+                      .filter((arrangement) => arrangement.songId === item.songId)
+                      .map(({ id, name }) => ({ id, name }))}
                   />
                 </li>
                 );

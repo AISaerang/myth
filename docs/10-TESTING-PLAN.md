@@ -11,6 +11,8 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Role/ownership permission helpers.
 - Invalid BPM/duration rejected.
 - Only one active arrangement version per song.
+- Reusable arrangements: existing names stay unchanged, zero-arrangement songs get `Default`, active arrangement becomes the default, and existing EventSong plus SongInstrumentChart rows backfill to it without data loss.
+- Role-tab visibility hides empty tabs and shows tabs containing notes, pattern, dynamic, or Guitar Lead content; skill aliases land on the matching visible POV.
 - Chart legacy parser recognizes section headings (Verse/Chorus/Reff/Tagline/Prechorus/Interlude/Bridge/Modulation→Key Change/Coda/Outro/Intro, plus Post-Chorus/Solo/Hook/Breakdown/Vamp/Turnaround/Ad-lib/Spoken/Transition/Reprise), keeps repeated sections, and ignores empty blocks.
 - Chart stage helpers keep repeated sections, clamp text size, and prevent prev/next navigation from leaving section bounds.
 - Arrangement composition keeps item order/duplicates and applies label overrides.

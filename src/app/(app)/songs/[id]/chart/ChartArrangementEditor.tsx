@@ -173,7 +173,7 @@ export function ChartArrangementEditor({
             <div className="flex flex-col gap-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
               <div className="flex flex-wrap items-center gap-2">
                 {selected.isActive ? (
-                  <Badge tone="success">Aransemen aktif</Badge>
+                  <Badge tone="success">Aransemen default lagu</Badge>
                 ) : (
                   <ArrangementActivateButton
                     songId={songId}

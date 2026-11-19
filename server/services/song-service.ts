@@ -21,6 +21,7 @@ import type {
 function eventSongReadInclude(eventId: string) {
   return {
     event: { select: { id: true, name: true } },
+    chartArrangement: { select: { id: true, name: true, defaultKey: true } },
     song: {
       include: {
         activeVersion: true,
@@ -58,8 +59,13 @@ function toEventSongView(eventSong: EventSongRead) {
     event: eventSong.event,
     eventSongId: eventSong.id,
     eventKey: eventSong.eventKey,
+    chartArrangementId: eventSong.chartArrangementId,
+    chartArrangementName: eventSong.chartArrangement.name,
     sortOrder: eventSong.sortOrder,
-    key: eventSongDisplayKey(eventSong.eventKey, eventSong.song.key),
+    key: eventSongDisplayKey(
+      eventSong.eventKey,
+      eventSong.chartArrangement.defaultKey ?? eventSong.song.key,
+    ),
     liturgicalFunction: eventSong.liturgicalFunction,
     arrangementNotes: eventSong.notes,
     status: eventSong.status,

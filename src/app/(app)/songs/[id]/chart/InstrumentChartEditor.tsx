@@ -125,7 +125,7 @@ export function InstrumentChartEditor({
       <div>
         <h2 className="text-lg font-semibold">Data instrumen</h2>
         <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
-          Aransemen dan data instrumen dipakai di semua event yang memakai lagu ini.
+          Data instrumen dan tab peran milik aransemen yang dipilih. Pemilihan aransemen dapat berbeda antar event.
         </p>
       </div>
       <form action={formAction} className="flex min-w-0 flex-col gap-4">

@@ -33,6 +33,7 @@ import {
   getEventArrangementContent,
   listChartSections,
   listArrangementRoleTabs,
+  listChartArrangements,
 } from "@server/services/chart-arrangement-service";
 import { getInstrumentChart } from "@server/services/instrument-chart-service";
 import {
@@ -625,9 +626,11 @@ async function SongChordChart({
   currentUserId: string;
   defaultPart: string | null;
 }) {
-  const [charts, arrangement] = await Promise.all([
+  const [charts, arrangement, arrangements, sharedEventCount] = await Promise.all([
     listChordCharts(songId),
     getEventArrangementContent({ songId, eventId }),
+    listChartArrangements(songId),
+    prisma.eventSong.count({ where: { songId } }),
   ]);
   const instrumentChart = arrangement
     ? await getInstrumentChart(arrangement.id)
@@ -654,6 +657,13 @@ async function SongChordChart({
       currentUserId={currentUserId}
       defaultPart={defaultPart}
       roleTabs={roleTabs.map((tab) => ({ role: tab.role, data: tab.data }))}
+      arrangements={arrangements.map((item) => ({
+        id: item.id,
+        name: item.name,
+        isActive: item.isActive,
+      }))}
+      selectedArrangementId={arrangement?.id ?? null}
+      sharedEventCount={sharedEventCount}
     />
   );
 }
