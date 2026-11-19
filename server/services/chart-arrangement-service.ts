@@ -59,6 +59,7 @@ export async function getActiveArrangementContent(
 ): Promise<{
   name: string;
   content: string;
+  defaultKey: string | null;
   sections: {
     id: string;
     label: string;
@@ -66,15 +67,54 @@ export async function getActiveArrangementContent(
     modulationSemitones: number;
   }[];
 } | null> {
-  const active = await prisma.chartArrangement.findFirst({
-    where: { songId, isActive: true },
-    include: {
-      items: {
-        orderBy: { sortOrder: "asc" },
-        include: { section: true },
-      },
-    },
-  });
+  return getEventArrangementContent({ songId, eventId: null });
+}
+
+export async function getEventArrangementContent({
+  songId,
+  eventId,
+}: {
+  songId: string;
+  eventId: string | null;
+}): Promise<{
+  name: string;
+  content: string;
+  defaultKey: string | null;
+  sections: {
+    id: string;
+    label: string;
+    content: string;
+    modulationSemitones: number;
+  }[];
+} | null> {
+  let arrangementId: string | null = null;
+  if (eventId) {
+    const eventSong = await prisma.eventSong.findUnique({
+      where: { eventId_songId: { eventId, songId } },
+      select: { chartArrangementId: true },
+    });
+    arrangementId = eventSong?.chartArrangementId ?? null;
+  }
+  const active = arrangementId
+    ? await prisma.chartArrangement.findUnique({
+        where: { id: arrangementId },
+        include: {
+          items: {
+            orderBy: { sortOrder: "asc" },
+            include: { section: true },
+          },
+        },
+      })
+    : await prisma.chartArrangement.findFirst({
+        where: { songId, isActive: true },
+        include: {
+          items: {
+            orderBy: { sortOrder: "asc" },
+            include: { section: true },
+          },
+        },
+      });
+  if (!active || active.songId !== songId) return null;
   if (!active || active.items.length === 0) return null;
   const content = composeArrangementContent(active.items);
   if (!content) return null;
@@ -92,7 +132,12 @@ export async function getActiveArrangementContent(
       modulationSemitones: item.modulationSemitones,
     }))
     .filter((section) => Boolean(section.content));
-  return { name: active.name, content, sections };
+  return {
+    name: active.name,
+    content,
+    defaultKey: active.defaultKey,
+    sections,
+  };
 }
 
 export async function createChartSection(
@@ -288,7 +333,10 @@ export async function updateChartArrangement(
 
   await prisma.chartArrangement.update({
     where: { id: input.arrangementId },
-    data: { name: input.name },
+    data: {
+      name: input.name,
+      defaultKey: input.defaultKey?.trim() || null,
+    },
   });
   await writeAudit({
     actorUserId,
@@ -514,6 +562,177 @@ export async function importLyricsChart(
     },
   });
   return { ok: true, id: result.arrangementId };
+}
+
+export async function duplicateChartArrangement(
+  actorUserId: string,
+  arrangementId: string,
+  newName: string,
+  eventId: string | null = null,
+): Promise<Result> {
+  const source = await prisma.chartArrangement.findUnique({
+    where: { id: arrangementId },
+    include: {
+      song: { select: { id: true, title: true } },
+      items: {
+        orderBy: { sortOrder: "asc" },
+      },
+      instrumentChart: true,
+      roleTabs: true,
+    },
+  });
+  if (!source) return { ok: false, error: "Aransemen tidak ditemukan." };
+  const duplicateName = await prisma.chartArrangement.findFirst({
+    where: { songId: source.songId, name: newName },
+    select: { id: true },
+  });
+  if (duplicateName) {
+    return { ok: false, error: "Nama aransemen sudah dipakai lagu ini." };
+  }
+
+  const copy = await prisma.$transaction(async (tx) => {
+    const created = await tx.chartArrangement.create({
+      data: {
+        songId: source.songId,
+        name: newName,
+        defaultKey: source.defaultKey,
+        isActive: false,
+        createdById: actorUserId,
+      },
+    });
+    await tx.chartArrangementItem.createMany({
+      data: source.items.map((item) => ({
+        arrangementId: created.id,
+        sectionId: item.sectionId,
+        sortOrder: item.sortOrder,
+        labelOverride: item.labelOverride,
+        modulationSemitones: item.modulationSemitones,
+      })),
+    });
+    if (source.instrumentChart) {
+      await tx.songInstrumentChart.create({
+        data: {
+          songId: source.songId,
+          arrangementId: created.id,
+          capo: source.instrumentChart.capo,
+          data: source.instrumentChart.data as object,
+          updatedById: actorUserId,
+        },
+      });
+    }
+    if (source.roleTabs.length > 0) {
+      await tx.arrangementRoleTab.createMany({
+        data: source.roleTabs.map((tab) => ({
+          arrangementId: created.id,
+          role: tab.role,
+          data: tab.data as object,
+          updatedById: actorUserId,
+        })),
+      });
+    }
+    if (eventId) {
+      await tx.eventSong.updateMany({
+        where: { eventId, songId: source.songId },
+        data: { chartArrangementId: created.id },
+      });
+    }
+    return created;
+  });
+
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.CHART_ARRANGEMENT_DUPLICATED,
+    entityType: "ChartArrangement",
+    entityId: copy.id,
+    summary: `Aransemen "${source.name}" diduplikasi menjadi "${newName}" untuk "${source.song.title}".`,
+    metadata: {
+      song: source.song.title,
+      sourceArrangementId: source.id,
+      eventId: eventId ?? "",
+    },
+  });
+  return { ok: true, id: copy.id };
+}
+
+export async function setEventSongArrangement(
+  actorUserId: string,
+  eventId: string,
+  songId: string,
+  arrangementId: string,
+): Promise<SimpleResult> {
+  const [eventSong, arrangement] = await Promise.all([
+    prisma.eventSong.findUnique({
+      where: { eventId_songId: { eventId, songId } },
+      select: { id: true },
+    }),
+    prisma.chartArrangement.findUnique({
+      where: { id: arrangementId },
+      select: { id: true, songId: true, name: true },
+    }),
+  ]);
+  if (!eventSong) return { ok: false, error: "Lagu tidak ada di event ini." };
+  if (!arrangement || arrangement.songId !== songId) {
+    return { ok: false, error: "Aransemen tidak cocok dengan lagu event ini." };
+  }
+  await prisma.eventSong.update({
+    where: { eventId_songId: { eventId, songId } },
+    data: { chartArrangementId: arrangement.id },
+  });
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.EVENT_SONG_ARRANGEMENT_SELECTED,
+    entityType: "EventSong",
+    entityId: `${eventId}:${songId}`,
+    summary: `Aransemen "${arrangement.name}" dipakai untuk lagu pada event.`,
+    metadata: { eventId, songId, arrangementId: arrangement.id },
+  });
+  return { ok: true };
+}
+
+export async function saveArrangementRoleTab(
+  actorUserId: string,
+  input: {
+    songId: string;
+    arrangementId: string;
+    role: string;
+    data: unknown;
+  },
+): Promise<SimpleResult> {
+  const arrangement = await prisma.chartArrangement.findUnique({
+    where: { id: input.arrangementId },
+    select: { id: true, songId: true, name: true },
+  });
+  if (!arrangement) return { ok: false, error: "Aransemen tidak ditemukan." };
+  if (arrangement.songId !== input.songId) {
+    return { ok: false, error: "Tab peran tidak cocok dengan lagu." };
+  }
+  await prisma.arrangementRoleTab.upsert({
+    where: {
+      arrangementId_role: {
+        arrangementId: input.arrangementId,
+        role: input.role,
+      },
+    },
+    create: {
+      arrangementId: input.arrangementId,
+      role: input.role,
+      data: input.data as object,
+      updatedById: actorUserId,
+    },
+    update: {
+      data: input.data as object,
+      updatedById: actorUserId,
+    },
+  });
+  await writeAudit({
+    actorUserId,
+    action: AuditAction.ARRANGEMENT_ROLE_TAB_SAVED,
+    entityType: "ChartArrangement",
+    entityId: input.arrangementId,
+    summary: `Tab peran "${input.role}" untuk aransemen "${arrangement.name}" diperbarui.`,
+    metadata: { songId: input.songId, role: input.role },
+  });
+  return { ok: true };
 }
 
 export async function importLegacyChart(

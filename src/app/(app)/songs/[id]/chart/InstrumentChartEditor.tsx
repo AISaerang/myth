@@ -34,12 +34,14 @@ export interface InstrumentEditorSection {
 
 export function InstrumentChartEditor({
   songId,
+  arrangementId,
   eventId,
   sections,
   initialCapo,
   initialData,
 }: {
   songId: string;
+  arrangementId: string;
   eventId?: string;
   sections: InstrumentEditorSection[];
   initialCapo: number;
@@ -128,6 +130,7 @@ export function InstrumentChartEditor({
       </div>
       <form action={formAction} className="flex min-w-0 flex-col gap-4">
         <input type="hidden" name="songId" value={songId} />
+        <input type="hidden" name="arrangementId" value={arrangementId} />
         {eventId ? <input type="hidden" name="eventId" value={eventId} /> : null}
         <input type="hidden" name="capo" value={capo} />
         <input type="hidden" name="data" value={JSON.stringify(data)} />

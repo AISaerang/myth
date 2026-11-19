@@ -24,6 +24,7 @@ export async function saveInstrumentChartAction(
   }
   const parsed = instrumentChartInputSchema.safeParse({
     songId: formData.get("songId"),
+    arrangementId: formData.get("arrangementId"),
     capo:
       typeof formData.get("capo") === "string" &&
       String(formData.get("capo")).trim() !== ""
@@ -38,10 +39,11 @@ export async function saveInstrumentChartAction(
     user,
     parsed.data.songId,
     optionalEventId(formData.get("eventId")),
+    { kind: "instrumentChart", id: parsed.data.arrangementId },
   );
   const result = await upsertInstrumentChart(
     user.id,
-    parsed.data.songId,
+    parsed.data.arrangementId,
     parsed.data,
   );
   if (!result.ok) return { ok: false, error: result.error };

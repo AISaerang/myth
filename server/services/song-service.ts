@@ -166,6 +166,29 @@ export async function addSongFromLibraryToEvent(
     if (existing) {
       return { ok: false as const, error: "Lagu sudah ada di setlist event ini." };
     }
+    let arrangement = await tx.chartArrangement.findFirst({
+      where: { songId, isActive: true },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!arrangement) {
+      arrangement = await tx.chartArrangement.findFirst({
+        where: { songId },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+      });
+    }
+    if (!arrangement) {
+      arrangement = await tx.chartArrangement.create({
+        data: {
+          songId,
+          name: "Default",
+          isActive: true,
+          createdById: actorUserId,
+        },
+        select: { id: true },
+      });
+    }
     const maxOrder = await tx.eventSong.aggregate({
       where: { eventId },
       _max: { sortOrder: true },
@@ -175,6 +198,7 @@ export async function addSongFromLibraryToEvent(
         eventId,
         songId,
         sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+        chartArrangementId: arrangement.id,
       },
     });
     return {
@@ -212,27 +236,40 @@ export async function createSong(
     where: { eventId: input.eventId },
     _max: { sortOrder: true },
   });
-  const song = await prisma.song.create({
-    data: {
-      title: input.title,
-      artistOrAuthor: input.artistOrAuthor || null,
-      key: input.key,
-      bpm: input.bpm,
-      timeSignature: input.timeSignature,
-      estimatedDurationSeconds: input.estimatedDurationSeconds,
-      originalReferenceUrl: input.originalReferenceUrl,
-      createdById: actorUserId,
-      eventSongs: {
-        create: {
-          eventId: input.eventId,
-          sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
-          liturgicalFunction: input.liturgicalFunction || null,
-          eventKey: input.key,
-          notes: input.arrangementNotes || null,
-          status: input.status as SongStatus,
-        },
+  const song = await prisma.$transaction(async (tx) => {
+    const createdSong = await tx.song.create({
+      data: {
+        title: input.title,
+        artistOrAuthor: input.artistOrAuthor || null,
+        key: input.key,
+        bpm: input.bpm,
+        timeSignature: input.timeSignature,
+        estimatedDurationSeconds: input.estimatedDurationSeconds,
+        originalReferenceUrl: input.originalReferenceUrl,
+        createdById: actorUserId,
       },
-    },
+    });
+    const arrangement = await tx.chartArrangement.create({
+      data: {
+        songId: createdSong.id,
+        name: "Default",
+        isActive: true,
+        createdById: actorUserId,
+      },
+    });
+    await tx.eventSong.create({
+      data: {
+        eventId: input.eventId,
+        songId: createdSong.id,
+        chartArrangementId: arrangement.id,
+        sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+        liturgicalFunction: input.liturgicalFunction || null,
+        eventKey: input.key,
+        notes: input.arrangementNotes || null,
+        status: input.status as SongStatus,
+      },
+    });
+    return createdSong;
   });
   await writeAudit({
     actorUserId,

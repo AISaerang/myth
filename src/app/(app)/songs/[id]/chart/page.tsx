@@ -45,7 +45,7 @@ export default async function ChartEditorPage({
     scopedEventId
       ? prisma.eventSong.findUnique({
           where: { eventId_songId: { eventId: scopedEventId, songId: id } },
-          select: { id: true },
+          select: { id: true, chartArrangementId: true },
         })
       : Promise.resolve(null),
     scopedEventId
@@ -75,12 +75,25 @@ export default async function ChartEditorPage({
   if (previewing) notFound();
   const editorEventId = decision.scope === "event" ? scopedEventId ?? undefined : undefined;
 
-  const [sections, arrangements, charts, instrumentChart] = await Promise.all([
+  const [sections, arrangements, charts] = await Promise.all([
     listChartSections(id),
     listChartArrangements(id),
     listChordCharts(id),
-    getInstrumentChart(id),
   ]);
+  const selectedArrangement =
+    arrangements.find((arrangement) =>
+      requestedArrangementId
+        ? arrangement.id === requestedArrangementId
+        : eventSong?.chartArrangementId
+          ? arrangement.id === eventSong.chartArrangementId
+          : arrangement.isActive,
+    ) ??
+    arrangements.find((arrangement) => arrangement.isActive) ??
+    arrangements[0] ??
+    null;
+  const instrumentChart = selectedArrangement
+    ? await getInstrumentChart(selectedArrangement.id)
+    : await getInstrumentChart("");
 
   const toSection = (section: {
     id: string;
@@ -154,6 +167,7 @@ export default async function ChartEditorPage({
       />
       <InstrumentChartEditor
         songId={song.id}
+        arrangementId={selectedArrangement?.id ?? ""}
         eventId={editorEventId}
         sections={sectionViews.map((section) => ({
           id: section.id,

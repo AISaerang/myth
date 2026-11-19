@@ -10,14 +10,24 @@ import {
 
 const EMPTY_DATA = { sections: {}, voicings: {} };
 
-export async function getInstrumentChart(songId: string) {
-  const [record, sectionRows] = await Promise.all([
-    prisma.songInstrumentChart.findUnique({ where: { songId } }),
-    prisma.chartSection.findMany({
-      where: { songId },
-      select: { id: true },
+export async function getInstrumentChart(arrangementId: string) {
+  const [record, arrangement] = await Promise.all([
+    prisma.songInstrumentChart.findUnique({ where: { arrangementId } }),
+    prisma.chartArrangement.findUnique({
+      where: { id: arrangementId },
+      select: { songId: true },
     }),
   ]);
+  if (!arrangement) {
+    return {
+      capo: 0,
+      data: instrumentChartDataSchema.parse(EMPTY_DATA),
+    };
+  }
+  const sectionRows = await prisma.chartSection.findMany({
+    where: { songId: arrangement.songId },
+    select: { id: true },
+  });
   if (!record) {
     return {
       capo: 0,
@@ -33,24 +43,43 @@ export async function getInstrumentChart(songId: string) {
   };
 }
 
+export async function getInstrumentChartForSong(songId: string) {
+  const arrangement = await prisma.chartArrangement.findFirst({
+    where: { songId, isActive: true },
+    select: { id: true },
+  });
+  if (!arrangement) {
+    return {
+      capo: 0,
+      data: instrumentChartDataSchema.parse(EMPTY_DATA),
+    };
+  }
+  return getInstrumentChart(arrangement.id);
+}
+
 export async function upsertInstrumentChart(
   actorUserId: string,
-  songId: string,
+  arrangementId: string,
   input: InstrumentChartInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const song = await prisma.song.findUnique({
-    where: { id: songId },
-    select: { id: true, title: true },
+  const arrangement = await prisma.chartArrangement.findUnique({
+    where: { id: arrangementId },
+    include: { song: { select: { id: true, title: true } } },
   });
-  if (!song) return { ok: false, error: "Lagu tidak ditemukan." };
-  if (input.songId !== songId) {
-    return { ok: false, error: "Data instrumen tidak cocok dengan lagu." };
+  if (!arrangement) {
+    return { ok: false, error: "Aransemen tidak ditemukan." };
+  }
+  if (
+    input.songId !== arrangement.songId ||
+    input.arrangementId !== arrangementId
+  ) {
+    return { ok: false, error: "Data instrumen tidak cocok dengan aransemen." };
   }
 
   const sectionIds = Object.keys(input.data.sections);
   if (sectionIds.length > 0) {
     const ownedSections = await prisma.chartSection.findMany({
-      where: { songId, id: { in: sectionIds } },
+      where: { songId: arrangement.songId, id: { in: sectionIds } },
       select: { id: true },
     });
     if (ownedSections.length !== sectionIds.length) {
@@ -59,9 +88,10 @@ export async function upsertInstrumentChart(
   }
 
   await prisma.songInstrumentChart.upsert({
-    where: { songId },
+    where: { arrangementId },
     create: {
-      songId,
+      songId: arrangement.songId,
+      arrangementId,
       capo: input.capo,
       data: input.data,
       updatedById: actorUserId,
@@ -75,11 +105,12 @@ export async function upsertInstrumentChart(
   await writeAudit({
     actorUserId,
     action: AuditAction.SONG_INSTRUMENT_CHART_UPDATED,
-    entityType: "Song",
-    entityId: songId,
-    summary: `Data instrumen "${song.title}" diperbarui.`,
+    entityType: "ChartArrangement",
+    entityId: arrangementId,
+    summary: `Data instrumen "${arrangement.song.title}" untuk aransemen "${arrangement.name}" diperbarui.`,
     metadata: {
-      song: song.title,
+      song: arrangement.song.title,
+      arrangement: arrangement.name,
       capo: String(input.capo),
       sections: String(sectionIds.length),
       voicings: String(Object.keys(input.data.voicings).length),

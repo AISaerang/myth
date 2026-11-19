@@ -13,6 +13,8 @@ export type SongContentChild =
   | { kind: "chordChart"; id: string }
   | { kind: "chartSection"; id: string }
   | { kind: "chartArrangement"; id: string }
+  | { kind: "instrumentChart"; id: string }
+  | { kind: "arrangementRoleTab"; id: string }
   | { kind: "arrangementVersion"; id: string };
 
 export function optionalEventId(value: unknown): string | null {
@@ -168,6 +170,20 @@ async function songContentChildSongId(
       select: { songId: true },
     });
     return row?.songId ?? null;
+  }
+  if (child.kind === "instrumentChart") {
+    const row = await prisma.chartArrangement.findUnique({
+      where: { id: child.id },
+      select: { songId: true },
+    });
+    return row?.songId ?? null;
+  }
+  if (child.kind === "arrangementRoleTab") {
+    const row = await prisma.arrangementRoleTab.findUnique({
+      where: { id: child.id },
+      select: { arrangement: { select: { songId: true } } },
+    });
+    return row?.arrangement.songId ?? null;
   }
   const row = await prisma.arrangementVersion.findUnique({
     where: { id: child.id },

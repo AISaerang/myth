@@ -125,6 +125,7 @@ export const instrumentChartDataSchema = z.object({
 
 export const instrumentChartInputSchema = z.object({
   songId: z.string().min(1, "Lagu tidak valid."),
+  arrangementId: z.string().min(1, "Aransemen tidak valid."),
   capo: z.number().int().min(0).max(11),
   data: instrumentChartDataSchema,
 });
