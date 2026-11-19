@@ -172,9 +172,9 @@ export interface ChordScanPart {
 const CHORD_TOKEN_RE =
   /^[A-G][#b]?(m|maj|min|sus|dim|aug|add|M)?\d*(?:[#b]\d*)?(\/[A-G][#b]?(?:m|sus\d|add\d)?\d*)?$/;
 
-function isBracketChord(token: string): boolean {
+export function isChordToken(token: string): boolean {
   const trimmed = token.trim();
-  if (trimmed === "|") return true;
+  if (trimmed === "|") return false;
   if (!trimmed || /\s/.test(trimmed) || !CHORD_TOKEN_RE.test(trimmed)) return false;
   try {
     parseChord(trimmed);
@@ -210,7 +210,7 @@ export function splitChordBrackets(line: string): ChordScanPart[] {
       const close = line.indexOf("]", i + 1);
       if (close === -1) break;
       const token = line.slice(i + 1, close);
-      if (isBracketChord(token)) {
+      if (isChordToken(token)) {
         pushText(i);
         parts.push({ kind: "chord", value: token.trim() });
         i = close + 1;
@@ -554,11 +554,8 @@ export function listChords(content: string): string[] {
   const seen = new Set<string>();
   content.replace(/\[([^\]]+)\]/g, (_m, token: string) => {
     const t = token.trim();
-    try {
-      parseChord(t);
+    if (isChordToken(t)) {
       seen.add(t);
-    } catch {
-      // abaikan
     }
     return "";
   });

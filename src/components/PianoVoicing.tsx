@@ -1,5 +1,5 @@
 import type { PianoVoicing as PianoVoicingData } from "@/lib/instrument-voicings";
-import { LH_MIN, RH_MIN } from "@/lib/pitch";
+import { LH_MAX, LH_MIN, RH_MAX, RH_MIN } from "@/lib/pitch";
 import { buildPianoKeyboard } from "@/lib/piano-keyboard";
 
 function keyboard(
@@ -8,34 +8,61 @@ function keyboard(
   hand: "Kiri" | "Kanan",
   tone: "sky" | "amber",
 ) {
-  const keys = buildPianoKeyboard(notes, start);
+  const end = hand === "Kiri" ? LH_MAX : RH_MAX;
+  const keys = buildPianoKeyboard(notes, start, end);
   const color =
     tone === "sky"
       ? "bg-sky-200 text-sky-950 ring-sky-700 dark:bg-sky-800 dark:text-white"
       : "bg-amber-200 text-amber-950 ring-amber-700 dark:bg-amber-700 dark:text-white";
 
+  const whiteKeys = keys.filter((key) => !key.black);
+  const blackKeyLeft = (key: (typeof keys)[number]) => {
+    const precedingWhite = keys
+      .slice(0, keys.indexOf(key))
+      .filter((item) => !item.black).length;
+    return ((precedingWhite / whiteKeys.length) * 100) - (2.5 / whiteKeys.length);
+  };
+
   return (
     <div
       role="img"
       aria-label={`Piano ${hand.toLowerCase()}: ${notes.join(" ") || "belum ada voicing"}`}
-      className="grid grid-cols-12 overflow-hidden rounded border border-zinc-400"
+      className="overflow-x-auto"
     >
-      {keys.map(({ midi, note, black }, index) => (
-        <div
-          key={midi}
-          aria-hidden="true"
-          className={`flex h-8 min-w-0 items-end justify-center border-r border-zinc-300 text-[8px] last:border-r-0 ${
-            black
-              ? "bg-zinc-800 text-zinc-100"
-              : "bg-white text-zinc-700 dark:bg-zinc-100"
-          } ${index === 12 ? "border-l-2 border-l-zinc-600" : ""} ${
-            note ? `ring-2 ring-inset ${color}` : ""
-          }`}
-          title={note ?? undefined}
-        >
-          {note ?? ""}
+      <div className="relative h-10 min-w-[220px] rounded border border-zinc-400">
+        <div className="flex h-full">
+          {whiteKeys.map((key) => (
+            <div
+              key={key.midi}
+              aria-hidden="true"
+              className={`flex h-full flex-1 items-end justify-center border-r border-zinc-300 text-[8px] last:border-r-0 ${
+                key.note
+                  ? `ring-2 ring-inset ${color}`
+                  : "bg-white text-zinc-700 dark:bg-zinc-100"
+              }`}
+              title={key.note ?? undefined}
+            >
+              {key.note ?? ""}
+            </div>
+          ))}
         </div>
-      ))}
+        {keys.filter((key) => key.black).map((key) => {
+          const left = blackKeyLeft(key);
+          return (
+            <div
+              key={key.midi}
+              aria-hidden="true"
+              className={`absolute top-0 h-6 w-[7%] min-w-[14px] border border-zinc-900 text-center text-[7px] ${
+                key.note ? `ring-2 ring-inset ${color}` : "bg-zinc-800 text-zinc-100"
+              }`}
+              style={{ left: `${left}%` }}
+              title={key.note ?? undefined}
+            >
+              {key.note ?? ""}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

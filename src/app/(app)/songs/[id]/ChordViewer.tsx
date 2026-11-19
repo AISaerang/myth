@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { KeyTransposeBar } from "@/components/KeyTransposeBar";
 import { NotationLine } from "@/components/NotAngka";
@@ -8,9 +8,9 @@ import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
 import { Badge } from "@/components/ui/Badge";
 import {
   extractChordLines,
+  isChordToken,
   layoutChordLine,
   listChords,
-  parseChord,
   transposeChord,
   transposeContent,
   transposeRoot,
@@ -42,6 +42,27 @@ import {
 import { clampTextSize, getStageSections, moveStageSection } from "@/lib/chart-stage";
 
 type ViewMode = "both" | "lyrics" | "chords";
+
+class SafeVoicingBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {}
+
+  render() {
+    return this.state.failed ? (
+      <span className="px-2 py-4 text-zinc-500">Voicing belum ada</span>
+    ) : (
+      this.props.children
+    );
+  }
+}
 type ChartViewPreferences = {
   offset: number;
   setOffset: (value: number) => void;
@@ -232,12 +253,7 @@ function renderChordTokens(
       children.push(line.slice(cursor, match.index));
     }
     let isChord = false;
-    try {
-      parseChord(token);
-      isChord = true;
-    } catch {
-      isChord = false;
-    }
+    isChord = isChordToken(token);
     if (onChordClick && isChord) {
       children.push(
         <button
@@ -927,20 +943,24 @@ export function ChordViewer({
                   : null,
               ].filter((part): part is string => Boolean(part));
               const openDisplayedChord = (symbol: string) => {
-                const baseSymbol = transposeChord(
-                  symbol,
-                  -sectionOffset,
-                  useFlats,
-                );
-                const voicing = resolveInstrumentVoicing({
-                  baseSymbol,
-                  sectionOffset,
-                  capo,
-                  capoMode: effectiveCapoMode,
-                  useFlats,
-                  override: instrumentData?.voicings,
-                });
-                if (voicing) setOpenVoicing({ chord: symbol, voicing });
+                try {
+                  const baseSymbol = transposeChord(
+                    symbol,
+                    -sectionOffset,
+                    useFlats,
+                  );
+                  const voicing = resolveInstrumentVoicing({
+                    baseSymbol,
+                    sectionOffset,
+                    capo,
+                    capoMode: effectiveCapoMode,
+                    useFlats,
+                    override: instrumentData?.voicings,
+                  });
+                  if (voicing) setOpenVoicing({ chord: symbol, voicing });
+                } catch {
+                  setOpenVoicing(null);
+                }
               };
               const chords =
                 instrumentPov === "guitar" || instrumentPov === "piano"
@@ -993,14 +1013,19 @@ export function ChordViewer({
                         aria-label={`${section.label} chord voicings`}
                       >
                         {chords.map((chord) => {
-                          const voicing = resolveInstrumentVoicing({
-                            baseSymbol: chord,
-                            sectionOffset,
-                            capo,
-                            capoMode: effectiveCapoMode,
-                            useFlats,
-                            override: instrumentData?.voicings,
-                          });
+                          let voicing: ResolvedInstrumentVoicing | null = null;
+                          try {
+                            voicing = resolveInstrumentVoicing({
+                              baseSymbol: chord,
+                              sectionOffset,
+                              capo,
+                              capoMode: effectiveCapoMode,
+                              useFlats,
+                              override: instrumentData?.voicings,
+                            });
+                          } catch {
+                            voicing = null;
+                          }
                           return (
                             <button
                               key={chord}
@@ -1018,17 +1043,21 @@ export function ChordViewer({
                                   : voicing?.sounding ?? chord}
                               </span>
                               {instrumentPov === "guitar" && voicing?.guitar ? (
-                                <GuitarChordDiagram
-                                  chord={voicing.shape}
-                                  shape={voicing.guitar}
-                                  compact
-                                />
+                                <SafeVoicingBoundary>
+                                  <GuitarChordDiagram
+                                    chord={voicing.shape}
+                                    shape={voicing.guitar}
+                                    compact
+                                  />
+                                </SafeVoicingBoundary>
                               ) : instrumentPov === "piano" && voicing?.piano ? (
-                                <PianoVoicing
-                                  chord={voicing.sounding}
-                                  voicing={voicing.piano}
-                                  compact
-                                />
+                                <SafeVoicingBoundary>
+                                  <PianoVoicing
+                                    chord={voicing.sounding}
+                                    voicing={voicing.piano}
+                                    compact
+                                  />
+                                </SafeVoicingBoundary>
                               ) : (
                                 <span className="px-2 py-4 text-zinc-500">
                                   Voicing belum ada
@@ -1234,15 +1263,19 @@ export function ChordViewer({
               </button>
             </div>
             {instrumentPov === "guitar" && openVoicing.voicing.guitar ? (
-              <GuitarChordDiagram
-                chord={openVoicing.voicing.shape}
-                shape={openVoicing.voicing.guitar}
-              />
+              <SafeVoicingBoundary>
+                <GuitarChordDiagram
+                  chord={openVoicing.voicing.shape}
+                  shape={openVoicing.voicing.guitar}
+                />
+              </SafeVoicingBoundary>
             ) : instrumentPov === "piano" && openVoicing.voicing.piano ? (
-              <PianoVoicing
-                chord={openVoicing.voicing.sounding}
-                voicing={openVoicing.voicing.piano}
-              />
+              <SafeVoicingBoundary>
+                <PianoVoicing
+                  chord={openVoicing.voicing.sounding}
+                  voicing={openVoicing.voicing.piano}
+                />
+              </SafeVoicingBoundary>
             ) : (
               <p>Voicing belum ada</p>
             )}
