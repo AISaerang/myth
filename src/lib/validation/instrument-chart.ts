@@ -79,9 +79,21 @@ export const pianoVoicingSchema = z.object({
   rh: z.array(pitch).max(8),
 });
 
+export const INSTRUMENT_DYNAMIC_VALUES = [
+  "pp",
+  "p",
+  "mp",
+  "mf",
+  "f",
+  "ff",
+  "cresc.",
+  "decresc.",
+  "rit.",
+] as const;
+
 const sectionMetadataSchema = z.object({
   dynamic: z
-    .enum(["pp", "p", "mp", "mf", "f", "ff", "cresc.", "decresc.", "rit."])
+    .enum(INSTRUMENT_DYNAMIC_VALUES)
     .optional(),
   rhythm: z
     .object({
