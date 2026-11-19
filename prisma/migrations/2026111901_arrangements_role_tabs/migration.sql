@@ -104,5 +104,8 @@ ALTER TABLE `EventSong`
   MODIFY COLUMN `chartArrangementId` VARCHAR(191) NOT NULL;
 
 ALTER TABLE `SongInstrumentChart`
+  ADD INDEX `SongInstrumentChart_songId_idx` (`songId`);
+
+ALTER TABLE `SongInstrumentChart`
   MODIFY COLUMN `arrangementId` VARCHAR(191) NOT NULL,
   DROP INDEX `SongInstrumentChart_songId_key`;

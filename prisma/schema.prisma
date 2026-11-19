@@ -597,6 +597,8 @@ model SongInstrumentChart {
   updatedById   String
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+
+  @@index([songId])
 }
 
 // Catatan per pemusik (POV part) pada satu lagu di satu event, mirip
