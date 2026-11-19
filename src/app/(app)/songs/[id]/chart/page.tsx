@@ -12,6 +12,7 @@ import { getInstrumentChart } from "@server/services/instrument-chart-service";
 import {
   listChartArrangements,
   listChartSections,
+  listArrangementRoleTabs,
 } from "@server/services/chart-arrangement-service";
 import {
   ChartArrangementEditor,
@@ -19,6 +20,7 @@ import {
   type EditorSection,
 } from "./ChartArrangementEditor";
 import { InstrumentChartEditor } from "./InstrumentChartEditor";
+import { ArrangementRoleTabEditor } from "./ArrangementRoleTabEditor";
 
 export default async function ChartEditorPage({
   params,
@@ -94,6 +96,9 @@ export default async function ChartEditorPage({
   const instrumentChart = selectedArrangement
     ? await getInstrumentChart(selectedArrangement.id)
     : await getInstrumentChart("");
+  const roleTabs = selectedArrangement
+    ? await listArrangementRoleTabs(selectedArrangement.id)
+    : [];
 
   const toSection = (section: {
     id: string;
@@ -177,6 +182,18 @@ export default async function ChartEditorPage({
         initialCapo={instrumentChart.capo}
         initialData={instrumentChart.data}
       />
+      {selectedArrangement ? (
+        <ArrangementRoleTabEditor
+          songId={song.id}
+          arrangementId={selectedArrangement.id}
+          eventId={editorEventId}
+          sections={sectionViews}
+          initialTabs={roleTabs.map((tab) => ({
+            role: tab.role,
+            data: tab.data,
+          }))}
+        />
+      ) : null}
     </div>
   );
 }

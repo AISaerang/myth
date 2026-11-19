@@ -77,6 +77,7 @@ export async function getEventArrangementContent({
   songId: string;
   eventId: string | null;
 }): Promise<{
+  id: string;
   name: string;
   content: string;
   defaultKey: string | null;
@@ -133,6 +134,7 @@ export async function getEventArrangementContent({
     }))
     .filter((section) => Boolean(section.content));
   return {
+    id: active.id,
     name: active.name,
     content,
     defaultKey: active.defaultKey,
@@ -562,6 +564,13 @@ export async function importLyricsChart(
     },
   });
   return { ok: true, id: result.arrangementId };
+}
+
+export async function listArrangementRoleTabs(arrangementId: string) {
+  return prisma.arrangementRoleTab.findMany({
+    where: { arrangementId },
+    orderBy: { role: "asc" },
+  });
 }
 
 export async function duplicateChartArrangement(

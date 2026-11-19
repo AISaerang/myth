@@ -65,6 +65,7 @@ export function ChordChartSection({
   canModerateNotes,
   currentUserId,
   defaultPart,
+  roleTabs = [],
 }: {
   songId: string;
   eventId: string;
@@ -86,6 +87,7 @@ export function ChordChartSection({
   canModerateNotes: boolean;
   currentUserId: string;
   defaultPart: string | null;
+  roleTabs?: readonly { role: string; data: unknown }[];
 }) {
   const active = charts.find((c) => c.isActive) ?? null;
   const history = charts.filter((c) => !c.isActive);
@@ -204,6 +206,8 @@ export function ChordChartSection({
             songId={songId}
             defaultCapo={defaultCapo}
             instrumentData={instrumentData}
+            roleTabs={roleTabs}
+            defaultPart={defaultPart}
             preferenceKey={`myth_chart_view:${songId}`}
             legacyPreferenceKey={`myth-chart:${songId}`}
             sections={displaySections.map((section) => ({
@@ -227,6 +231,8 @@ export function ChordChartSection({
             songId={songId}
             defaultCapo={defaultCapo}
             instrumentData={instrumentData}
+            roleTabs={roleTabs}
+            defaultPart={defaultPart}
             preferenceKey={`myth_chart_view:${songId}`}
             legacyPreferenceKey={`myth-chart:${songId}`}
             sections={displaySections}

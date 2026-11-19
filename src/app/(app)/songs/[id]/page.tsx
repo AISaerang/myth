@@ -30,7 +30,9 @@ import { getMyProgress, getSongProgress } from "@server/services/progress-servic
 import { listChordCharts } from "@server/services/chord-service";
 import {
   getActiveArrangementContent,
+  getEventArrangementContent,
   listChartSections,
+  listArrangementRoleTabs,
 } from "@server/services/chart-arrangement-service";
 import { getInstrumentChart } from "@server/services/instrument-chart-service";
 import {
@@ -623,11 +625,16 @@ async function SongChordChart({
   currentUserId: string;
   defaultPart: string | null;
 }) {
-  const [charts, arrangement, instrumentChart] = await Promise.all([
+  const [charts, arrangement] = await Promise.all([
     listChordCharts(songId),
-    getActiveArrangementContent(songId),
-    getInstrumentChart(songId),
+    getEventArrangementContent({ songId, eventId }),
   ]);
+  const instrumentChart = arrangement
+    ? await getInstrumentChart(arrangement.id)
+    : await getInstrumentChart("");
+  const roleTabs = arrangement
+    ? await listArrangementRoleTabs(arrangement.id)
+    : [];
   return (
     <ChordChartSection
       songId={songId}
@@ -646,6 +653,7 @@ async function SongChordChart({
       canModerateNotes={canModerateNotes}
       currentUserId={currentUserId}
       defaultPart={defaultPart}
+      roleTabs={roleTabs.map((tab) => ({ role: tab.role, data: tab.data }))}
     />
   );
 }

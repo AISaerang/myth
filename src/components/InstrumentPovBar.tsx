@@ -1,4 +1,11 @@
-export type InstrumentPov = "chart" | "guitar" | "piano";
+import type { ArrangementRoleSlug } from "@/lib/arrangement-roles";
+import { ARRANGEMENT_ROLE_CATALOG } from "@/lib/arrangement-roles";
+
+export type InstrumentPov =
+  | "chart"
+  | "guitar"
+  | "piano"
+  | ArrangementRoleSlug;
 export type CapoMode = "shape" | "sounding";
 
 const buttonClass =
@@ -18,6 +25,7 @@ export function InstrumentPovBar({
   showPov = true,
   showKeyControls = true,
   showCapo = true,
+  visibleRoleTabs = [],
 }: {
   instrumentPov: InstrumentPov;
   onInstrumentPov: (value: InstrumentPov) => void;
@@ -32,6 +40,7 @@ export function InstrumentPovBar({
   showPov?: boolean;
   showKeyControls?: boolean;
   showCapo?: boolean;
+  visibleRoleTabs?: readonly ArrangementRoleSlug[];
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -50,6 +59,19 @@ export function InstrumentPovBar({
               onClick={() => onInstrumentPov(value)}
             >
               {label}
+            </button>
+          ))}
+          {ARRANGEMENT_ROLE_CATALOG.filter((role) =>
+            visibleRoleTabs.includes(role.slug),
+          ).map((role) => (
+            <button
+              key={role.slug}
+              type="button"
+              className={buttonClass}
+              aria-pressed={instrumentPov === role.slug}
+              onClick={() => onInstrumentPov(role.slug)}
+            >
+              {role.label}
             </button>
           ))}
         </div>
