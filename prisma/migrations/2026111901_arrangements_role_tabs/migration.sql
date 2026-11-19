@@ -81,9 +81,6 @@ WHERE `sic`.`arrangementId` IS NULL;
 ALTER TABLE `EventSong`
   ADD INDEX `EventSong_chartArrangementId_idx` (`chartArrangementId`);
 
-ALTER TABLE `ChartArrangement`
-  ADD INDEX `ChartArrangement_songId_isActive_idx` (`songId`, `isActive`);
-
 ALTER TABLE `EventSong`
   ADD CONSTRAINT `EventSong_chartArrangementId_fkey`
   FOREIGN KEY (`chartArrangementId`) REFERENCES `ChartArrangement`(`id`)
