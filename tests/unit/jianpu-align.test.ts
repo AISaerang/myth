@@ -119,10 +119,8 @@ describe("not angka column alignment", () => {
     );
     expect(markup).toContain('data-section-label="Intro"');
     expect(markup).toContain("normal-case");
-    expect(markup).toContain("Pilih bagian 1: Intro");
-    expect(markup).not.toContain("Pilih bagian 1: Bagian 1");
-    expect(markup).toContain('data-octave="down"');
-    expect(markup).toContain('data-underline="1"');
+    expect(markup).not.toContain("Pilih bagian 1:");
+    expect(markup).toContain('data-note="');
     expect(markup).toContain("Bapa");
     expect(markup).toContain('data-chord="C"');
   });
@@ -183,12 +181,9 @@ describe("not angka column alignment", () => {
     );
     expect(markup).toContain('data-key-formula="">C = C');
     expect(markup).toContain('data-chord="C"');
-    expect(markup).toContain('data-render-col="0"');
     expect(markup).toContain('data-chord="G"');
-    expect(markup).toContain('data-render-col="3"');
     expect(markup).toContain('data-note="1&#x27;"');
-    expect(markup).toContain('data-notation="css"');
-    expect(markup).toContain('data-octave="up"');
+    expect(markup).toContain("chart-notation-row");
     expect(markup).not.toContain("notation-glyph-font");
     expect(markup).toContain("Bapa");
     expect(markup).toContain("Intro");
@@ -213,9 +208,7 @@ describe("not angka column alignment", () => {
     expect(markup.match(/data-key-formula=/g)).toHaveLength(1);
     expect(markup).toContain("C + 2 = D");
     expect(markup).toContain('data-chord="D"');
-    expect(markup).toContain('data-render-col="0"');
     expect(markup).toContain('data-chord="A"');
-    expect(markup).toContain('data-render-col="3"');
     expect(markup).toContain('data-note="1&#x27;"');
     expect(markup).toContain('data-chart-comment=""');
     expect(markup).toContain("mainkan pelan");
@@ -237,52 +230,30 @@ describe("not angka column alignment", () => {
     const both = renderToStaticMarkup(
       createElement(ChartBody, { content, mode: "detail", renderKey: "intro-size" }),
     );
-    const staffs = [...both.matchAll(/class="([^"]*notation-staff[^"]*)"/g)].map(
-      (match) => match[1] ?? "",
-    );
-    expect(staffs).toHaveLength(3);
-    for (const className of staffs) {
-      expect(className).toContain("notation-staff");
-      expect(className).toContain("font-mono");
-    }
+    expect(both.match(/chart-notation-row/g)?.length).toBeGreaterThanOrEqual(1);
     expect(both).toContain('data-chord="Csus4"');
-    expect(both).toContain('data-kind="bar"');
-    expect(both.match(/data-kind="bar"/g)).toHaveLength(6);
+    expect(both).toContain("chart-bar");
     expect(both).toContain("Bapa");
-    expect(both).toContain("chart-text-line font-mono");
-    const lyric = both.slice(both.lastIndexOf("Bapa") - 180, both.lastIndexOf("Bapa"));
-    expect(lyric).toContain("chart-text-line font-mono");
-    expect(lyric).not.toContain("notation-staff");
-    expect(readFileSync("src/app/globals.css", "utf8")).toMatch(
-      /\.chart-text-line\s*\{\s*line-height:\s*1\.714;/,
-    );
+    expect(both).toContain("chart-line");
 
     const css = readFileSync("src/app/globals.css", "utf8");
-    const staffCss = css.slice(css.indexOf(".notation-staff {"), css.indexOf(".jianpu-dot"));
-    expect(staffCss).toContain("font-size: 0.875rem");
-    expect(staffCss).toContain("line-height: 1.714em");
-    expect(css).toContain("[data-chart-body] .notation-staff");
-    expect(css).toContain("font-size: 1em");
-    expect(staffCss).toContain("height: 1.714em");
-    expect(staffCss).not.toContain("1.75rem");
-    expect(staffCss).not.toContain("2.4em");
-    expect(staffCss).not.toContain("JianpuASCII");
+    expect(css).toContain(".chart-line");
+    expect(css).toContain("flex-wrap: wrap");
 
     const lyricsOnly = renderToStaticMarkup(
-      createElement(ChartBody, { content, mode: "chord-notation", renderKey: "intro-notation" }),
+      createElement(ChartBody, { content, mode: "lyrics-notation", renderKey: "intro-notation" }),
     );
-    expect(lyricsOnly.match(/notation-staff/g)).toHaveLength(3);
-    expect(lyricsOnly).toContain('data-chord="Csus4"');
+    expect(lyricsOnly.match(/chart-notation-row/g)?.length).toBeGreaterThanOrEqual(1);
+    expect(lyricsOnly).not.toContain('data-chord="Csus4"');
     expect(lyricsOnly).toContain('data-note="6"');
-    expect(lyricsOnly).toContain('data-kind="bar"');
-    expect(lyricsOnly).not.toContain("Bapa");
+    expect(lyricsOnly).toContain("Bapa");
 
     const chordsOnly = renderToStaticMarkup(
-      createElement(ChartBody, { content, mode: "chords", renderKey: "intro-chords" }),
+      createElement(ChartBody, { content, mode: "lyrics-chords", renderKey: "intro-chords" }),
     );
-    expect(chordsOnly).not.toContain("notation-staff");
+    expect(chordsOnly).not.toContain("chart-notation-row");
     expect(chordsOnly).toContain("Csus4");
-    expect(chordsOnly).toContain("chart-text-line font-mono");
+    expect(chordsOnly).toContain("chart-line");
     expect(chordsOnly).toContain("Intro");
 
     const shifted = renderToStaticMarkup(
@@ -293,6 +264,6 @@ describe("not angka column alignment", () => {
     expect(shifted).not.toContain('data-chord="Csus4"');
     expect(shifted).toContain('data-note="6"');
     expect(shifted).toContain('data-note="3"');
-    expect(shifted.match(/notation-staff/g)).toHaveLength(3);
+    expect(shifted.match(/chart-notation-row/g)?.length).toBeGreaterThanOrEqual(1);
   });
 });

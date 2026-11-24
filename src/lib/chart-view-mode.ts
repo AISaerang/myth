@@ -6,9 +6,9 @@ import {
 } from "@/lib/chords";
 
 export type ChartViewMode =
-  | "chords"
-  | "chord-lyric"
-  | "chord-notation"
+  | "lyrics"
+  | "lyrics-notation"
+  | "lyrics-chords"
   | "detail";
 
 export type ChartLineKind =
@@ -23,9 +23,9 @@ export const CHART_VIEW_MODES: readonly {
   value: ChartViewMode;
   label: string;
 }[] = [
-  { value: "chords", label: "Chord saja" },
-  { value: "chord-lyric", label: "Chord + lirik" },
-  { value: "chord-notation", label: "Chord + notasi" },
+  { value: "lyrics", label: "Lirik" },
+  { value: "lyrics-notation", label: "Lirik + Notasi" },
+  { value: "lyrics-chords", label: "Lirik + Chord" },
   { value: "detail", label: "Detail" },
 ];
 
@@ -33,15 +33,36 @@ export const CHART_DISPLAY_MODE_KEY = "myth_chart_display_mode";
 
 export function isChartViewMode(value: unknown): value is ChartViewMode {
   return (
-    value === "chords" ||
-    value === "chord-lyric" ||
-    value === "chord-notation" ||
+    value === "lyrics" ||
+    value === "lyrics-notation" ||
+    value === "lyrics-chords" ||
     value === "detail"
   );
 }
 
 export function readChartViewMode(value: unknown): ChartViewMode {
-  return isChartViewMode(value) ? value : "detail";
+  if (isChartViewMode(value)) return value;
+  if (value === "chords" || value === "chord-lyric") return "lyrics-chords";
+  if (value === "chord-notation") return "lyrics-notation";
+  return "detail";
+}
+
+export function layersForMode(mode: ChartViewMode): {
+  chords: boolean;
+  notation: boolean;
+  lyrics: true;
+  comments: boolean;
+} {
+  if (mode === "lyrics") {
+    return { chords: false, notation: false, lyrics: true, comments: false };
+  }
+  if (mode === "lyrics-notation") {
+    return { chords: false, notation: true, lyrics: true, comments: false };
+  }
+  if (mode === "lyrics-chords") {
+    return { chords: true, notation: false, lyrics: true, comments: false };
+  }
+  return { chords: true, notation: true, lyrics: true, comments: true };
 }
 
 export function chartComment(line: string): string | null {
@@ -85,16 +106,12 @@ export function shouldShowChartLine(
   kind: ChartLineKind,
   mode: ChartViewMode,
 ): boolean {
-  if (kind === "empty" || kind === "label" || kind === "chords-only") {
-    return true;
-  }
-  if (kind === "comment") return mode === "detail";
-  if (kind === "notation") {
-    return mode === "detail" || mode === "chord-notation";
-  }
-  if (kind === "lyric") {
-    return mode === "detail" || mode === "chord-lyric";
-  }
+  const layers = layersForMode(mode);
+  if (kind === "empty" || kind === "label") return true;
+  if (kind === "comment") return layers.comments;
+  if (kind === "chords-only") return layers.chords;
+  if (kind === "notation") return layers.notation || layers.chords;
+  if (kind === "lyric") return layers.lyrics;
   return false;
 }
 

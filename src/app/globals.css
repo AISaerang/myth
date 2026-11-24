@@ -100,6 +100,76 @@ body {
   line-height: 1.714;
 }
 
+[data-chart-body],
+.chart-line {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chart-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  column-gap: 0.35em;
+  row-gap: 0.25em;
+  font-size: calc(1em * var(--chart-text-scale, 1));
+}
+
+.chart-word {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  align-items: flex-end;
+}
+
+.chart-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  line-height: 1.714;
+}
+
+.chart-cell[data-chord]:not([data-chord=""]) {
+  padding-inline-end: 0.4em;
+}
+
+.chart-chord-row {
+  height: 1.714em;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.chart-chord-button {
+  position: relative;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--chart-chord);
+  font-weight: 700;
+}
+
+.chart-chord-ext,
+.chord-ext {
+  font-size: 0.72em;
+  line-height: 1;
+  transform: translateY(-0.35em);
+  margin-inline-start: 0.02em;
+}
+
+.chart-notation-row,
+.chart-text-cell {
+  display: inline-block;
+  min-width: 1ch;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Satu kolom = 1ch font staff (angka sama dengan baris lirik: text-sm / 1.5rem).
    Baris nada lebih tinggi supaya titik oktaf, beam, dan garis ketukan muat
    tanpa font khusus dan tanpa memotong di layar sempit. */

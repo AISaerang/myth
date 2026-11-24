@@ -1,19 +1,15 @@
 "use client";
 
-import { Component, memo, type ReactNode } from "react";
+import { Component, memo, type CSSProperties, type ReactNode } from "react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { KeyTransposeBar } from "@/components/KeyTransposeBar";
-import { NotationLine } from "@/components/NotAngka";
+import { ChartLineView } from "@/components/ChartLineView";
 import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
 import { ChartSectionNavigator } from "@/components/ChartSectionNavigator";
 import { Badge } from "@/components/ui/Badge";
 import {
-  extractChordLines,
-  isChordToken,
   layoutChordLine,
   listChords,
-  parseBarLine,
-  simplifyChordToken,
   transposeChord,
   transposeContent,
   transposeRoot,
@@ -42,10 +38,8 @@ import {
   type ArrangementRoleSlug,
 } from "@/lib/arrangement-roles";
 import {
-  alignChordsToNotation,
   contentHasNotation,
   formatTransposeFormula,
-  notationLineError,
 } from "@/lib/jianpu-align";
 import {
   clampTextScale,
@@ -55,11 +49,11 @@ import {
 import {
   CHART_DISPLAY_MODE_KEY,
   CHART_VIEW_MODES,
-  chartComment,
-  classifyChartLine,
+  layersForMode,
   readChartViewMode,
   type ChartViewMode,
 } from "@/lib/chart-view-mode";
+import { buildLineModel, sectionIsInstrumental } from "@/lib/chart-cells";
 
 type ViewMode = ChartViewMode;
 
@@ -259,79 +253,6 @@ function sectionLabelAt(lines: string[], index: number): string | null {
   return displaySectionLabel(layout.label, { content: body.join("\n") });
 }
 
-function renderChordTokens(
-  line: string,
-  onChordClick?: (symbol: string) => void,
-  simplify = false,
-): ReactNode[] {
-  const children: ReactNode[] = [];
-  const tokenRegex = /\S+/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-  while ((match = tokenRegex.exec(line)) !== null) {
-    const token = match[0] as string;
-    if (match.index > cursor) {
-      children.push(line.slice(cursor, match.index));
-    }
-    let isChord = false;
-    isChord = isChordToken(token);
-    const displayedToken = simplify ? simplifyChordToken(token) : token;
-    if (onChordClick && isChord) {
-      children.push(
-        <button
-          key={`${match.index}-${token}`}
-          type="button"
-          className="chart-chord min-h-[44px] min-w-[44px] font-semibold underline decoration-dotted underline-offset-2"
-          aria-label={`Tampilkan voicing ${token}`}
-          onClick={() => onChordClick(token)}
-        >
-          {displayedToken}
-        </button>,
-      );
-    } else {
-      children.push(displayedToken);
-    }
-    cursor = match.index + token.length;
-  }
-  if (cursor < line.length) children.push(line.slice(cursor));
-  return children;
-}
-
-function renderBarLine(
-  line: string,
-  onChordClick?: (symbol: string) => void,
-  simplify = false,
-): ReactNode[] {
-  const parts = parseBarLine(line);
-  if (!parts) return [];
-  return parts.map((part, index) => {
-    if (part.kind !== "chord-slot") return part.value;
-    return (
-      <span key={`${index}-${part.value}`}>
-        {part.anticipation ? "." : ""}
-        {part.chords.map((chord, chordIndex) => (
-          <span key={`${chordIndex}-${chord}`}>
-            {chordIndex > 0 ? "-" : ""}
-            {onChordClick ? (
-              <button
-                type="button"
-                className="chart-chord font-semibold underline decoration-dotted underline-offset-2"
-                aria-label={`Tampilkan voicing ${chord}`}
-                onClick={() => onChordClick(chord)}
-              >
-                {simplify ? simplifyChordToken(chord) : chord}
-              </button>
-            ) : (
-              <span className="chart-chord font-semibold">
-                {simplify ? simplifyChordToken(chord) : chord}
-              </span>
-            )}
-          </span>
-        ))}
-      </span>
-    );
-  });
-}
 
 function renderChart(
   content: string,
@@ -343,43 +264,25 @@ function renderChart(
 ) {
   const lines = content.split("\n");
   let sectionIndex = 0;
+  const layers = layersForMode(mode);
   return lines.map((line, index) => {
     const lineKey = `${key}-${index}`;
-    const kind = classifyChartLine(line);
-    if (kind === "empty") {
-      return <div key={lineKey} className="h-4" />;
-    }
-    if (kind === "comment") {
-      if (mode !== "detail") return null;
-      const comment = chartComment(line);
-      if (!comment) return <div key={lineKey} className="h-2" />;
-      return (
-        <p
-          key={lineKey}
-          data-chart-comment=""
-          className="chart-comment"
-        >
-          {comment}
-        </p>
-      );
-    }
-    if (kind === "chords-only" && parseBarLine(line)) {
-      return (
-        <pre
-          key={lineKey}
-          data-chart-bar-line=""
-          className="chart-text-line font-mono whitespace-pre"
-        >
-          {renderBarLine(line, onChordClick, simplify)}
-        </pre>
-      );
-    }
-    const shownLabel = sectionLabelAt(lines, index);
-    const { chordLine, lyricLine, label, isEmpty } = layoutChordLine(line);
-    if (isEmpty) return <div key={lineKey} className="h-4" />;
-    if (label) {
-      const shown = shownLabel ?? label;
+    const model = buildLineModel(line);
+    if (model.kind === "label") {
+      const shownLabel = sectionLabelAt(lines, index);
+      const shown = shownLabel ?? model.label;
       const currentSectionIndex = sectionIndex++;
+      const blockStart = index + 1;
+      let blockEnd = lines.length;
+      for (let cursor = blockStart; cursor < lines.length; cursor += 1) {
+        if (layoutChordLine(lines[cursor] ?? "").label) {
+          blockEnd = cursor;
+          break;
+        }
+      }
+      const instrumental =
+        mode === "lyrics" &&
+        sectionIsInstrumental(lines.slice(index, blockEnd));
       return (
         <div
           key={lineKey}
@@ -391,101 +294,32 @@ function renderChart(
           }`}
         >
           {shown}
-        </div>
-      );
-    }
-    if (kind === "chords-only") {
-      const chordText =
-        mode === "chords"
-          ? extractChordLines(line)[0] ?? ""
-          : chordLine;
-      if (!chordText.trim()) return <div key={lineKey} className="h-2" />;
-      return (
-        <pre
-          key={lineKey}
-          className="chart-text-line font-mono whitespace-pre"
-        >
-          {renderChordTokens(chordText, onChordClick, simplify)}
-        </pre>
-      );
-    }
-    if (kind === "notation") {
-      if (mode === "chord-lyric") return null;
-      if (mode === "chords") {
-        const extracted = extractChordLines(line)[0] ?? "";
-        if (!extracted.trim()) return <div key={lineKey} className="h-2" />;
-        return (
-          <pre
-            key={lineKey}
-            className="chart-text-line font-mono whitespace-pre"
-          >
-            {renderChordTokens(extracted, onChordClick, simplify)}
-          </pre>
-        );
-      }
-      const aligned = alignChordsToNotation(chordLine, lyricLine);
-      if (aligned) {
-        return (
-          <div key={lineKey} className="max-w-full">
-            <NotationLine
-              alignment={aligned}
-              onChordClick={onChordClick}
-              simplify={simplify}
-            />
-          </div>
-        );
-      }
-      const notationError = notationLineError(lyricLine);
-      return (
-        <div key={lineKey} className="min-w-0 max-w-full">
-          <div className="chart-text-line font-mono whitespace-pre">
-            {chordLine.trim() ? (
-              <div className="chart-chord font-semibold">
-                {renderChordTokens(chordLine, onChordClick, simplify)}
-              </div>
-            ) : null}
-            {lyricLine.trim() ? <div>{lyricLine}</div> : null}
-          </div>
-          {mode === "detail" || mode === "chord-notation" ? (
-            <p
-              data-notation-error=""
-              className="chart-error mt-1 text-xs"
-            >
-              Baris ini terlihat seperti not angka tapi gagal dirender
-              {notationError ? `: ${notationError}` : ", periksa pola nada 0–7."}
-            </p>
+          {instrumental ? (
+            <span className="ml-2 text-zinc-500 dark:text-zinc-400 normal-case font-normal">
+              (instrumental)
+            </span>
           ) : null}
         </div>
       );
     }
-    if (kind === "lyric") {
-      if (mode === "chord-notation") return null;
-      if (mode === "chords") {
-        const extracted = extractChordLines(line)[0] ?? "";
-        if (!extracted.trim()) return <div key={lineKey} className="h-2" />;
-        return (
-          <pre
-            key={lineKey}
-            className="chart-text-line font-mono whitespace-pre"
-          >
-            {renderChordTokens(extracted, onChordClick, simplify)}
-          </pre>
-        );
-      }
-      return (
-        <div key={lineKey} className="min-w-0 max-w-full">
-          <div className="chart-text-line font-mono whitespace-pre">
-            {chordLine.trim() ? (
-              <div className="chart-chord font-semibold">
-                {renderChordTokens(chordLine, onChordClick, simplify)}
-              </div>
-            ) : null}
-            {lyricLine.trim() ? <div>{lyricLine}</div> : null}
-          </div>
-        </div>
-      );
+    if (model.kind === "comment") {
+      return <ChartLineView key={lineKey} model={model} layers={layers} simplify={simplify} onChordClick={onChordClick} />;
     }
-    return null;
+    if (model.kind === "empty") {
+      return <div key={lineKey} className="h-4" />;
+    }
+    if (model.kind === "error") {
+      return <ChartLineView key={lineKey} model={model} layers={layers} simplify={simplify} onChordClick={onChordClick} />;
+    }
+    if (model.kind === "bars" && !layers.chords) return null;
+    if (model.kind === "lyric" && mode === "lyrics-notation") {
+      return <ChartLineView key={lineKey} model={model} layers={{ ...layers, chords: false }} simplify={simplify} onChordClick={onChordClick} />;
+    }
+    if (model.kind === "notation" && mode === "lyrics") return null;
+    if (model.kind === "lyric" && mode === "lyrics") {
+      return <ChartLineView key={lineKey} model={model} layers={{ ...layers, chords: false, notation: false }} simplify={simplify} onChordClick={onChordClick} />;
+    }
+    return <ChartLineView key={lineKey} model={model} layers={layers} simplify={simplify} onChordClick={onChordClick} />;
   });
 }
 
@@ -715,37 +549,66 @@ export function ChordViewer({
         >
           {chartTheme === "dark" ? "Tema terang" : "Tema gelap"}
         </button>
-        <button
-          type="button"
-          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
-          onClick={() => setAutoScroll((enabled) => !enabled)}
-          aria-pressed={autoScroll}
-          disabled={reducedMotion}
-          title={reducedMotion ? "Nonaktif saat pengurangan gerakan aktif" : undefined}
-        >
-          {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
-        </button>
-        <label className="flex shrink-0 items-center gap-2 px-2 text-xs">
-          Kecepatan
-          <input
-            type="range"
-            min={1}
-            max={5}
-            value={scrollSpeed}
-            onChange={(event) => setScrollSpeed(Number(event.target.value))}
-            aria-label="Kecepatan auto-scroll"
-            disabled={reducedMotion}
-          />
-        </label>
+        {stage ? (
+          <>
+            <button
+              type="button"
+              className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+              onClick={() => setAutoScroll((enabled) => !enabled)}
+              aria-pressed={autoScroll}
+              disabled={reducedMotion}
+              title={reducedMotion ? "Nonaktif saat pengurangan gerakan aktif" : undefined}
+            >
+              {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
+            </button>
+            <label className="flex shrink-0 items-center gap-2 px-2 text-xs">
+              Kecepatan
+              <input
+                type="range"
+                min={1}
+                max={5}
+                value={scrollSpeed}
+                onChange={(event) => setScrollSpeed(Number(event.target.value))}
+                aria-label="Kecepatan auto-scroll"
+                disabled={reducedMotion}
+              />
+            </label>
+          </>
+        ) : null}
         {stage ? (
           <button
             type="button"
             className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
-            onClick={() => setStageActive(false)}
+            onClick={() => {
+              setAutoScroll(false);
+              setStageActive(false);
+              window.requestAnimationFrame(() => {
+                document.getElementById(`chart-section-${activeSectionRef.current}`)?.scrollIntoView({
+                  block: "start",
+                  behavior: "auto",
+                });
+              });
+            }}
           >
             Keluar panggung
           </button>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            className="min-h-[44px] shrink-0 rounded-lg bg-sky-700 px-3 text-xs font-medium text-white"
+            onClick={() => {
+              setStageActive(true);
+              window.requestAnimationFrame(() => {
+                document.getElementById(`stage-section-${activeSectionRef.current}`)?.scrollIntoView({
+                  block: "start",
+                  behavior: "auto",
+                });
+              });
+            }}
+          >
+            Mode panggung
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1156,7 +1019,16 @@ export function ChordViewer({
       });
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setStageActive(false);
+      if (event.key === "Escape") {
+        setAutoScroll(false);
+        setStageActive(false);
+        window.requestAnimationFrame(() => {
+          document.getElementById(`chart-section-${activeSectionRef.current}`)?.scrollIntoView({
+            block: "start",
+            behavior: "auto",
+          });
+        });
+      }
       if (event.key === "ArrowDown") {
         event.preventDefault();
         jump(1);
@@ -1328,7 +1200,7 @@ export function ChordViewer({
           onReset={resetViewerToC}
           showResetButton={false}
         />
-        {mode === "detail" || mode === "chord-notation" ? (
+        {mode === "detail" || mode === "lyrics-notation" ? (
           <div className="mt-2">
             <NotationSymbolGuide compact />
           </div>
@@ -1411,31 +1283,14 @@ export function ChordViewer({
         <button
           type="button"
           className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
-          onClick={() => setAutoScroll((enabled) => !enabled)}
-          aria-pressed={autoScroll}
-          disabled={reducedMotion}
-          title={reducedMotion ? "Nonaktif saat pengurangan gerakan aktif" : undefined}
-        >
-          {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
-        </button>
-        <label className="flex items-center gap-2 text-xs">
-          Kecepatan
-          <input
-            type="range"
-            min={1}
-            max={5}
-            value={scrollSpeed}
-            onChange={(event) => setScrollSpeed(Number(event.target.value))}
-            aria-label="Kecepatan auto-scroll"
-            disabled={reducedMotion}
-          />
-        </label>
-        <button
-          type="button"
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
           onClick={() => {
-            activeSectionRef.current = 0;
             setStageActive(true);
+            window.requestAnimationFrame(() => {
+              document.getElementById(`stage-section-${activeSectionRef.current}`)?.scrollIntoView({
+                block: "start",
+                behavior: "auto",
+              });
+            });
           }}
         >
           Mode panggung
@@ -1444,7 +1299,7 @@ export function ChordViewer({
       <div
         data-chart-body=""
         className="chart-surface chart-scroll-content min-w-0 max-w-full rounded-lg p-4"
-        style={{ fontSize: `calc(0.875rem * ${textScale / 100})` }}
+        style={{ "--chart-text-scale": textScale / 100 } as CSSProperties}
       >
         {sections ? (
           <div className="flex min-w-0 flex-col gap-5">
@@ -1631,7 +1486,7 @@ export function ChordViewer({
                         : ""
                     }`}
                   >
-                    <div className="min-w-0 max-w-full overflow-x-auto">
+                    <div className="min-w-0 max-w-full">
                       <ChartBody
                         content={transposedSections[index] ?? section.content}
                         mode={mode}
@@ -1651,7 +1506,7 @@ export function ChordViewer({
             })}
           </div>
         ) : (
-          <div className="min-w-0 max-w-full overflow-x-auto">
+          <div className="min-w-0 max-w-full">
             <ChartBody
               content={transposed}
               mode={mode}
@@ -1666,15 +1521,8 @@ export function ChordViewer({
           </div>
         )}
       </div>
-      {!stageActive ? (
-        <ChartSectionNavigator
-          sections={stageSections}
-          targetIdPrefix="chart-section"
-          activeIndexRef={activeSectionRef}
-          reducedMotion={reducedMotion}
-        />
-      ) : null}
-      {!stageActive ? renderMobileControls() : null}
+      {/* Normal view intentionally has no floating stage navigation or auto-scroll. */}
+      {!stageActive ? renderMobileControls(false) : null}
       {stageActive ? (
         <div
           data-chart-theme={chartTheme}
@@ -1714,13 +1562,28 @@ export function ChordViewer({
               Kecepatan
               <input type="range" min={1} max={5} value={scrollSpeed} onChange={(event) => setScrollSpeed(Number(event.target.value))} aria-label="Kecepatan auto-scroll" disabled={reducedMotion} />
             </label>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setStageActive(false)}>Keluar</button>
+            <button
+              type="button"
+              className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
+              onClick={() => {
+                setAutoScroll(false);
+                setStageActive(false);
+                window.requestAnimationFrame(() => {
+                  document.getElementById(`chart-section-${activeSectionRef.current}`)?.scrollIntoView({
+                    block: "start",
+                    behavior: "auto",
+                  });
+                });
+              }}
+            >
+              Keluar
+            </button>
           </div>
           <div
             ref={stageScrollRef}
             data-chart-body=""
             className="chart-scroll-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-8"
-            style={{ fontSize: `calc(0.875rem * ${textScale / 100})` }}
+            style={{ "--chart-text-scale": textScale / 100 } as CSSProperties}
           >
             {sections ? (
               <div className="flex flex-col gap-5">
