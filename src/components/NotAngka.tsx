@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { alignChordsToNotation, type NotationAlignment, type NotationToken } from "@/lib/jianpu-align";
 import { parseJianpu, type JianpuNote } from "@/lib/jianpu";
 
@@ -5,7 +6,7 @@ import { parseJianpu, type JianpuNote } from "@/lib/jianpu";
  * Not angka satu baris dengan kunci di kolom yang sama.
  * Titik oktaf, garis kres/mol, beam, dan legato digambar CSS — tanpa font khusus.
  */
-export function NotationLine({
+export const NotationLine = memo(function NotationLine({
   alignment,
   onChordClick,
 }: {
@@ -110,7 +111,7 @@ export function NotationLine({
       </div>
     </div>
   );
-}
+});
 
 export function NotAngka({ value, className = "" }: { value: string; className?: string }) {
   const result = parseJianpu(value);

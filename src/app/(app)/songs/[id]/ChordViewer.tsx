@@ -1,7 +1,7 @@
 "use client";
 
-import { Component, type ReactNode } from "react";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Component, memo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { KeyTransposeBar } from "@/components/KeyTransposeBar";
 import { NotationLine } from "@/components/NotAngka";
 import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
@@ -295,6 +295,7 @@ function renderChart(
   onChordClick?: (symbol: string) => void,
 ) {
   const lines = content.split("\n");
+  let sectionIndex = 0;
   return lines.map((line, index) => {
     const lineKey = `${key}-${index}`;
     const kind = classifyChartLine(line);
@@ -320,10 +321,13 @@ function renderChart(
     if (isEmpty) return <div key={lineKey} className="h-4" />;
     if (label) {
       const shown = shownLabel ?? label;
+      const currentSectionIndex = sectionIndex++;
       return (
         <div
           key={lineKey}
+          id={`chart-section-${currentSectionIndex}`}
           data-section-label={shown}
+          data-chart-section-index={currentSectionIndex}
           className={`mt-3 text-xs font-semibold tracking-wide text-zinc-500 first:mt-0 ${
             shown === "Intro" ? "normal-case" : "uppercase"
           }`}
@@ -424,7 +428,7 @@ function renderChart(
 }
 
 /** Isi chart tanpa kontrol transpose, supaya rumus nada tidak diulang per bagian. */
-export function ChartBody({
+export const ChartBody = memo(function ChartBody({
   content,
   mode = "detail",
   renderKey,
@@ -436,7 +440,7 @@ export function ChartBody({
   onChordClick?: (symbol: string) => void;
 }) {
   return <>{renderChart(content, mode, renderKey, onChordClick)}</>;
-}
+});
 
 export function ChordViewer({
   content,
@@ -539,6 +543,18 @@ export function ChordViewer({
   const [scrollSpeed, setScrollSpeed] = useState(2);
   const [activeSection, setActiveSection] = useState(0);
   const stageScrollRef = useRef<HTMLDivElement>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => {
+      setReducedMotion(preference.matches);
+      if (preference.matches) setAutoScroll(false);
+    };
+    update();
+    preference.addEventListener("change", update);
+    return () => preference.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     if (!preferenceKey || hasSharedPreferences) return;
@@ -768,6 +784,49 @@ export function ChordViewer({
     () => sectionOffsets(sections ?? [], baseKey, offset, resetToC),
     [baseKey, offset, resetToC, sections],
   );
+  const transposedSections = useMemo(
+    () =>
+      sections?.map((section, index) =>
+        transposeContent(
+          section.content,
+          offsets[index] ?? keyOffsetFromC(baseKey) + offset,
+          useFlats,
+        ),
+      ) ?? [],
+    [baseKey, offset, offsets, sections, useFlats],
+  );
+  const transposedRoleContents = useMemo(() => {
+    const result = new Map<string, string>();
+    if (instrumentPov !== "guitar_lead" || !sections) return result;
+    const roleTab = roleTabs.find((tab) => tab.role === instrumentPov)?.data;
+    if (!roleTab || typeof roleTab !== "object") return result;
+    const roleSections = (
+      roleTab as { sections?: Record<string, { content?: string }> }
+    ).sections;
+    if (!roleSections) return result;
+    sections.forEach((section, index) => {
+      const sectionContent = roleSections[section.id]?.content;
+      if (sectionContent) {
+        result.set(
+          section.id,
+          transposeContent(
+            sectionContent,
+            offsets[index] ?? keyOffsetFromC(baseKey) + offset,
+            useFlats,
+          ),
+        );
+      }
+    });
+    return result;
+  }, [
+    baseKey,
+    instrumentPov,
+    offset,
+    offsets,
+    roleTabs,
+    sections,
+    useFlats,
+  ]);
   const stageSections = useMemo(
     () =>
       sections
@@ -803,7 +862,10 @@ export function ChordViewer({
       setActiveSection(next);
       document
         .getElementById(`stage-section-${next}`)
-        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+        ?.scrollIntoView({
+          block: "start",
+          behavior: reducedMotion ? "auto" : "smooth",
+        });
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setStageActive(false);
@@ -819,21 +881,52 @@ export function ChordViewer({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [activeSection, stageActive, stageSections.length]);
+  }, [activeSection, reducedMotion, stageActive, stageSections.length]);
 
   useEffect(() => {
-    if (!stageActive || !autoScroll) return;
-    const timer = window.setInterval(() => {
-      const element = stageScrollRef.current;
-      if (!element) return;
-      if (element.scrollTop + element.clientHeight >= element.scrollHeight - 2) {
-        setAutoScroll(false);
-        return;
+    if (!autoScroll) return;
+    if (reducedMotion) return;
+
+    let frame = 0;
+    let previousTime = 0;
+    const scroll = (time: number) => {
+      if (previousTime === 0) previousTime = time;
+      const elapsed = Math.min(time - previousTime, 50);
+      previousTime = time;
+      if (stageActive) {
+        const element = stageScrollRef.current;
+        if (!element) {
+          frame = window.requestAnimationFrame(scroll);
+          return;
+        }
+        const nextTop = element.scrollTop + (scrollSpeed * 12 * elapsed) / 1000;
+        const maxTop = element.scrollHeight - element.clientHeight;
+        element.scrollTop = Math.min(nextTop, maxTop);
+        if (element.scrollTop >= maxTop - 1) {
+          setAutoScroll(false);
+          return;
+        }
+      } else {
+        const root = document.documentElement;
+        const maxTop = root.scrollHeight - window.innerHeight;
+        window.scrollBy(0, (scrollSpeed * 12 * elapsed) / 1000);
+        if (window.scrollY >= maxTop - 1) {
+          setAutoScroll(false);
+          return;
+        }
       }
-      element.scrollBy({ top: scrollSpeed, behavior: "auto" });
-    }, 100);
-    return () => window.clearInterval(timer);
-  }, [autoScroll, scrollSpeed, stageActive]);
+      frame = window.requestAnimationFrame(scroll);
+    };
+    frame = window.requestAnimationFrame(scroll);
+    return () => window.cancelAnimationFrame(frame);
+  }, [autoScroll, reducedMotion, scrollSpeed, stageActive]);
+
+  useEffect(() => {
+    if (!autoScroll) return;
+    const pause = () => setAutoScroll(false);
+    window.addEventListener("touchstart", pause, { passive: true });
+    return () => window.removeEventListener("touchstart", pause);
+  }, [autoScroll]);
 
   function resetViewerToC() {
     setResetToC(true);
@@ -864,8 +957,69 @@ export function ChordViewer({
     setActiveSection(next);
     document
       .getElementById(`stage-section-${next}`)
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+      ?.scrollIntoView({
+        block: "start",
+        behavior: reducedMotion ? "auto" : "smooth",
+      });
   }
+
+  const openPlainChartChord = useCallback(
+    (symbol: string) => {
+      const sectionOffset = keyOffsetFromC(displayBaseKey) + offset;
+      const baseSymbol = transposeChord(symbol, -sectionOffset, useFlats);
+      const voicing = resolveInstrumentVoicing({
+        baseSymbol,
+        sectionOffset,
+        capo,
+        capoMode: effectiveCapoMode,
+        useFlats,
+        override: instrumentData?.voicings,
+      });
+      if (voicing) setOpenVoicing({ chord: symbol, voicing });
+    },
+    [
+      capo,
+      displayBaseKey,
+      effectiveCapoMode,
+      instrumentData?.voicings,
+      offset,
+      useFlats,
+    ],
+  );
+
+  const sectionChordHandlers = useMemo(() => {
+    const handlers = new Map<string, (symbol: string) => void>();
+    for (const [index, section] of (sections ?? []).entries()) {
+      const sectionOffset =
+        offsets[index] ?? keyOffsetFromC(baseKey) + offset;
+      handlers.set(section.id, (symbol: string) => {
+        try {
+          const baseSymbol = transposeChord(symbol, -sectionOffset, useFlats);
+          const voicing = resolveInstrumentVoicing({
+            baseSymbol,
+            sectionOffset,
+            capo,
+            capoMode: effectiveCapoMode,
+            useFlats,
+            override: instrumentData?.voicings,
+          });
+          if (voicing) setOpenVoicing({ chord: symbol, voicing });
+        } catch {
+          setOpenVoicing(null);
+        }
+      });
+    }
+    return handlers;
+  }, [
+    baseKey,
+    capo,
+    effectiveCapoMode,
+    instrumentData,
+    offset,
+    offsets,
+    sections,
+    useFlats,
+  ]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -961,6 +1115,28 @@ export function ChordViewer({
         <button
           type="button"
           className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          onClick={() => setAutoScroll((enabled) => !enabled)}
+          aria-pressed={autoScroll}
+          disabled={reducedMotion}
+          title={reducedMotion ? "Nonaktif saat pengurangan gerakan aktif" : undefined}
+        >
+          {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
+        </button>
+        <label className="flex items-center gap-2 text-xs">
+          Kecepatan
+          <input
+            type="range"
+            min={1}
+            max={5}
+            value={scrollSpeed}
+            onChange={(event) => setScrollSpeed(Number(event.target.value))}
+            aria-label="Kecepatan auto-scroll"
+            disabled={reducedMotion}
+          />
+        </label>
+        <button
+          type="button"
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
           onClick={() => {
             setActiveSection(0);
             setStageActive(true);
@@ -1003,26 +1179,6 @@ export function ChordViewer({
                       }
                     ).sections?.[section.id]
                   : null;
-              const openDisplayedChord = (symbol: string) => {
-                try {
-                  const baseSymbol = transposeChord(
-                    symbol,
-                    -sectionOffset,
-                    useFlats,
-                  );
-                  const voicing = resolveInstrumentVoicing({
-                    baseSymbol,
-                    sectionOffset,
-                    capo,
-                    capoMode: effectiveCapoMode,
-                    useFlats,
-                    override: instrumentData?.voicings,
-                  });
-                  if (voicing) setOpenVoicing({ chord: symbol, voicing });
-                } catch {
-                  setOpenVoicing(null);
-                }
-              };
               const chords =
                 instrumentPov === "guitar" || instrumentPov === "piano"
                   ? listChords(section.content)
@@ -1030,8 +1186,10 @@ export function ChordViewer({
               return (
                 <section
                   key={`${section.id}-${index}`}
+                  id={`chart-section-${index}`}
                   data-chart-section={section.id}
-                  className="min-w-0 border-b border-zinc-200 pb-4 last:border-b-0 last:pb-0 dark:border-zinc-800"
+                  data-chart-section-index={index}
+                  className="min-w-0 border-b border-zinc-200 pb-4 last:border-b-0 last:pb-0 dark:border-zinc-800 [content-visibility:auto] [contain:content]"
                 >
                   <div className="mb-2 flex min-w-0 flex-col gap-2">
                     <h3 className="text-xs font-semibold tracking-wide text-zinc-500">
@@ -1049,7 +1207,10 @@ export function ChordViewer({
                           ) : instrumentPov === "guitar_lead" ? (
                             roleSection.content ? (
                               <ChartBody
-                                content={transposeContent(roleSection.content, sectionOffset, useFlats)}
+                                content={
+                                  transposedRoleContents.get(section.id) ??
+                                  roleSection.content
+                                }
                                 mode={mode}
                                 renderKey={`${sectionOffset}-${useFlats}-role-${instrumentPov}-${section.id}-${index}`}
                               />
@@ -1173,14 +1334,16 @@ export function ChordViewer({
                     }`}
                   >
                     <div className="min-w-0 max-w-full overflow-x-auto">
-                      {renderChart(
-                        transposeContent(section.content, sectionOffset, useFlats),
-                        mode,
-                        `${sectionOffset}-${useFlats}-${mode}-${section.id}-${index}`,
-                        instrumentPov === "chart"
-                          ? undefined
-                          : openDisplayedChord,
-                      )}
+                      <ChartBody
+                        content={transposedSections[index] ?? section.content}
+                        mode={mode}
+                        renderKey={`${sectionOffset}-${useFlats}-${mode}-${section.id}-${index}`}
+                        onChordClick={
+                          instrumentPov === "chart"
+                            ? undefined
+                            : sectionChordHandlers.get(section.id)
+                        }
+                      />
                     </div>
                     {annotations?.general}
                   </div>
@@ -1197,24 +1360,7 @@ export function ChordViewer({
               onChordClick={
                 instrumentPov === "chart"
                   ? undefined
-                  : (symbol) => {
-                      const sectionOffset =
-                        keyOffsetFromC(displayBaseKey) + offset;
-                      const baseSymbol = transposeChord(
-                        symbol,
-                        -sectionOffset,
-                        useFlats,
-                      );
-                      const voicing = resolveInstrumentVoicing({
-                        baseSymbol,
-                        sectionOffset,
-                        capo,
-                        capoMode: effectiveCapoMode,
-                        useFlats,
-                        override: instrumentData?.voicings,
-                      });
-                      if (voicing) setOpenVoicing({ chord: symbol, voicing });
-                    }
+                  : openPlainChartChord
               }
             />
           </div>
@@ -1269,12 +1415,12 @@ export function ChordViewer({
             <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setStageTheme((theme) => (theme === "dark" ? "light" : "dark"))}>
               {stageTheme === "dark" ? "Terang" : "Gelap"}
             </button>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setAutoScroll((enabled) => !enabled)} aria-pressed={autoScroll}>
+            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setAutoScroll((enabled) => !enabled)} aria-pressed={autoScroll} disabled={reducedMotion}>
               {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
             </button>
             <label className="flex items-center gap-2 text-xs">
               Kecepatan
-              <input type="range" min={1} max={5} value={scrollSpeed} onChange={(event) => setScrollSpeed(Number(event.target.value))} aria-label="Kecepatan auto-scroll" />
+              <input type="range" min={1} max={5} value={scrollSpeed} onChange={(event) => setScrollSpeed(Number(event.target.value))} aria-label="Kecepatan auto-scroll" disabled={reducedMotion} />
             </label>
             <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setStageActive(false)}>Keluar</button>
           </div>
@@ -1301,7 +1447,7 @@ export function ChordViewer({
                         {index + 1}. {section.label}
                       </h2>
                       {renderChart(
-                        transposeContent(section.content, sectionOffset, useFlats),
+                        transposedSections[index] ?? section.content,
                         mode,
                         `stage-${sectionOffset}-${useFlats}-${mode}-${section.id}-${index}`,
                       )}
