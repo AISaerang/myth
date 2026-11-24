@@ -55,7 +55,7 @@ export default async function AppLayout({
           },
         ]
       : []),
-    ...(hasEventAccess && (admin || observer) && !preview
+    ...(hasEventAccess
       ? [{ href: "/batches", label: "Batch" }]
       : []),
     ...(hasEventAccess

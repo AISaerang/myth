@@ -67,29 +67,42 @@ export function MedleyGroupCards({
                 >
                   Buka sheet gabungan
                 </Link>
-                {canWrite
-                  ? run.items.slice(0, -1).map((item, index) => {
-                      const next = run.items[index + 1];
-                      if (!next) return null;
-                      const saved = transitionBySongId.get(item.songId);
-                      const transition =
-                        saved?.toSongId === next.songId ? saved : undefined;
-                      return (
-                        <div key={`${item.songId}-${next.songId}`}>
-                          <p className="mb-1 text-sm font-medium">
-                            {item.song.title} → {next.song.title}
-                          </p>
-                          <MedleyTransitionForm
-                            batchId={batchId}
-                            fromSongId={item.songId}
-                            toSongId={next.songId}
-                            initialContent={transition?.content}
-                            initialNotes={transition?.notes}
-                          />
+                {run.items.slice(0, -1).map((item, index) => {
+                  const next = run.items[index + 1];
+                  if (!next) return null;
+                  const saved = transitionBySongId.get(item.songId);
+                  const transition =
+                    saved?.toSongId === next.songId ? saved : undefined;
+                  return (
+                    <div key={`${item.songId}-${next.songId}`}>
+                      <p className="mb-1 text-sm font-medium">
+                        {item.song.title} → {next.song.title}
+                      </p>
+                      {canWrite ? (
+                        <MedleyTransitionForm
+                          batchId={batchId}
+                          fromSongId={item.songId}
+                          toSongId={next.songId}
+                          initialContent={transition?.content}
+                          initialNotes={transition?.notes}
+                        />
+                      ) : transition ? (
+                        <div className="flex flex-col gap-2 text-sm">
+                          {transition.content ? (
+                            <pre className="whitespace-pre-wrap font-sans">
+                              {transition.content}
+                            </pre>
+                          ) : null}
+                          {transition.notes ? (
+                            <p className="whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
+                              {transition.notes}
+                            </p>
+                          ) : null}
                         </div>
-                      );
-                    })
-                  : null}
+                      ) : null}
+                    </div>
+                  );
+                })}
             </MedleyRunDetails>
           ))}
         </div>

@@ -70,6 +70,8 @@
 6. Online monitoring menyelesaikan pertanyaan.
 7. MD menentukan lagu siap dibawa ke onsite rehearsal atau perlu revisi.
 
+MEMBER dan OBSERVER dapat membuka Batch untuk melihat batch non-arsip yang memiliki lagu publish dan belum diarsipkan. Transisi medley tersimpan tampil sebagai teks read-only. EVENT_ADMIN/ADMIN dalam Preview melihat batasan baca yang sama; kontrol kelola hanya muncul di Edit mode dan tetap tunduk pada authorization server.
+
 ## Online monitoring
 1. Admin buat sesi, link, agenda, dan lagu.
 2. User update status sebelum sesi.

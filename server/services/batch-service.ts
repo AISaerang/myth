@@ -61,6 +61,7 @@ export async function listBatches(eventId: string) {
               eventId: true,
               status: true,
               isPublished: true,
+              archivedAt: true,
               _count: { select: { assignments: true } },
             },
           },

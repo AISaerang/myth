@@ -5,7 +5,7 @@ Mobile-first, ringkas, Bahasa Indonesia konsisten, status memakai teks + warna, 
 
 ## Navigation
 Admin: Dashboard, Event Brief, Lagu, Batch, Personel & Akses, Tasks/Blockers, Rehearsal, Equipment & Teknis, Decisions/Notes, Settings.  
-User: Beranda, Lagu Saya, Task Saya, Rehearsal, Materi/Drive, Profil & Password.  
+User: Beranda, Lagu Saya, Batch (read-only), Task Saya, Rehearsal, Materi/Drive, Profil & Password.
 Observer (Pantau): Dashboard pantau, Event Brief, Lagu (semua publish), Batch (read-only), Tasks & Usulan, Rehearsal, Equipment & Teknis, Profil & Password. Tanpa Personel & Akses, Broadcast, Keputusan, dan semua form admin.
 
 ## Login page
@@ -60,7 +60,7 @@ Aransemen lagu: halaman `/songs/[id]/chart` berisi master bagian (Verse/Chorus/B
 Pilihan: Belum mulai; Sedang dipelajari; Sudah mencoba dengan referensi; Perlu bantuan; Siap untuk rehearsal. Catatan opsional, timestamp otomatis. User hanya mengubah status sendiri.
 
 ## Batch page
-Nama, release date, target review, lagu, progress, jumlah personel yang update, blocker, Publish/Unpublish, Mark reviewed.
+Admin dan EVENT_ADMIN dalam mode Edit melihat nama, release date, target review, lagu, progress, jumlah personel yang update, blocker, serta kontrol pengelolaan. MEMBER, OBSERVER, dan pengelola dalam mode Preview atau pada event tertutup mendapat tampilan read-only berisi batch non-arsip yang memiliki lagu publish dan belum diarsipkan. Draft, lagu arsip, filter arsip, dan kontrol mutasi tidak ditampilkan. Informasi transisi medley tersimpan ditampilkan sebagai teks; badge lagu tetap mengikuti urutan seluruh item batch agar sama dengan urutan pengelola.
 
 ## Rehearsal page
 Tipe, tanggal/jam, lokasi/link, agenda, lagu, attendance, catatan, keputusan, action items. Status: scheduled/completed/cancelled/rescheduled.

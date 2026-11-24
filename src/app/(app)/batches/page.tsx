@@ -1,10 +1,18 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireFreshUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import {
+  canManageEvent,
+  canWriteEventData,
+  isAdmin,
+} from "@/lib/permissions";
+import { canManageBatchUi, isBatchReadable, publishedBatchItems } from "@/lib/batch-view";
+import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
 import { getActiveEventFor, listEvents } from "@server/services/event-service";
 import { listBatches } from "@server/services/batch-service";
+import { getEventRole } from "@server/services/event-access";
 import { EventPicker } from "../songs/EventPicker";
 import { BatchForm } from "./BatchForm";
 import { BatchStatusBadge } from "./BatchStatusBadge";
@@ -39,21 +47,32 @@ export default async function BatchesPage({
   const current = await getActiveEventFor(user, params.eventId);
   const eventId = current?.id;
   if (!eventId) notFound();
+  const eventRole = await getEventRole(user, eventId);
+  if (!eventRole) notFound();
+  const canWrite = canWriteEventData(
+    eventRole,
+    Boolean(current.accessClosedAt),
+    isAdmin(user),
+  );
+  const preview =
+    (isAdmin(user) || canManageEvent(eventRole)) &&
+    uiModeForEvent((await cookies()).get(UI_MODE_COOKIE)?.value, eventId) ===
+      "preview";
+  const canManageUi = canManageBatchUi(canWrite, preview);
   const filter: BatchFilter = FILTERS.some((f) => f.value === params.filter)
     ? (params.filter as BatchFilter)
     : "active";
 
   const all = await listBatches(eventId);
-  const observer = !isAdmin(user);
   const visible = all.filter((b) =>
-    (!observer || b.items.some((item) => item.song.isPublished)) &&
-    (filter === "all"
-      ? true
-      : filter === "archived"
-        ? b.status === "ARCHIVED"
-        : b.status !== "ARCHIVED"),
+    canManageUi
+      ? filter === "all"
+        ? true
+        : filter === "archived"
+          ? b.status === "ARCHIVED"
+          : b.status !== "ARCHIVED"
+      : isBatchReadable(b),
   );
-  // Non-admin (USER/OBSERVER): tampilan read-only, lagu Publish saja.
 
   return (
     <div className="flex flex-col gap-4">
@@ -64,34 +83,36 @@ export default async function BatchesPage({
           value={eventId}
         />
       </div>
-      {observer ? (
+      {!canManageUi ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Mode pantau: daftar batch read-only. Klik batch untuk melihat lagu-lagunya.
+          Mode baca: daftar batch read-only berisi lagu yang sudah publish.
         </p>
       ) : (
         <BatchForm mode="create" eventId={eventId} />
       )}
-      <nav aria-label="Filter batch" className="flex flex-wrap gap-1">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.value}
-            href={`/batches?eventId=${eventId}&filter=${f.value}`}
-            aria-current={filter === f.value ? "page" : undefined}
-            className={`rounded-lg px-3 py-2 text-sm font-medium ${
-              filter === f.value
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
-      </nav>
+      {canManageUi ? (
+        <nav aria-label="Filter batch" className="flex flex-wrap gap-1">
+          {FILTERS.map((f) => (
+            <Link
+              key={f.value}
+              href={`/batches?eventId=${eventId}&filter=${f.value}`}
+              aria-current={filter === f.value ? "page" : undefined}
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                filter === f.value
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              {f.label}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
       <Card title={`Batch (${visible.length})`}>
         {visible.length === 0 ? (
           <EmptyState
             title={
-              filter === "archived"
+              canManageUi && filter === "archived"
                 ? "Tidak ada batch arsip"
                 : "Belum ada batch di event ini"
             }
@@ -109,15 +130,15 @@ export default async function BatchesPage({
                 >
                   {b.name}
                   <span className="block text-xs font-normal text-zinc-500 no-underline">
-                    {observer
-                      ? b.items.filter((item) => item.song.isPublished).length
-                      : b.items.length}{" "}
+                    {canManageUi
+                      ? b.items.length
+                      : publishedBatchItems(b.items).length}{" "}
                     lagu
                   </span>
                 </Link>
                 <span className="flex shrink-0 items-center gap-2">
                   <BatchStatusBadge status={b.status} />
-                  {!observer && b.items.length === 0 ? (
+                  {canManageUi && b.items.length === 0 ? (
                     <DeleteBatchButton batchId={b.id} batchName={b.name} />
                   ) : null}
                 </span>
