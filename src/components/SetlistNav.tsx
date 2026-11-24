@@ -4,16 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { SetlistNavResult } from "@/lib/setlist-nav";
-
-function songHref(songId: string, eventId: string, batchId: string): string {
-  const query = new URLSearchParams({ eventId, batchId });
-  return `/songs/${songId}?${query.toString()}`;
-}
-
-function batchHref(eventId: string, batch: SetlistNavResult["batch"]): string {
-  if (!batch) return `/songs?eventId=${encodeURIComponent(eventId)}`;
-  return `/songs?eventId=${encodeURIComponent(eventId)}#${batch.anchorId}`;
-}
+import {
+  setlistListHref,
+  setlistSongHref,
+  type SetlistNavContext,
+} from "@/lib/setlist-nav";
 
 function NavSlot({
   href,
@@ -45,21 +40,31 @@ export function SetlistNav({
   songId,
   eventId,
   nav,
+  context,
 }: {
   songId: string;
-  eventId: string;
+  eventId?: string;
   nav: SetlistNavResult;
+  context?: SetlistNavContext;
 }) {
   const router = useRouter();
+  const linkContext: SetlistNavContext =
+    context ?? { kind: "member", eventId: eventId ?? "" };
+  const songHref = (targetSongId: string, batchId: string) =>
+    setlistSongHref(targetSongId, batchId, linkContext);
+  const batchHref = (batch: SetlistNavResult["batch"]) =>
+    batch
+      ? setlistListHref(batch.anchorId, linkContext)
+      : setlistListHref("", linkContext).replace(/#$/, "");
   const prevHref = nav.batch
     ? nav.prev
-      ? songHref(nav.prev.songId, eventId, nav.batch.id)
-      : batchHref(eventId, nav.batch)
+      ? songHref(nav.prev.songId, nav.batch.id)
+      : batchHref(nav.batch)
     : null;
   const nextHref = nav.batch
     ? nav.next
-      ? songHref(nav.next.songId, eventId, nav.batch.id)
-      : batchHref(eventId, nav.batch)
+      ? songHref(nav.next.songId, nav.batch.id)
+      : batchHref(nav.batch)
     : null;
 
   useEffect(() => {
@@ -92,19 +97,19 @@ export function SetlistNav({
     <nav aria-label="Navigasi setlist" className="flex min-w-0 flex-col gap-2">
       <div className="grid min-w-0 grid-cols-2 gap-2 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         <NavSlot
-          href={prevHref ?? batchHref(eventId, nav.batch)}
+          href={prevHref ?? batchHref(nav.batch)}
           label={nav.prev ? "← Lagu sebelumnya" : `Awal · ${nav.batch.name}`}
           title={nav.prev?.title}
           align="left"
         />
         <Link
-          href={batchHref(eventId, nav.batch)}
+          href={batchHref(nav.batch)}
           className="col-span-2 flex min-h-11 items-center justify-center px-2 text-center text-xs font-medium text-zinc-600 underline dark:text-zinc-300 lg:col-span-1"
         >
           {nav.batch.name} · {nav.position}/{nav.total}
         </Link>
         <NavSlot
-          href={nextHref ?? batchHref(eventId, nav.batch)}
+          href={nextHref ?? batchHref(nav.batch)}
           label={nav.next ? "Lagu berikutnya →" : `Akhir · ${nav.batch.name}`}
           title={nav.next?.title}
           align="right"
@@ -116,7 +121,7 @@ export function SetlistNav({
           {nav.otherBatches.map((batch) => (
             <Link
               key={batch.id}
-              href={songHref(songId, eventId, batch.id)}
+              href={songHref(songId, batch.id)}
               className="min-h-11 py-2 font-medium underline"
             >
               {batch.name}

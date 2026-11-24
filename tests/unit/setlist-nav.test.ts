@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { BatchCatalog } from "@/lib/batch-badge";
-import { resolveSetlistNav } from "@/lib/setlist-nav";
+import {
+  resolveSetlistNav,
+  setlistListHref,
+  setlistSongHref,
+} from "@/lib/setlist-nav";
 
 const catalog: BatchCatalog[] = [
   {
@@ -32,6 +36,32 @@ const catalog: BatchCatalog[] = [
 ];
 
 describe("resolveSetlistNav", () => {
+  it("builds member and guest hrefs for songs and batch anchors", () => {
+    expect(
+      setlistSongHref("song 1", "batch/a", {
+        kind: "member",
+        eventId: "event 1",
+      }),
+    ).toBe("/songs/song%201?batchId=batch%2Fa&eventId=event+1");
+    expect(
+      setlistSongHref("song 1", "batch/a", {
+        kind: "guest",
+        token: "token/a",
+      }),
+    ).toBe("/e/token%2Fa/tamu/lagu/song%201?batchId=batch%2Fa");
+    expect(
+      setlistListHref("badge-batch-1", {
+        kind: "member",
+        eventId: "event 1",
+      }),
+    ).toBe("/songs?eventId=event+1#badge-batch-1");
+    expect(
+      setlistListHref("badge-batch-1", {
+        kind: "guest",
+        token: "token/a",
+      }),
+    ).toBe("/e/token%2Fa/tamu/lagu#badge-batch-1");
+  });
   it("returns previous and next links for the middle song", () => {
     expect(resolveSetlistNav("two", catalog, { publishedOnly: false })).toMatchObject({
       batch: { id: "batch-a", name: "Batch A", anchorId: "badge-batch-a-2" },
