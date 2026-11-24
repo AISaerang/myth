@@ -9,11 +9,14 @@ import {
   normalizeToC,
   noteIndex,
   overUnderToChordPro,
+  parseBarLine,
   parseChord,
   semitonesBetween,
+  simplifyChordToken,
   stripChords,
   transposeChord,
   transposeContent,
+  transposeBarLine,
   transposeRoot,
   transposeSpacedChords,
 } from "@/lib/chords";
@@ -47,6 +50,97 @@ describe("transposeChord", () => {
   it("rejects garbage", () => {
     expect(() => parseChord("H7")).toThrow();
     expect(() => noteIndex("Z")).toThrow();
+  });
+});
+
+describe("simplifyChordToken", () => {
+  it.each([
+    ["C/E", "C"],
+    ["F/A", "F"],
+    ["D7/F#", "D"],
+    ["G/B", "G"],
+    ["C11", "C"],
+    ["D7", "D"],
+    ["Gm7", "Gm"],
+    ["Dm7", "Dm"],
+    ["Bbmaj7", "Bb"],
+    ["A7", "A"],
+    ["Cmaj7", "C"],
+    ["Csus4", "C"],
+    ["Cdim7", "Cdim"],
+    ["Caug", "Caug"],
+    ["Bm7b5", "Bm"],
+    ["C°7", "Cdim"],
+    ["Cø7", "Cm"],
+    ["Am-Bb", "Am-Bb"],
+    [".C/E", ".C"],
+    [".", "."],
+    ["%", "%"],
+    ["|", "|"],
+    ["N.C.", "N.C."],
+  ])("simplifies %s to %s", (token, expected) => {
+    expect(simplifyChordToken(token)).toBe(expected);
+  });
+});
+
+describe("instrumental bar syntax", () => {
+  it("parses chord-only slots, empty beats, push chords, repeats, and bars", () => {
+    expect(parseBarLine("| . . . Am-Bb |")?.map((part) => part.kind)).toEqual([
+      "bar",
+      "space",
+      "rest",
+      "space",
+      "rest",
+      "space",
+      "rest",
+      "space",
+      "chord-slot",
+      "space",
+      "bar",
+    ]);
+    expect(parseBarLine("C   .   G")).not.toBeNull();
+    expect(parseBarLine(".C/E")?.[0]).toMatchObject({
+      kind: "chord-slot",
+      anticipation: true,
+      chords: ["C/E"],
+    });
+    expect(parseBarLine("%")?.[0]?.kind).toBe("repeat");
+    expect(parseBarLine("|")).toBeNull();
+  });
+
+  it("transposes only chord slots and preserves beat syntax", () => {
+    expect(transposeBarLine("| . . . Am-Bb |", 2)).toBe(
+      "| . . . Bm-C |",
+    );
+    expect(transposeBarLine(".C/E", 1)).toBe(".C#/F");
+    expect(transposeBarLine("| % |", 2)).toBe("| % |");
+    expect(transposeContent("| . . . Am-Bb |", 2)).toBe(
+      "| . . . Bm-C |",
+    );
+  });
+
+  it("preserves bar rows through both editor formats", () => {
+    const bars = ["C   .   G", "| . . . . |", "| . . . Am-Bb |", ".C/E", "%"];
+    for (const bar of bars) {
+      expect(overUnderToChordPro(bar)).toBe(bar);
+      expect(chordProToOverUnder(bar)).toBe(bar);
+    }
+  });
+
+  it("keeps legacy comments, notation, lyrics, chord-only lines, and bars unchanged", () => {
+    const legacy = [
+      "# catatan intro",
+      "{Intro}",
+      "[C]1' / [5 6] 5- .5",
+      "[C]Kami [G]puji",
+      "[Bb] [C] [Am] [Dm]",
+      "|",
+    ].join("\n");
+    expect(overUnderToChordPro(chordProToOverUnder(legacy))).toBe(legacy);
+  });
+
+  it("includes bar-line chords in chord inventories", () => {
+    expect(listChords("| . . . Am-Bb |")).toEqual(["Am", "Bb"]);
   });
 });
 
