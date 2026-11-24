@@ -139,13 +139,21 @@ export function transposeContent(
   useFlats = false,
 ): string {
   if (semitones % 12 === 0) return content;
-  return mapInlineChords(content, (token) => {
-    try {
-      return transposeChord(token.trim(), semitones, useFlats);
-    } catch {
-      return token;
-    }
-  });
+  return content
+    .split("\n")
+    .map((line) => {
+      if (parseBarLine(line)) {
+        return transposeBarLine(line, semitones, useFlats);
+      }
+      return mapInlineChords(line, (token) => {
+        try {
+          return transposeChord(token.trim(), semitones, useFlats);
+        } catch {
+          return token;
+        }
+      });
+    })
+    .join("\n");
 }
 
 // Normalisasi chart dari nada asal ke C (basis seragam tim).
@@ -170,7 +178,7 @@ export interface ChordScanPart {
 // Regex chord yang cukup ketat agar baris lirik biasa (cth. "Bapa", "Do")
 // tidak salah dikenali sebagai baris chord. Beam not angka `[5 6]` tidak lolos.
 const CHORD_TOKEN_RE =
-  /^[A-G][#b]?(m|maj|min|sus|dim|aug|add|M)?\d*(?:[#b]\d*)?(\/[A-G][#b]?(?:m|sus\d|add\d)?\d*)?$/;
+  /^[A-G][#b]?(m|maj|min|sus|dim|aug|add|M|ø|°|\+)?\d*(?:[#b]\d*)?(\/[A-G][#b]?(?:m|sus\d|add\d)?\d*)?$/;
 
 export function isChordToken(token: string): boolean {
   const trimmed = token.trim();
@@ -182,6 +190,113 @@ export function isChordToken(token: string): boolean {
   } catch {
     return false;
   }
+}
+
+export type BarLinePart =
+  | { kind: "space"; value: string }
+  | { kind: "bar"; value: "|" }
+  | { kind: "rest"; value: "." }
+  | { kind: "repeat"; value: "%" }
+  | {
+      kind: "chord-slot";
+      value: string;
+      anticipation: boolean;
+      chords: string[];
+    };
+
+export function parseBarLine(line: string): BarLinePart[] | null {
+  const parts: BarLinePart[] = [];
+  let hasBar = false;
+  let hasChord = false;
+  let hasBarSyntax = false;
+  const tokenRe = /\s+|\S+/g;
+  let match: RegExpExecArray | null;
+  while ((match = tokenRe.exec(line)) !== null) {
+    const value = match[0] as string;
+    if (/^\s+$/.test(value)) {
+      parts.push({ kind: "space", value });
+      continue;
+    }
+    if (value === "|") {
+      hasBar = true;
+      parts.push({ kind: "bar", value });
+      continue;
+    }
+    if (value === ".") {
+      hasBarSyntax = true;
+      parts.push({ kind: "rest", value });
+      continue;
+    }
+    if (value === "%") {
+      hasBarSyntax = true;
+      parts.push({ kind: "repeat", value });
+      continue;
+    }
+
+    const anticipation = value.startsWith(".");
+    const chordValue = anticipation ? value.slice(1) : value;
+    const chords = chordValue.split("-");
+    if (!chords.every(isChordToken)) return null;
+    hasChord = true;
+    if (anticipation || chords.length > 1) hasBarSyntax = true;
+    parts.push({
+      kind: "chord-slot",
+      value,
+      anticipation,
+      chords,
+    });
+  }
+
+  if ((!hasBarSyntax && !hasBar) || (hasBar && !hasChord && !hasBarSyntax)) {
+    return null;
+  }
+  return parts;
+}
+
+export function transposeBarLine(
+  line: string,
+  semitones: number,
+  useFlats = false,
+): string {
+  const parts = parseBarLine(line);
+  if (!parts) return line;
+  return parts
+    .map((part) => {
+      if (part.kind !== "chord-slot") return part.value;
+      const chords = part.chords.map((chord) => {
+        try {
+          return transposeChord(chord, semitones, useFlats);
+        } catch {
+          return chord;
+        }
+      });
+      return `${part.anticipation ? "." : ""}${chords.join("-")}`;
+    })
+    .join("");
+}
+
+function simplifySingleChord(token: string): string {
+  if (!isChordToken(token)) return token;
+  const { root, suffix } = parseChord(token);
+  if (/dim|°/i.test(suffix)) return `${root}dim`;
+  if (/aug|\+/.test(suffix)) return `${root}aug`;
+  if (/sus/i.test(suffix)) return root;
+  if (/ø/i.test(suffix) || /m7b5/i.test(suffix)) return `${root}m`;
+
+  const isMinor =
+    /min/i.test(suffix) ||
+    (suffix.startsWith("m") && !/^maj/i.test(suffix));
+  const isMajor = /maj/i.test(suffix) || suffix.startsWith("M");
+  return isMinor && !isMajor ? `${root}m` : root;
+}
+
+export function simplifyChordToken(token: string): string {
+  const prefix = token.startsWith(".") ? "." : "";
+  const chordSlot = prefix ? token.slice(1) : token;
+  if (!chordSlot) return token;
+  const chordParts = chordSlot.split("-");
+  if (!chordParts.every(isChordToken)) return token;
+  return `${prefix}${chordParts.map(simplifySingleChord).join("-")}`;
 }
 
 // Pecah satu baris jadi teks dan chord. Kurung not angka (`[5 6]`, `[[5 6]]`)
@@ -356,10 +471,14 @@ interface OverUnderChord {
 interface ChordLineParse {
   chords: OverUnderChord[];
   trailing: string[]; // token non-chord (mis. "|") yang dipertahankan
+  barLine: boolean;
 }
 
 function parseOverUnderChordLine(line: string): ChordLineParse | null {
   if (!line.trim()) return null;
+  if (parseBarLine(line)) {
+    return { chords: [], trailing: [], barLine: true };
+  }
   const chords: OverUnderChord[] = [];
   const trailing: string[] = [];
   const tokenRe = /\S+/g;
@@ -373,7 +492,7 @@ function parseOverUnderChordLine(line: string): ChordLineParse | null {
     if (!CHORD_TOKEN_RE.test(token)) return null;
     chords.push({ token, col: match.index });
   }
-  return chords.length > 0 ? { chords, trailing } : null;
+  return chords.length > 0 ? { chords, trailing, barLine: false } : null;
 }
 
 function snapNotationChordPos(lyric: string, col: number): number {
@@ -512,10 +631,15 @@ export function overUnderToChordPro(content: string): string {
       outLines.push(line);
       continue;
     }
+    if (chordLine.barLine) {
+      outLines.push(line);
+      continue;
+    }
     const next = lines[i + 1];
     if (
       next &&
       next.trim() &&
+      next.trim() !== "|" &&
       !LABEL_LINE_RE.test(next) &&
       !parseOverUnderChordLine(next)
     ) {
@@ -552,6 +676,12 @@ export function isOverUnderFormat(content: string): boolean {
 // Daftar semua chord unik (untuk validasi/preview).
 export function listChords(content: string): string[] {
   const seen = new Set<string>();
+  for (const line of content.split("\n")) {
+    for (const part of parseBarLine(line) ?? []) {
+      if (part.kind !== "chord-slot") continue;
+      for (const chord of part.chords) seen.add(chord);
+    }
+  }
   content.replace(/\[([^\]]+)\]/g, (_m, token: string) => {
     const t = token.trim();
     if (isChordToken(t)) {

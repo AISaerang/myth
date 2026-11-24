@@ -44,7 +44,7 @@ describe("notation normalization and diagnostics", () => {
   it("renders a CSS slur below the notation notes", () => {
     const css = readFileSync("src/app/globals.css", "utf8");
     const slurCss = css.slice(css.indexOf(".notation-slur {"), css.indexOf(".jianpu-dot"));
-    expect(slurCss).toContain("bottom: 0.55rem");
+    expect(slurCss).toContain("bottom: 0.63em");
     expect(slurCss).toContain("border-bottom");
     expect(slurCss).not.toContain("border-top");
   });
@@ -119,7 +119,8 @@ describe("not angka column alignment", () => {
     );
     expect(markup).toContain('data-section-label="Intro"');
     expect(markup).toContain("normal-case");
-    expect(markup).not.toContain("Bagian 1");
+    expect(markup).toContain("Pilih bagian 1: Intro");
+    expect(markup).not.toContain("Pilih bagian 1: Bagian 1");
     expect(markup).toContain('data-octave="down"');
     expect(markup).toContain('data-underline="1"');
     expect(markup).toContain("Bapa");
@@ -241,24 +242,28 @@ describe("not angka column alignment", () => {
     );
     expect(staffs).toHaveLength(3);
     for (const className of staffs) {
-      expect(className).toContain("text-sm");
-      expect(className).toContain("leading-6");
+      expect(className).toContain("notation-staff");
       expect(className).toContain("font-mono");
     }
     expect(both).toContain('data-chord="Csus4"');
     expect(both).toContain('data-kind="bar"');
     expect(both.match(/data-kind="bar"/g)).toHaveLength(6);
     expect(both).toContain("Bapa");
-    expect(both).toContain("font-mono text-sm leading-6");
+    expect(both).toContain("chart-text-line font-mono");
     const lyric = both.slice(both.lastIndexOf("Bapa") - 180, both.lastIndexOf("Bapa"));
-    expect(lyric).toContain("text-sm");
+    expect(lyric).toContain("chart-text-line font-mono");
     expect(lyric).not.toContain("notation-staff");
+    expect(readFileSync("src/app/globals.css", "utf8")).toMatch(
+      /\.chart-text-line\s*\{\s*line-height:\s*1\.714;/,
+    );
 
     const css = readFileSync("src/app/globals.css", "utf8");
     const staffCss = css.slice(css.indexOf(".notation-staff {"), css.indexOf(".jianpu-dot"));
     expect(staffCss).toContain("font-size: 0.875rem");
-    expect(staffCss).toContain("line-height: 1.5rem");
-    expect(staffCss).toContain("height: 1.5rem");
+    expect(staffCss).toContain("line-height: 1.714em");
+    expect(css).toContain("[data-chart-body] .notation-staff");
+    expect(css).toContain("font-size: 1em");
+    expect(staffCss).toContain("height: 1.714em");
     expect(staffCss).not.toContain("1.75rem");
     expect(staffCss).not.toContain("2.4em");
     expect(staffCss).not.toContain("JianpuASCII");
@@ -277,7 +282,7 @@ describe("not angka column alignment", () => {
     );
     expect(chordsOnly).not.toContain("notation-staff");
     expect(chordsOnly).toContain("Csus4");
-    expect(chordsOnly).toContain("text-sm");
+    expect(chordsOnly).toContain("chart-text-line font-mono");
     expect(chordsOnly).toContain("Intro");
 
     const shifted = renderToStaticMarkup(

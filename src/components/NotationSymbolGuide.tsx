@@ -86,6 +86,19 @@ export function NotationSymbolGuide({
               </tr>
             </tbody>
           </table>
+          <div className="mt-3 border-t border-zinc-200 pt-2 dark:border-zinc-700">
+            <p className="font-sans text-xs font-semibold">Baris chord instrumental</p>
+            <p className="mt-1 font-sans text-xs leading-5">
+              <span className="font-mono">|</span> batas birama,{" "}
+              <span className="font-mono">.</span> ketukan kosong/tahan,{" "}
+              <span className="font-mono">.Am</span> chord antisipasi,{" "}
+              <span className="font-mono">Am-Bb</span> gabungan chord satu
+              ketukan, dan <span className="font-mono">%</span> ulang birama
+              sebelumnya. Pada not angka, <span className="font-mono">-</span>{" "}
+              tetap tanda tahan dan <span className="font-mono">.</span> tetap
+              tanda oktaf/titik ritme.
+            </p>
+          </div>
         </div>
       ) : null}
     </div>

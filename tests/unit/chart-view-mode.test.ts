@@ -22,6 +22,10 @@ describe("chart view mode", () => {
     expect(classifyChartLine("[C]Kami [G]puji")).toBe("lyric");
     expect(classifyChartLine("[C]1 2 3 |")).toBe("notation");
     expect(classifyChartLine("[Csus4]")).toBe("chords-only");
+    expect(classifyChartLine("| . . . . |")).toBe("chords-only");
+    expect(classifyChartLine("C   .   G")).toBe("chords-only");
+    expect(classifyChartLine("[C]5- / [5 6] .5")).toBe("notation");
+    expect(classifyChartLine("|")).toBe("lyric");
     expect(classifyChartLine("")).toBe("empty");
   });
 

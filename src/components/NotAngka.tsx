@@ -1,16 +1,20 @@
+import { memo } from "react";
 import { alignChordsToNotation, type NotationAlignment, type NotationToken } from "@/lib/jianpu-align";
 import { parseJianpu, type JianpuNote } from "@/lib/jianpu";
+import { simplifyChordToken } from "@/lib/chords";
 
 /**
  * Not angka satu baris dengan kunci di kolom yang sama.
  * Titik oktaf, garis kres/mol, beam, dan legato digambar CSS — tanpa font khusus.
  */
-export function NotationLine({
+export const NotationLine = memo(function NotationLine({
   alignment,
   onChordClick,
+  simplify = false,
 }: {
   alignment: NotationAlignment;
   onChordClick?: (symbol: string) => void;
+  simplify?: boolean;
 }) {
   const notes = alignment.tokens.filter((token) => token.kind === "note");
   const aria = [
@@ -26,7 +30,7 @@ export function NotationLine({
 
   return (
     <div
-      className="notation-staff font-mono text-sm leading-6"
+      className="notation-staff chart-text-line font-mono"
       style={{ width: `calc(${alignment.columns} * 1ch)` }}
       data-notation-line=""
       data-notation="css"
@@ -46,25 +50,25 @@ export function NotationLine({
                 type="button"
                 data-chord={chord.token}
                 data-render-col={chord.renderCol}
-                className="absolute flex min-h-[44px] min-w-[44px] items-center justify-start font-semibold text-sky-700 dark:text-sky-400"
+                className="chart-chord absolute flex min-h-[44px] min-w-[44px] items-center justify-start font-semibold"
                 style={{
                   left: `calc(${chord.renderCol} * 1ch)`,
-                  top: "calc((1.5rem - 1em) / 2)",
+                  top: "calc((1.714em - 1em) / 2)",
                 }}
                 aria-label={`Tampilkan voicing ${chord.token}`}
                 onClick={() => onChordClick(chord.token)}
               >
-                {chord.token}
+                {simplify ? simplifyChordToken(chord.token) : chord.token}
               </button>
             ) : (
               <span
                 key={`${chord.token}-${chord.renderCol}-${index}`}
                 data-chord={chord.token}
                 data-render-col={chord.renderCol}
-                className="absolute font-semibold text-sky-700 dark:text-sky-400"
+                className="chart-chord absolute font-semibold"
                 style={{ left: `calc(${chord.renderCol} * 1ch)` }}
               >
-                {chord.token}
+                {simplify ? simplifyChordToken(chord.token) : chord.token}
               </span>
             )
           ))}
@@ -110,13 +114,13 @@ export function NotationLine({
       </div>
     </div>
   );
-}
+});
 
 export function NotAngka({ value, className = "" }: { value: string; className?: string }) {
   const result = parseJianpu(value);
   if (!result.valid) {
     return (
-      <span className={`text-xs text-red-600 dark:text-red-400 ${className}`}>
+      <span className={`chart-error text-xs ${className}`}>
         Notasi tidak valid: {result.error}
       </span>
     );
@@ -130,7 +134,7 @@ export function NotAngka({ value, className = "" }: { value: string; className?:
         const aligned = alignChordsToNotation("", line);
         if (!aligned) {
           return line.trim() ? (
-            <span key={index} className="font-mono text-sm">
+            <span key={index} className="chart-text-line font-mono">
               {line}
             </span>
           ) : (

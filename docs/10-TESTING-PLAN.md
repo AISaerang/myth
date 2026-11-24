@@ -15,6 +15,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Role-tab visibility hides empty tabs and shows tabs containing notes, pattern, dynamic, or Guitar Lead content; skill aliases land on the matching visible POV.
 - Chart legacy parser recognizes section headings (Verse/Chorus/Reff/Tagline/Prechorus/Interlude/Bridge/Modulation→Key Change/Coda/Outro/Intro, plus Post-Chorus/Solo/Hook/Breakdown/Vamp/Turnaround/Ad-lib/Spoken/Transition/Reprise), keeps repeated sections, and ignores empty blocks.
 - Chart stage helpers keep repeated sections, clamp text size, and prevent prev/next navigation from leaving section bounds.
+- Chart UX helpers select the visible section, clamp the 80–200% text scale, and preserve non-chord tokens while simplifying chord slots.
 - Arrangement composition keeps item order/duplicates and applies label overrides.
 - Medley runs split on non-consecutive legacy members and on hidden/archived items; singleton runs are not medleys. A reorder recalculates runs from batch order.
 - Batch views: global ADMIN/EVENT_ADMIN Edit controls are visible; Preview, closed-event EVENT_ADMIN, MEMBER, and OBSERVER views are read-only; readers see only non-archived batches with published, non-archived songs; batch badge ranks still include hidden items.
@@ -38,6 +39,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Share link: token generation is 43-char base64url and hashing is deterministic without plaintext; callback allowlist accepts only `/e/{token}` and rejects absolute/protocol-relative/traversal/query/hash/other paths; validity matrix covers active, expired, revoked, max uses, cancelled event, closed event, and `includeDrafts` visibility; landing resolution never increments `useCount`; an account without membership gets one `MEMBER` row (audit `source=SHARE_LINK`) and no `SongAssignment`; an existing member gets no second row; a guest cookie cannot pass `requireActionUser`; a guest cookie for event A cannot read event B; revocation invalidates an existing guest; `maxUses` does not evict an already-started guest; audit metadata contains no raw token.
 - Guest setlist navigation: member and guest href helpers encode IDs correctly, guest prev/next/list hrefs stay under `/e/{token}/tamu`, and guest batch anchors include `batchId` plus the batch anchor hash.
 - Chart display modes: row classification covers labels, comments, notation, lyrics, chords-only, and empty rows; detail is the default, legacy `both`/`lyrics` values are ignored, and per-device preference is stored under `myth_chart_display_mode`.
+- Chart viewer controls: simplify, text scale, and theme preferences persist per device; bottom controls and section navigation keep the chart's final content clear of the mobile safe area.
 
 ## Integration tests
 - Create user stores hash, not plaintext.

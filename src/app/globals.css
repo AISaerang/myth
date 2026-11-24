@@ -25,6 +25,81 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+[data-chart-section-active="true"] {
+  border-radius: 0.5rem;
+  background-color: var(--chart-active-bg, color-mix(in srgb, #0284c7 7%, transparent));
+}
+
+[data-chart-theme="light"] {
+  --chart-foreground: #27272a;
+  --chart-muted: #71717a;
+  --chart-chord: #075985;
+  --chart-error: #b91c1c;
+  --chart-surface: #fafafa;
+  --chart-active-bg: #e0f2fe;
+  color: var(--chart-foreground);
+}
+
+[data-chart-theme="dark"] {
+  --chart-foreground: #e4e4e7;
+  --chart-muted: #a1a1aa;
+  --chart-chord: #38bdf8;
+  --chart-error: #fca5a5;
+  --chart-surface: #18181b;
+  --chart-active-bg: #0c4a6e;
+  color: var(--chart-foreground);
+}
+
+[data-chart-theme] .chart-surface,
+[data-chart-theme].chart-stage-overlay {
+  background-color: var(--chart-surface);
+  color: var(--chart-foreground);
+}
+
+[data-chart-theme] .chart-section-nav {
+  border-color: color-mix(in srgb, var(--chart-foreground) 18%, transparent);
+  background-color: color-mix(in srgb, var(--chart-surface) 95%, transparent);
+  color: var(--chart-foreground);
+}
+
+[data-chart-theme] .chart-mobile-controls {
+  border-top: 1px solid
+    color-mix(in srgb, var(--chart-foreground) 18%, transparent);
+  background-color: color-mix(in srgb, var(--chart-surface) 96%, transparent);
+  color: var(--chart-foreground);
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 12%);
+  backdrop-filter: blur(12px);
+}
+
+[data-chart-theme] .chart-section-nav button:not([aria-pressed="true"]) {
+  border-color: color-mix(in srgb, var(--chart-foreground) 24%, transparent);
+}
+
+[data-chart-theme] .chart-chord {
+  color: var(--chart-chord);
+}
+
+[data-chart-theme] .chart-comment,
+[data-chart-theme] .chart-section-label {
+  color: var(--chart-muted);
+}
+
+[data-chart-theme] .chart-error {
+  color: var(--chart-error);
+}
+
+[data-chart-theme] [data-chart-section-active="true"] {
+  background-color: var(--chart-active-bg);
+}
+
+.chart-scroll-content {
+  padding-bottom: calc(9rem + env(safe-area-inset-bottom));
+}
+
+.chart-text-line {
+  line-height: 1.714;
+}
+
 /* Satu kolom = 1ch font staff (angka sama dengan baris lirik: text-sm / 1.5rem).
    Baris nada lebih tinggi supaya titik oktaf, beam, dan garis ketukan muat
    tanpa font khusus dan tanpa memotong di layar sempit. */
@@ -32,36 +107,40 @@ body {
   position: relative;
   display: inline-block;
   font-size: 0.875rem;
-  line-height: 1.5rem;
+  line-height: 1.714em;
   letter-spacing: 0;
   font-kerning: none;
   font-variant-ligatures: none;
   vertical-align: top;
 }
 
+[data-chart-body] .notation-staff {
+  font-size: 1em;
+}
+
 .notation-staff .notation-chords {
   position: relative;
-  height: 1.5rem;
+  height: 1.714em;
 }
 
 .notation-staff .notation-notes {
   position: relative;
-  height: 3.4rem;
+  height: 3.9em;
 }
 
 .notation-staff .notation-chords > span {
-  top: calc((1.5rem - 1em) / 2);
+  top: calc((1.714em - 1em) / 2);
   line-height: 1;
 }
 
 .notation-staff .notation-cell {
-  top: 1.45rem;
+  top: 1.657em;
   line-height: 1;
 }
 
 .notation-beam {
   position: absolute;
-  top: 0.62rem;
+  top: 0.71em;
   height: 0;
   border-top: 2px solid currentColor;
   pointer-events: none;
@@ -70,7 +149,7 @@ body {
 .notation-beam[data-beam="2"]::after {
   content: "";
   position: absolute;
-  top: 3px;
+  top: 0.21em;
   right: 0;
   left: 0;
   border-top: 2px solid currentColor;
@@ -79,8 +158,8 @@ body {
 .notation-slur {
   position: absolute;
   top: auto;
-  bottom: 0.55rem;
-  height: 0.34rem;
+  bottom: 0.63em;
+  height: 0.39em;
   border-bottom: 2px solid currentColor;
   border-right: 1px solid transparent;
   border-left: 1px solid transparent;
@@ -125,7 +204,7 @@ body {
 
 .jianpu-underlines {
   position: absolute;
-  top: calc(100% + 0.62rem);
+  top: calc(100% + 0.71em);
   right: 0;
   left: 0;
   display: flex;

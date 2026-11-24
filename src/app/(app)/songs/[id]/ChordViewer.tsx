@@ -1,16 +1,19 @@
 "use client";
 
-import { Component, type ReactNode } from "react";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Component, memo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { KeyTransposeBar } from "@/components/KeyTransposeBar";
 import { NotationLine } from "@/components/NotAngka";
 import { NotationSymbolGuide } from "@/components/NotationSymbolGuide";
+import { ChartSectionNavigator } from "@/components/ChartSectionNavigator";
 import { Badge } from "@/components/ui/Badge";
 import {
   extractChordLines,
   isChordToken,
   layoutChordLine,
   listChords,
+  parseBarLine,
+  simplifyChordToken,
   transposeChord,
   transposeContent,
   transposeRoot,
@@ -44,7 +47,11 @@ import {
   formatTransposeFormula,
   notationLineError,
 } from "@/lib/jianpu-align";
-import { clampTextSize, getStageSections, moveStageSection } from "@/lib/chart-stage";
+import {
+  clampTextScale,
+  getStageSections,
+  moveStageSection,
+} from "@/lib/chart-stage";
 import {
   CHART_DISPLAY_MODE_KEY,
   CHART_VIEW_MODES,
@@ -70,7 +77,7 @@ class SafeVoicingBoundary extends Component<
 
   render() {
     return this.state.failed ? (
-      <span className="px-2 py-4 text-zinc-500">
+      <span className="chart-section-label px-2 py-4">
         {this.props.fallback ?? "Voicing belum ada"}
       </span>
     ) : (
@@ -255,6 +262,7 @@ function sectionLabelAt(lines: string[], index: number): string | null {
 function renderChordTokens(
   line: string,
   onChordClick?: (symbol: string) => void,
+  simplify = false,
 ): ReactNode[] {
   const children: ReactNode[] = [];
   const tokenRegex = /\S+/g;
@@ -267,20 +275,21 @@ function renderChordTokens(
     }
     let isChord = false;
     isChord = isChordToken(token);
+    const displayedToken = simplify ? simplifyChordToken(token) : token;
     if (onChordClick && isChord) {
       children.push(
         <button
           key={`${match.index}-${token}`}
           type="button"
-          className="min-h-[44px] min-w-[44px] font-semibold text-sky-700 underline decoration-dotted underline-offset-2 dark:text-sky-400"
+          className="chart-chord min-h-[44px] min-w-[44px] font-semibold underline decoration-dotted underline-offset-2"
           aria-label={`Tampilkan voicing ${token}`}
           onClick={() => onChordClick(token)}
         >
-          {token}
+          {displayedToken}
         </button>,
       );
     } else {
-      children.push(token);
+      children.push(displayedToken);
     }
     cursor = match.index + token.length;
   }
@@ -288,13 +297,52 @@ function renderChordTokens(
   return children;
 }
 
+function renderBarLine(
+  line: string,
+  onChordClick?: (symbol: string) => void,
+  simplify = false,
+): ReactNode[] {
+  const parts = parseBarLine(line);
+  if (!parts) return [];
+  return parts.map((part, index) => {
+    if (part.kind !== "chord-slot") return part.value;
+    return (
+      <span key={`${index}-${part.value}`}>
+        {part.anticipation ? "." : ""}
+        {part.chords.map((chord, chordIndex) => (
+          <span key={`${chordIndex}-${chord}`}>
+            {chordIndex > 0 ? "-" : ""}
+            {onChordClick ? (
+              <button
+                type="button"
+                className="chart-chord font-semibold underline decoration-dotted underline-offset-2"
+                aria-label={`Tampilkan voicing ${chord}`}
+                onClick={() => onChordClick(chord)}
+              >
+                {simplify ? simplifyChordToken(chord) : chord}
+              </button>
+            ) : (
+              <span className="chart-chord font-semibold">
+                {simplify ? simplifyChordToken(chord) : chord}
+              </span>
+            )}
+          </span>
+        ))}
+      </span>
+    );
+  });
+}
+
 function renderChart(
   content: string,
   mode: ViewMode,
   key: string,
   onChordClick?: (symbol: string) => void,
+  sectionIdPrefix = "chart-section",
+  simplify = false,
 ) {
   const lines = content.split("\n");
+  let sectionIndex = 0;
   return lines.map((line, index) => {
     const lineKey = `${key}-${index}`;
     const kind = classifyChartLine(line);
@@ -309,10 +357,21 @@ function renderChart(
         <p
           key={lineKey}
           data-chart-comment=""
-          className="text-sm text-zinc-600 dark:text-zinc-400"
+          className="chart-comment"
         >
           {comment}
         </p>
+      );
+    }
+    if (kind === "chords-only" && parseBarLine(line)) {
+      return (
+        <pre
+          key={lineKey}
+          data-chart-bar-line=""
+          className="chart-text-line font-mono whitespace-pre"
+        >
+          {renderBarLine(line, onChordClick, simplify)}
+        </pre>
       );
     }
     const shownLabel = sectionLabelAt(lines, index);
@@ -320,11 +379,14 @@ function renderChart(
     if (isEmpty) return <div key={lineKey} className="h-4" />;
     if (label) {
       const shown = shownLabel ?? label;
+      const currentSectionIndex = sectionIndex++;
       return (
         <div
           key={lineKey}
+          id={`${sectionIdPrefix}-${currentSectionIndex}`}
           data-section-label={shown}
-          className={`mt-3 text-xs font-semibold tracking-wide text-zinc-500 first:mt-0 ${
+          data-chart-section-index={currentSectionIndex}
+          className={`chart-section-label mt-3 scroll-mt-20 text-xs font-semibold tracking-wide first:mt-0 ${
             shown === "Intro" ? "normal-case" : "uppercase"
           }`}
         >
@@ -341,9 +403,9 @@ function renderChart(
       return (
         <pre
           key={lineKey}
-          className="font-mono text-sm leading-7 whitespace-pre-wrap"
+          className="chart-text-line font-mono whitespace-pre"
         >
-          {renderChordTokens(chordText, onChordClick)}
+          {renderChordTokens(chordText, onChordClick, simplify)}
         </pre>
       );
     }
@@ -355,9 +417,9 @@ function renderChart(
         return (
           <pre
             key={lineKey}
-            className="font-mono text-sm leading-7 whitespace-pre-wrap"
+            className="chart-text-line font-mono whitespace-pre"
           >
-            {renderChordTokens(extracted, onChordClick)}
+            {renderChordTokens(extracted, onChordClick, simplify)}
           </pre>
         );
       }
@@ -365,17 +427,21 @@ function renderChart(
       if (aligned) {
         return (
           <div key={lineKey} className="max-w-full">
-            <NotationLine alignment={aligned} onChordClick={onChordClick} />
+            <NotationLine
+              alignment={aligned}
+              onChordClick={onChordClick}
+              simplify={simplify}
+            />
           </div>
         );
       }
       const notationError = notationLineError(lyricLine);
       return (
         <div key={lineKey} className="min-w-0 max-w-full">
-          <div className="w-max font-mono text-sm leading-6 whitespace-pre">
+          <div className="chart-text-line font-mono whitespace-pre">
             {chordLine.trim() ? (
-              <div className="font-semibold text-sky-700 dark:text-sky-400">
-                {renderChordTokens(chordLine, onChordClick)}
+              <div className="chart-chord font-semibold">
+                {renderChordTokens(chordLine, onChordClick, simplify)}
               </div>
             ) : null}
             {lyricLine.trim() ? <div>{lyricLine}</div> : null}
@@ -383,7 +449,7 @@ function renderChart(
           {mode === "detail" || mode === "chord-notation" ? (
             <p
               data-notation-error=""
-              className="mt-1 text-xs text-red-600 dark:text-red-400"
+              className="chart-error mt-1 text-xs"
             >
               Baris ini terlihat seperti not angka tapi gagal dirender
               {notationError ? `: ${notationError}` : ", periksa pola nada 0–7."}
@@ -400,18 +466,18 @@ function renderChart(
         return (
           <pre
             key={lineKey}
-            className="font-mono text-sm leading-7 whitespace-pre-wrap"
+            className="chart-text-line font-mono whitespace-pre"
           >
-            {renderChordTokens(extracted, onChordClick)}
+            {renderChordTokens(extracted, onChordClick, simplify)}
           </pre>
         );
       }
       return (
         <div key={lineKey} className="min-w-0 max-w-full">
-          <div className="w-max font-mono text-sm leading-6 whitespace-pre">
+          <div className="chart-text-line font-mono whitespace-pre">
             {chordLine.trim() ? (
-              <div className="font-semibold text-sky-700 dark:text-sky-400">
-                {renderChordTokens(chordLine, onChordClick)}
+              <div className="chart-chord font-semibold">
+                {renderChordTokens(chordLine, onChordClick, simplify)}
               </div>
             ) : null}
             {lyricLine.trim() ? <div>{lyricLine}</div> : null}
@@ -424,19 +490,34 @@ function renderChart(
 }
 
 /** Isi chart tanpa kontrol transpose, supaya rumus nada tidak diulang per bagian. */
-export function ChartBody({
+export const ChartBody = memo(function ChartBody({
   content,
   mode = "detail",
   renderKey,
   onChordClick,
+  sectionIdPrefix,
+  simplify,
 }: {
   content: string;
   mode?: ViewMode;
   renderKey: string;
   onChordClick?: (symbol: string) => void;
+  sectionIdPrefix?: string;
+  simplify?: boolean;
 }) {
-  return <>{renderChart(content, mode, renderKey, onChordClick)}</>;
-}
+  return (
+    <>
+      {renderChart(
+        content,
+        mode,
+        renderKey,
+        onChordClick,
+        sectionIdPrefix,
+        simplify,
+      )}
+    </>
+  );
+});
 
 export function ChordViewer({
   content,
@@ -532,13 +613,213 @@ export function ChordViewer({
   const showPOV = showPovControls ?? Boolean(songId);
   const showKey = showKeyControls ?? Boolean(songId);
   const showCapo = showCapoControls ?? Boolean(songId);
-  const [textSize, setTextSize] = useState(14);
+  const [textScale, setTextScale] = useState(100);
+  const [textScaleLoaded, setTextScaleLoaded] = useState(false);
   const [stageActive, setStageActive] = useState(false);
-  const [stageTheme, setStageTheme] = useState<"dark" | "light">("dark");
+  const [systemTheme, setSystemTheme] = useState<"dark" | "light">("light");
+  const [themeOverride, setThemeOverride] = useState<"dark" | "light" | null>(
+    null,
+  );
+  const [themeLoaded, setThemeLoaded] = useState(false);
   const [autoScroll, setAutoScroll] = useState(false);
+  const [simplify, setSimplify] = useState(false);
+  const [simplifyLoaded, setSimplifyLoaded] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState(2);
-  const [activeSection, setActiveSection] = useState(0);
+  const activeSectionRef = useRef(0);
   const stageScrollRef = useRef<HTMLDivElement>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const chartTheme = themeOverride ?? systemTheme;
+  const renderMobileControls = (stage = false) => (
+    <div className="chart-mobile-controls fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[70] sm:hidden">
+      <div
+        role="toolbar"
+        aria-label="Kontrol chart"
+        className="flex items-center gap-2 overflow-x-auto px-2 py-1.5"
+      >
+        <div className="flex shrink-0 gap-1" role="group" aria-label="Mode tampil">
+          {MODES.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setMode(item.value)}
+              aria-pressed={mode === item.value}
+              className={`min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-medium ${
+                mode === item.value
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "border border-zinc-300 dark:border-zinc-700"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex shrink-0 gap-1" role="group" aria-label="Transpose nada">
+          <button
+            type="button"
+            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            onClick={() => setOffset(offset - 1)}
+            aria-label="Turunkan setengah nada"
+          >
+            −½
+          </button>
+          <button
+            type="button"
+            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            onClick={() => setOffset(offset + 1)}
+            aria-label="Naikkan setengah nada"
+          >
+            +½
+          </button>
+          <button
+            type="button"
+            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs dark:border-zinc-700"
+            onClick={resetViewerToC}
+          >
+            Reset nada
+          </button>
+        </div>
+        <button
+          type="button"
+          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+          onClick={() => setSimplify((enabled) => !enabled)}
+          aria-label="Sederhanakan chord"
+          aria-pressed={simplify}
+        >
+          {simplify ? "Chord ringkas" : "Sederhanakan"}
+        </button>
+        <button
+          type="button"
+          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          onClick={() => setTextScale((scale) => clampTextScale(scale - 10))}
+          disabled={textScale <= 80}
+        >
+          A−
+        </button>
+        <span className="shrink-0 text-xs">{textScale}%</span>
+        <button
+          type="button"
+          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          onClick={() => setTextScale((scale) => clampTextScale(scale + 10))}
+          disabled={textScale >= 200}
+        >
+          A+
+        </button>
+        <button
+          type="button"
+          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+          onClick={() =>
+            setThemeOverride(chartTheme === "dark" ? "light" : "dark")
+          }
+          aria-label={`Gunakan tema ${chartTheme === "dark" ? "terang" : "gelap"}`}
+          aria-pressed={themeOverride !== null}
+        >
+          {chartTheme === "dark" ? "Tema terang" : "Tema gelap"}
+        </button>
+        <button
+          type="button"
+          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+          onClick={() => setAutoScroll((enabled) => !enabled)}
+          aria-pressed={autoScroll}
+          disabled={reducedMotion}
+          title={reducedMotion ? "Nonaktif saat pengurangan gerakan aktif" : undefined}
+        >
+          {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
+        </button>
+        <label className="flex shrink-0 items-center gap-2 px-2 text-xs">
+          Kecepatan
+          <input
+            type="range"
+            min={1}
+            max={5}
+            value={scrollSpeed}
+            onChange={(event) => setScrollSpeed(Number(event.target.value))}
+            aria-label="Kecepatan auto-scroll"
+            disabled={reducedMotion}
+          />
+        </label>
+        {stage ? (
+          <button
+            type="button"
+            className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+            onClick={() => setStageActive(false)}
+          >
+            Keluar panggung
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => {
+      setReducedMotion(preference.matches);
+      if (preference.matches) setAutoScroll(false);
+    };
+    update();
+    preference.addEventListener("change", update);
+    return () => preference.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () =>
+      setSystemTheme(preference.matches ? "dark" : "light");
+    update();
+    preference.addEventListener("change", update);
+    return () => preference.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    let savedSimplify = false;
+    try {
+      savedSimplify = window.localStorage.getItem("myth_chart_simplify") === "true";
+    } catch (error) {
+      console.warn("Preferensi penyederhanaan chord tidak dapat dibaca.", error);
+    }
+    const timer = window.setTimeout(() => {
+      setSimplify(savedSimplify);
+      setSimplifyLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!simplifyLoaded) return;
+    try {
+      window.localStorage.setItem("myth_chart_simplify", String(simplify));
+    } catch (error) {
+      console.warn("Preferensi penyederhanaan chord tidak dapat disimpan.", error);
+    }
+  }, [simplify, simplifyLoaded]);
+
+  useEffect(() => {
+    let savedTheme: "dark" | "light" | null = null;
+    try {
+      const saved = window.localStorage.getItem("myth_chart_theme");
+      if (saved === "dark" || saved === "light") savedTheme = saved;
+    } catch (error) {
+      console.warn("Preferensi tema chart tidak dapat dibaca.", error);
+    }
+    const timer = window.setTimeout(() => {
+      setThemeOverride(savedTheme);
+      setThemeLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!themeLoaded) return;
+    try {
+      if (themeOverride) {
+        window.localStorage.setItem("myth_chart_theme", themeOverride);
+      } else {
+        window.localStorage.removeItem("myth_chart_theme");
+      }
+    } catch (error) {
+      console.warn("Preferensi tema chart tidak dapat disimpan.", error);
+    }
+  }, [themeLoaded, themeOverride]);
 
   useEffect(() => {
     if (!preferenceKey || hasSharedPreferences) return;
@@ -768,6 +1049,49 @@ export function ChordViewer({
     () => sectionOffsets(sections ?? [], baseKey, offset, resetToC),
     [baseKey, offset, resetToC, sections],
   );
+  const transposedSections = useMemo(
+    () =>
+      sections?.map((section, index) =>
+        transposeContent(
+          section.content,
+          offsets[index] ?? keyOffsetFromC(baseKey) + offset,
+          useFlats,
+        ),
+      ) ?? [],
+    [baseKey, offset, offsets, sections, useFlats],
+  );
+  const transposedRoleContents = useMemo(() => {
+    const result = new Map<string, string>();
+    if (instrumentPov !== "guitar_lead" || !sections) return result;
+    const roleTab = roleTabs.find((tab) => tab.role === instrumentPov)?.data;
+    if (!roleTab || typeof roleTab !== "object") return result;
+    const roleSections = (
+      roleTab as { sections?: Record<string, { content?: string }> }
+    ).sections;
+    if (!roleSections) return result;
+    sections.forEach((section, index) => {
+      const sectionContent = roleSections[section.id]?.content;
+      if (sectionContent) {
+        result.set(
+          section.id,
+          transposeContent(
+            sectionContent,
+            offsets[index] ?? keyOffsetFromC(baseKey) + offset,
+            useFlats,
+          ),
+        );
+      }
+    });
+    return result;
+  }, [
+    baseKey,
+    instrumentPov,
+    offset,
+    offsets,
+    roleTabs,
+    sections,
+    useFlats,
+  ]);
   const stageSections = useMemo(
     () =>
       sections
@@ -782,36 +1106,64 @@ export function ChordViewer({
   const effectiveCapoMode = localCapoMode;
 
   useEffect(() => {
-    const savedSize = Number(window.localStorage.getItem("myth-stage-text-size"));
-    if (Number.isFinite(savedSize) && savedSize > 0) {
-      const frame = window.requestAnimationFrame(() =>
-        setTextSize(clampTextSize(savedSize)),
-      );
-      return () => window.cancelAnimationFrame(frame);
+    let savedScale = 100;
+    try {
+      const current = window.localStorage.getItem("myth_chart_text_scale");
+      if (current !== null) {
+        const parsed = Number(current);
+        if (Number.isFinite(parsed)) savedScale = clampTextScale(parsed);
+      } else {
+        const legacySize = Number(
+          window.localStorage.getItem("myth-stage-text-size"),
+        );
+        if (Number.isFinite(legacySize) && legacySize > 0) {
+          savedScale = clampTextScale((legacySize / 14) * 100);
+        }
+      }
+    } catch (error) {
+      console.warn("Preferensi ukuran teks chart tidak dapat dibaca.", error);
     }
+    const timer = window.setTimeout(() => {
+      setTextScale(savedScale);
+      setTextScaleLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("myth-stage-text-size", String(textSize));
-  }, [textSize]);
+    if (!textScaleLoaded) return;
+    try {
+      window.localStorage.setItem("myth_chart_text_scale", String(textScale));
+      window.localStorage.removeItem("myth-stage-text-size");
+    } catch (error) {
+      console.warn("Preferensi ukuran teks chart tidak dapat disimpan.", error);
+    }
+  }, [textScale, textScaleLoaded]);
 
   useEffect(() => {
     if (!stageActive) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const jump = (next: number) => {
-      setActiveSection(next);
-      document
-        .getElementById(`stage-section-${next}`)
-        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    const jump = (direction: -1 | 1) => {
+      const next = moveStageSection(
+        activeSectionRef.current,
+        direction,
+        stageSections.length,
+      );
+      document.getElementById(`stage-section-${next}`)?.scrollIntoView({
+        block: "start",
+        behavior: reducedMotion ? "auto" : "smooth",
+      });
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setStageActive(false);
       if (event.key === "ArrowDown") {
-        jump(moveStageSection(activeSection, 1, stageSections.length));
+        event.preventDefault();
+        jump(1);
       }
       if (event.key === "ArrowUp") {
-        jump(moveStageSection(activeSection, -1, stageSections.length));
+        event.preventDefault();
+        jump(-1);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -819,21 +1171,52 @@ export function ChordViewer({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [activeSection, stageActive, stageSections.length]);
+  }, [reducedMotion, stageActive, stageSections.length]);
 
   useEffect(() => {
-    if (!stageActive || !autoScroll) return;
-    const timer = window.setInterval(() => {
-      const element = stageScrollRef.current;
-      if (!element) return;
-      if (element.scrollTop + element.clientHeight >= element.scrollHeight - 2) {
-        setAutoScroll(false);
-        return;
+    if (!autoScroll) return;
+    if (reducedMotion) return;
+
+    let frame = 0;
+    let previousTime = 0;
+    const scroll = (time: number) => {
+      if (previousTime === 0) previousTime = time;
+      const elapsed = Math.min(time - previousTime, 50);
+      previousTime = time;
+      if (stageActive) {
+        const element = stageScrollRef.current;
+        if (!element) {
+          frame = window.requestAnimationFrame(scroll);
+          return;
+        }
+        const nextTop = element.scrollTop + (scrollSpeed * 12 * elapsed) / 1000;
+        const maxTop = element.scrollHeight - element.clientHeight;
+        element.scrollTop = Math.min(nextTop, maxTop);
+        if (element.scrollTop >= maxTop - 1) {
+          setAutoScroll(false);
+          return;
+        }
+      } else {
+        const root = document.documentElement;
+        const maxTop = root.scrollHeight - window.innerHeight;
+        window.scrollBy(0, (scrollSpeed * 12 * elapsed) / 1000);
+        if (window.scrollY >= maxTop - 1) {
+          setAutoScroll(false);
+          return;
+        }
       }
-      element.scrollBy({ top: scrollSpeed, behavior: "auto" });
-    }, 100);
-    return () => window.clearInterval(timer);
-  }, [autoScroll, scrollSpeed, stageActive]);
+      frame = window.requestAnimationFrame(scroll);
+    };
+    frame = window.requestAnimationFrame(scroll);
+    return () => window.cancelAnimationFrame(frame);
+  }, [autoScroll, reducedMotion, scrollSpeed, stageActive]);
+
+  useEffect(() => {
+    if (!autoScroll) return;
+    const pause = () => setAutoScroll(false);
+    window.addEventListener("touchstart", pause, { passive: true });
+    return () => window.removeEventListener("touchstart", pause);
+  }, [autoScroll]);
 
   function resetViewerToC() {
     setResetToC(true);
@@ -856,19 +1239,66 @@ export function ChordViewer({
     setCapoModeExplicit(true);
   }
 
-  function jumpToSection(index: number) {
-    const next =
-      stageSections.length === 0
-        ? 0
-        : Math.min(stageSections.length - 1, Math.max(0, index));
-    setActiveSection(next);
-    document
-      .getElementById(`stage-section-${next}`)
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }
+  const openPlainChartChord = useCallback(
+    (symbol: string) => {
+      const sectionOffset = keyOffsetFromC(displayBaseKey) + offset;
+      const baseSymbol = transposeChord(symbol, -sectionOffset, useFlats);
+      const voicing = resolveInstrumentVoicing({
+        baseSymbol,
+        sectionOffset,
+        capo,
+        capoMode: effectiveCapoMode,
+        useFlats,
+        override: instrumentData?.voicings,
+      });
+      if (voicing) setOpenVoicing({ chord: symbol, voicing });
+    },
+    [
+      capo,
+      displayBaseKey,
+      effectiveCapoMode,
+      instrumentData?.voicings,
+      offset,
+      useFlats,
+    ],
+  );
+
+  const sectionChordHandlers = useMemo(() => {
+    const handlers = new Map<string, (symbol: string) => void>();
+    for (const [index, section] of (sections ?? []).entries()) {
+      const sectionOffset =
+        offsets[index] ?? keyOffsetFromC(baseKey) + offset;
+      handlers.set(section.id, (symbol: string) => {
+        try {
+          const baseSymbol = transposeChord(symbol, -sectionOffset, useFlats);
+          const voicing = resolveInstrumentVoicing({
+            baseSymbol,
+            sectionOffset,
+            capo,
+            capoMode: effectiveCapoMode,
+            useFlats,
+            override: instrumentData?.voicings,
+          });
+          if (voicing) setOpenVoicing({ chord: symbol, voicing });
+        } catch {
+          setOpenVoicing(null);
+        }
+      });
+    }
+    return handlers;
+  }, [
+    baseKey,
+    capo,
+    effectiveCapoMode,
+    instrumentData,
+    offset,
+    offsets,
+    sections,
+    useFlats,
+  ]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" data-chart-theme={chartTheme}>
       {showPOV || showKey || showCapo ? (
         <InstrumentPovBar
           instrumentPov={instrumentPov}
@@ -905,7 +1335,7 @@ export function ChordViewer({
         ) : null}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Mode tampil">
+        <div className="hidden flex-wrap gap-1 sm:flex" role="group" aria-label="Mode tampil">
           {MODES.map((item) => (
             <button
               key={item.value}
@@ -940,29 +1370,71 @@ export function ChordViewer({
           />
         ) : null}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="hidden flex-wrap items-center gap-2 sm:flex">
         <button
           type="button"
           className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
-          onClick={() => setTextSize((size) => clampTextSize(size - 2))}
-          disabled={textSize <= 14}
+          onClick={() => setSimplify((enabled) => !enabled)}
+          aria-label="Sederhanakan chord"
+          aria-pressed={simplify}
+        >
+          {simplify ? "Chord sederhana aktif" : "Sederhanakan chord"}
+        </button>
+        <button
+          type="button"
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          onClick={() => setTextScale((scale) => clampTextScale(scale - 10))}
+          disabled={textScale <= 80}
         >
           A−
         </button>
         <button
           type="button"
           className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
-          onClick={() => setTextSize((size) => clampTextSize(size + 2))}
-          disabled={textSize >= 24}
+          onClick={() => setTextScale((scale) => clampTextScale(scale + 10))}
+          disabled={textScale >= 200}
         >
           A+
         </button>
-        <span className="text-xs text-zinc-500">{textSize}px</span>
+        <span className="text-xs text-zinc-500">{textScale}%</span>
+        <button
+          type="button"
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          onClick={() =>
+            setThemeOverride(chartTheme === "dark" ? "light" : "dark")
+          }
+          aria-label={`Gunakan tema ${chartTheme === "dark" ? "terang" : "gelap"}`}
+          aria-pressed={themeOverride !== null}
+        >
+          {chartTheme === "dark" ? "Tema terang" : "Tema gelap"}
+        </button>
+        <button
+          type="button"
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          onClick={() => setAutoScroll((enabled) => !enabled)}
+          aria-pressed={autoScroll}
+          disabled={reducedMotion}
+          title={reducedMotion ? "Nonaktif saat pengurangan gerakan aktif" : undefined}
+        >
+          {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
+        </button>
+        <label className="flex items-center gap-2 text-xs">
+          Kecepatan
+          <input
+            type="range"
+            min={1}
+            max={5}
+            value={scrollSpeed}
+            onChange={(event) => setScrollSpeed(Number(event.target.value))}
+            aria-label="Kecepatan auto-scroll"
+            disabled={reducedMotion}
+          />
+        </label>
         <button
           type="button"
           className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
           onClick={() => {
-            setActiveSection(0);
+            activeSectionRef.current = 0;
             setStageActive(true);
           }}
         >
@@ -971,7 +1443,8 @@ export function ChordViewer({
       </div>
       <div
         data-chart-body=""
-        className="min-w-0 max-w-full rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900"
+        className="chart-surface chart-scroll-content min-w-0 max-w-full rounded-lg p-4"
+        style={{ fontSize: `calc(0.875rem * ${textScale / 100})` }}
       >
         {sections ? (
           <div className="flex min-w-0 flex-col gap-5">
@@ -1003,26 +1476,6 @@ export function ChordViewer({
                       }
                     ).sections?.[section.id]
                   : null;
-              const openDisplayedChord = (symbol: string) => {
-                try {
-                  const baseSymbol = transposeChord(
-                    symbol,
-                    -sectionOffset,
-                    useFlats,
-                  );
-                  const voicing = resolveInstrumentVoicing({
-                    baseSymbol,
-                    sectionOffset,
-                    capo,
-                    capoMode: effectiveCapoMode,
-                    useFlats,
-                    override: instrumentData?.voicings,
-                  });
-                  if (voicing) setOpenVoicing({ chord: symbol, voicing });
-                } catch {
-                  setOpenVoicing(null);
-                }
-              };
               const chords =
                 instrumentPov === "guitar" || instrumentPov === "piano"
                   ? listChords(section.content)
@@ -1030,11 +1483,13 @@ export function ChordViewer({
               return (
                 <section
                   key={`${section.id}-${index}`}
+                  id={`chart-section-${index}`}
                   data-chart-section={section.id}
-                  className="min-w-0 border-b border-zinc-200 pb-4 last:border-b-0 last:pb-0 dark:border-zinc-800"
+                  data-chart-section-index={index}
+                  className="min-w-0 scroll-mt-20 border-b border-zinc-200 pb-4 last:border-b-0 last:pb-0 dark:border-zinc-800 [content-visibility:auto] [contain:content]"
                 >
                   <div className="mb-2 flex min-w-0 flex-col gap-2">
-                    <h3 className="text-xs font-semibold tracking-wide text-zinc-500">
+                    <h3 className="chart-section-label text-xs font-semibold tracking-wide">
                       {section.label}
                     </h3>
                     {roleSection ? (
@@ -1049,9 +1504,13 @@ export function ChordViewer({
                           ) : instrumentPov === "guitar_lead" ? (
                             roleSection.content ? (
                               <ChartBody
-                                content={transposeContent(roleSection.content, sectionOffset, useFlats)}
+                                content={
+                                  transposedRoleContents.get(section.id) ??
+                                  roleSection.content
+                                }
                                 mode={mode}
                                 renderKey={`${sectionOffset}-${useFlats}-role-${instrumentPov}-${section.id}-${index}`}
+                                simplify={simplify}
                               />
                             ) : roleSection.notes ? (
                               <p className="whitespace-pre-wrap">{roleSection.notes}</p>
@@ -1173,14 +1632,17 @@ export function ChordViewer({
                     }`}
                   >
                     <div className="min-w-0 max-w-full overflow-x-auto">
-                      {renderChart(
-                        transposeContent(section.content, sectionOffset, useFlats),
-                        mode,
-                        `${sectionOffset}-${useFlats}-${mode}-${section.id}-${index}`,
-                        instrumentPov === "chart"
-                          ? undefined
-                          : openDisplayedChord,
-                      )}
+                      <ChartBody
+                        content={transposedSections[index] ?? section.content}
+                        mode={mode}
+                        renderKey={`${sectionOffset}-${useFlats}-${mode}-${section.id}-${index}`}
+                        simplify={simplify}
+                        onChordClick={
+                          instrumentPov === "chart"
+                            ? undefined
+                            : sectionChordHandlers.get(section.id)
+                        }
+                      />
                     </div>
                     {annotations?.general}
                   </div>
@@ -1194,94 +1656,71 @@ export function ChordViewer({
               content={transposed}
               mode={mode}
               renderKey={`${offset}-${useFlats}-${mode}`}
+              simplify={simplify}
               onChordClick={
                 instrumentPov === "chart"
                   ? undefined
-                  : (symbol) => {
-                      const sectionOffset =
-                        keyOffsetFromC(displayBaseKey) + offset;
-                      const baseSymbol = transposeChord(
-                        symbol,
-                        -sectionOffset,
-                        useFlats,
-                      );
-                      const voicing = resolveInstrumentVoicing({
-                        baseSymbol,
-                        sectionOffset,
-                        capo,
-                        capoMode: effectiveCapoMode,
-                        useFlats,
-                        override: instrumentData?.voicings,
-                      });
-                      if (voicing) setOpenVoicing({ chord: symbol, voicing });
-                    }
+                  : openPlainChartChord
               }
             />
           </div>
         )}
       </div>
+      {!stageActive ? (
+        <ChartSectionNavigator
+          sections={stageSections}
+          targetIdPrefix="chart-section"
+          activeIndexRef={activeSectionRef}
+          reducedMotion={reducedMotion}
+        />
+      ) : null}
+      {!stageActive ? renderMobileControls() : null}
       {stageActive ? (
         <div
-          className={`fixed inset-0 z-[100] flex flex-col ${
-            stageTheme === "dark"
-              ? "bg-zinc-950 text-zinc-100"
-              : "bg-white text-zinc-950"
-          }`}
+          data-chart-theme={chartTheme}
+          className="chart-stage-overlay fixed inset-0 z-[100] flex flex-col"
           role="dialog"
           aria-modal="true"
           aria-label="Mode panggung"
         >
-          <div className="flex min-h-14 flex-wrap items-center gap-2 border-b border-zinc-700/40 px-3 py-2">
+          <div className="hidden min-h-14 flex-wrap items-center gap-2 border-b border-zinc-700/40 px-3 py-2 sm:flex">
             <button
               type="button"
               className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
-              onClick={() => jumpToSection(moveStageSection(activeSection, -1, stageSections.length))}
-              disabled={stageSections.length === 0 || activeSection === 0}
+              onClick={() => setSimplify((enabled) => !enabled)}
+              aria-label="Sederhanakan chord"
+              aria-pressed={simplify}
             >
-              Sebelumnya
+              {simplify ? "Chord ringkas" : "Sederhanakan chord"}
             </button>
+            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
+            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
+            <span className="text-xs">{textScale}%</span>
             <button
               type="button"
               className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
-              onClick={() => jumpToSection(moveStageSection(activeSection, 1, stageSections.length))}
-              disabled={stageSections.length === 0 || activeSection >= stageSections.length - 1}
+              onClick={() =>
+                setThemeOverride(chartTheme === "dark" ? "light" : "dark")
+              }
+              aria-label={`Gunakan tema ${chartTheme === "dark" ? "terang" : "gelap"}`}
+              aria-pressed={themeOverride !== null}
             >
-              Berikutnya
+              {chartTheme === "dark" ? "Tema terang" : "Tema gelap"}
             </button>
-            <select
-              value={activeSection}
-              onChange={(event) => jumpToSection(Number(event.target.value))}
-              aria-label="Lompat ke section"
-              className="h-11 max-w-[45vw] rounded-lg border border-zinc-500/50 bg-transparent px-2 text-sm"
-            >
-              {stageSections.length === 0 ? (
-                <option value={0}>Tanpa section</option>
-              ) : (
-                stageSections.map((section) => (
-                  <option key={`${section.lineIndex}-${section.label}`} value={section.index}>
-                    {section.index + 1}. {section.label}
-                  </option>
-                ))
-              )}
-            </select>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextSize((size) => clampTextSize(size - 2))} disabled={textSize <= 14}>A−</button>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextSize((size) => clampTextSize(size + 2))} disabled={textSize >= 24}>A+</button>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setStageTheme((theme) => (theme === "dark" ? "light" : "dark"))}>
-              {stageTheme === "dark" ? "Terang" : "Gelap"}
-            </button>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setAutoScroll((enabled) => !enabled)} aria-pressed={autoScroll}>
+            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setAutoScroll((enabled) => !enabled)} aria-pressed={autoScroll} disabled={reducedMotion}>
               {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
             </button>
             <label className="flex items-center gap-2 text-xs">
               Kecepatan
-              <input type="range" min={1} max={5} value={scrollSpeed} onChange={(event) => setScrollSpeed(Number(event.target.value))} aria-label="Kecepatan auto-scroll" />
+              <input type="range" min={1} max={5} value={scrollSpeed} onChange={(event) => setScrollSpeed(Number(event.target.value))} aria-label="Kecepatan auto-scroll" disabled={reducedMotion} />
             </label>
             <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setStageActive(false)}>Keluar</button>
           </div>
           <div
             ref={stageScrollRef}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-8"
-            style={{ fontSize: textSize }}
+            data-chart-body=""
+            className="chart-scroll-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-8"
+            style={{ fontSize: `calc(0.875rem * ${textScale / 100})` }}
           >
             {sections ? (
               <div className="flex flex-col gap-5">
@@ -1291,19 +1730,19 @@ export function ChordViewer({
                     <section
                       key={section.id}
                       id={`stage-section-${index}`}
-                      className={`rounded-lg border px-3 py-4 ${
-                        activeSection === index
-                          ? "border-sky-500"
-                          : "border-zinc-500/30"
-                      }`}
+                      data-chart-section-index={index}
+                      className="rounded-lg border border-zinc-500/30 px-3 py-4"
                     >
                       <h2 className="mb-3 font-bold">
                         {index + 1}. {section.label}
                       </h2>
                       {renderChart(
-                        transposeContent(section.content, sectionOffset, useFlats),
+                        transposedSections[index] ?? section.content,
                         mode,
                         `stage-${sectionOffset}-${useFlats}-${mode}-${section.id}-${index}`,
+                        undefined,
+                        "chart-section",
+                        simplify,
                       )}
                     </section>
                   );
@@ -1314,15 +1753,26 @@ export function ChordViewer({
                 content={transposed}
                 mode={mode}
                 renderKey={`stage-${offset}-${useFlats}-${mode}`}
+                sectionIdPrefix="stage-section"
+                simplify={simplify}
               />
             )}
           </div>
+          {renderMobileControls(true)}
+          <ChartSectionNavigator
+            sections={stageSections}
+            targetIdPrefix="stage-section"
+            scrollRootRef={stageScrollRef}
+            activeIndexRef={activeSectionRef}
+            reducedMotion={reducedMotion}
+            stage
+          />
         </div>
       ) : null}
       {openVoicing ? (
         <div
           role="presentation"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setOpenVoicing(null);
           }}

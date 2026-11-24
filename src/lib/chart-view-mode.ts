@@ -1,5 +1,9 @@
 import { alignChordsToNotation, notationLineError } from "@/lib/jianpu-align";
-import { extractChordLines, layoutChordLine } from "@/lib/chords";
+import {
+  extractChordLines,
+  layoutChordLine,
+  parseBarLine,
+} from "@/lib/chords";
 
 export type ChartViewMode =
   | "chords"
@@ -70,6 +74,7 @@ export function classifyChartLine(line: string): ChartLineKind {
   ) {
     return "notation";
   }
+  if (parseBarLine(line)) return "chords-only";
   if (!layout.lyricLine.trim() && layout.chordLine.trim()) {
     return "chords-only";
   }
