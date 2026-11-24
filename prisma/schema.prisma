@@ -108,6 +108,8 @@ model Event {
   eventSongs     EventSong[]
   // Materi khusus event (docs/13 §4.2); null = materi pustaka.
   eventMaterials SongMaterial[]    @relation("EventMaterials")
+  // Tautan event publik (tamu). Satu event boleh punya banyak tautan.
+  shareLinks     ShareLink[]
 
   @@index([eventStatus, eventDate])
   @@index([eventType, eventStatus])
@@ -828,6 +830,47 @@ model EquipmentItem {
   updatedAt        DateTime        @updatedAt
 
   @@index([eventId, status])
+}
+
+// Tautan publik berbagi satu event. Hanya hash SHA-256 token yang
+// disimpan; token mentah tampil sekali ke admin pembuat tautan.
+// Akun yang membuka tautan valid dengan sesi login otomatis menjadi
+// MEMBER event ini. Guest (tanpa akun) memakai ShareGuestSession.
+model ShareLink {
+  id            String    @id @default(cuid())
+  tokenHash     String    @unique
+  eventId       String
+  event         Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  label         String?   @db.VarChar(80)
+  includeDrafts Boolean   @default(false)
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  maxUses       Int?
+  useCount      Int       @default(0)
+  lastUsedAt    DateTime?
+  // Plain user id (no FK): preserves history even if accounts change.
+  createdById   String    @db.VarChar(191)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  guestSessions ShareGuestSession[]
+
+  @@index([eventId, revokedAt])
+}
+
+// Sesi tamu read-only untuk satu tautan. Bukan User, bukan Session.
+// Hanya hash SHA-256 token sesi yang disimpan; token mentah hidup di
+// cookie HttpOnly myth_share_guest.
+model ShareGuestSession {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  shareLinkId String
+  shareLink   ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  displayName String?   @db.VarChar(100)
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  lastSeenAt  DateTime?
+
+  @@index([shareLinkId, expiresAt])
 }
 
 model DecisionLog {

@@ -34,6 +34,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Final lock requires intentional authorized action.
 - Overdue task and equipment blocker aggregation.
 - Cancelled rehearsal excluded from upcoming list.
+- Share link: token generation is 43-char base64url and hashing is deterministic without plaintext; callback allowlist accepts only `/e/{token}` and rejects absolute/protocol-relative/traversal/query/hash/other paths; validity matrix covers active, expired, revoked, max uses, cancelled event, closed event, and `includeDrafts` visibility; landing resolution never increments `useCount`; an account without membership gets one `MEMBER` row (audit `source=SHARE_LINK`) and no `SongAssignment`; an existing member gets no second row; a guest cookie cannot pass `requireActionUser`; a guest cookie for event A cannot read event B; revocation invalidates an existing guest; `maxUses` does not evict an already-started guest; audit metadata contains no raw token.
 
 ## Integration tests
 - Create user stores hash, not plaintext.
@@ -56,9 +57,10 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 3. Rehearsal: admin schedules session → user sees schedule → attendance/notes/task recorded.
 4. Equipment: item marked blocked with PIC → dashboard shows blocker → status becomes tested.
 5. Authorization: user visits admin URL and attempts cross-user mutation; access denied and data unchanged.
+6. Event share link: admin creates a link and copies the one-time URL → logged-in non-member opens it, becomes MEMBER, and lands on `/event/{id}`; logged-out visitor logs in with `callbackUrl` and returns to the same link; guest opens it, sees only that event's allowed pages, and is blocked after revoke.
 
 ## Manual QA
-Test mobile layout, long titles, keyboard navigation, labels, empty/loading/error states, Asia/Jakarta time, Drive permissions, no horizontal overflow, no stack traces, reset flow.
+Test mobile layout, long titles, keyboard navigation, labels, empty/loading/error states, Asia/Jakarta time, Drive permissions, no horizontal overflow, no stack traces, reset flow. For the guest shell also check the "Tamu" badge, one-time-link warning, one-time URL copy, invalid-link message, and nav staying inside `/e/{token}/tamu`.
 
 ## Security release gate
 No secrets in Git; hash passwords; server-side RBAC and validation; safe cookies; no public registration; no role self-escalation; private contacts restricted; no secrets in logs; bootstrap process documented.

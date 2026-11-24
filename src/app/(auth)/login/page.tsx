@@ -1,18 +1,27 @@
 import { redirect } from "next/navigation";
 import { Alert } from "@/components/ui/Alert";
 import { getSessionUser } from "@/lib/auth";
+import { sanitizeShareCallback } from "@/lib/share-token";
 import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ passwordChanged?: string }>;
+  searchParams: Promise<{ passwordChanged?: string; callbackUrl?: string }>;
 }) {
+  const params = await searchParams;
+  const callbackUrl = sanitizeShareCallback(params.callbackUrl);
   const user = await getSessionUser();
   if (user) {
-    redirect(user.mustChangePassword ? "/change-password" : "/dashboard");
+    if (user.mustChangePassword) {
+      redirect(
+        callbackUrl
+          ? `/change-password?callbackUrl=${encodeURIComponent(callbackUrl)}`
+          : "/change-password",
+      );
+    }
+    redirect(callbackUrl ?? "/dashboard");
   }
-  const params = await searchParams;
 
   return (
     <div className="flex flex-col gap-4">
@@ -21,7 +30,7 @@ export default async function LoginPage({
           <p>Silakan masuk dengan password baru.</p>
         </Alert>
       ) : null}
-      <LoginForm />
+      <LoginForm callbackUrl={callbackUrl} />
       <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
         Tidak punya akun? Hubungi admin — tidak ada pendaftaran publik.
       </p>

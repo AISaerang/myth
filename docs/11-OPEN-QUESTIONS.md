@@ -31,6 +31,9 @@ Do not present unresolved information as confirmed.
 - [ ] Decide if manual Drive links are enough for MVP.
 - [x] Decide if email notifications or read-only committee role are needed → **read-only committee role = `OBSERVER` (label "Pantau"), implemented 15 Okt 2026**: publish-only read-all + suggestions moderated by MD. Email notifications still deferred.
 - [ ] Store contact data only if operationally necessary.
+- [x] Event share link default → **auto-add `EventMembership` `MEMBER`** for a logged-in account that opens a valid `/e/{token}` (audit `source=SHARE_LINK`), with no automatic `SongAssignment` ("Tugaskan") and no `User.role` change. Reason: "masuk via akun" needs `EventMembership`, or `src/proxy.ts` and `getAccessibleEvent` return 404. The alternative — view-only for a logged-in non-member — is **rejected** for now; ask the owner before changing it.
+- [x] A guest is a `ShareGuestSession` plus HttpOnly `myth_share_guest` cookie, **not** a `User`, `Person`, `Session`, `EventMembership`, or `OBSERVER`. The guest is read-only and bound to one share link.
+- [x] Draft songs in the guest setlist are included **only** when the link was created with "Sertakan lagu draft internal" (`includeDrafts=true`); the default is off, matching the member publish-only view.
 
 ## Boundary reminder
 MD owns musical preparation and direction. Panitia/PIC owns event-wide decisions, final rundown, cross-division coordination, and non-musical follow-up. For cross-boundary tasks, explicitly assign an owner.

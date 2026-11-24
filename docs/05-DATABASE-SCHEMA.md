@@ -74,8 +74,15 @@ RehearsalAttendance: `id`, `rehearsalId`, `personId`, `status` (`EXPECTED|PRESEN
 ### AuditLog
 `id`, `actorUserId?`, `action`, `entityType`, `entityId`, `summary`, `metadataJson?` (never secrets), `createdAt`.
 
+### ShareLink / ShareGuestSession
+ShareLink: `id`, `tokenHash` unique (SHA-256 dari token 256-bit; token mentah tidak disimpan), `eventId`, `label?` (maks. 80), `includeDrafts` (default `false`), `expiresAt?`, `revokedAt?`, `maxUses?`, `useCount` (default 0), `lastUsedAt?`, `createdById` (plain user id, bukan FK), timestamps. Index `(eventId, revokedAt)`.
+
+ShareGuestSession: `id`, `tokenHash` unique (SHA-256 dari token sesi tamu di cookie `myth_share_guest`), `shareLinkId`, `displayName?` (maks. 100, label non-unik), `expiresAt`, `createdAt`, `lastSeenAt?`. Index `(shareLinkId, expiresAt)`. Bukan `User`, bukan `Session`, dan tidak punya `EventMembership`.
+
+Migration `20261124000000_event_share_link` hanya menambah kedua tabel, indeks, dan foreign key ke `Event`/`ShareLink` dengan `ON DELETE CASCADE`; tidak mengubah atau menghapus kolom lama.
+
 ## Relationships and rules
-Event has songs, batches, tasks, rehearsals, equipment, decisions. Song has assignments, versions, materials, progress. Person has skills, assignments, progress, tasks, attendance. Rehearsal links songs and people.
+Event has songs, batches, tasks, rehearsals, equipment, decisions, and share links. A share link has many guest sessions. Song has assignments, versions, materials, progress. Person has skills, assignments, progress, tasks, attendance. Rehearsal links songs and people.
 
 Use transactions for version activation; archive rather than delete referenced songs; preserve user history after deactivation; validate BPM/duration and date ranges; normalize usernames; restrict contact fields.
 
@@ -83,4 +90,4 @@ Use transactions for version activation; archive rather than delete referenced s
 Unique username; indexes for event/status/published songs, batch status, progress person/song, task status/due/assignee, rehearsal starts/status, equipment status, audit entity/date, and `SongNote(eventSongId, targetInstrumentSkillId)`.
 
 ## Authorization
-Admin can manage event records. User sees published/relevant data, assigned songs/tasks, and own progress. Observer (`OBSERVER`, label UI "Pantau") sees all published data and all personnel progress on published songs plus publish-scoped tasks, and may create suggestions (Task `TODO` without PIC, moderated by MD). Observer cannot see DRAFT songs, contacts, or manage anything. User cannot change other users' progress or roles. Enforce server-side.
+Admin can manage event records. User sees published/relevant data, assigned songs/tasks, and own progress. Observer (`OBSERVER`, label UI "Pantau") sees all published data and all personnel progress on published songs plus publish-scoped tasks, and may create suggestions (Task `TODO` without PIC, moderated by MD). Observer cannot see DRAFT songs, contacts, or manage anything. User cannot change other users' progress or roles. A share-link guest has no row in `User`/`Session`/`EventMembership`; access is only the valid `ShareGuestSession` bound to one `ShareLink`, and every mutation guard rejects it. Enforce server-side.

@@ -8,7 +8,13 @@ import { PasswordField } from "@/components/ui/PasswordField";
 import { PASSWORD_MAX_LENGTH } from "@/lib/password-policy";
 import { changePasswordAction } from "@server/actions/auth";
 
-export function ChangePasswordForm({ isFirstLogin }: { isFirstLogin: boolean }) {
+export function ChangePasswordForm({
+  isFirstLogin,
+  callbackUrl,
+}: {
+  isFirstLogin: boolean;
+  callbackUrl?: string | null;
+}) {
   const [state, formAction, pending] = useActionState(changePasswordAction, {
     ok: false,
   });
@@ -22,6 +28,9 @@ export function ChangePasswordForm({ isFirstLogin }: { isFirstLogin: boolean }) 
         </p>
       ) : null}
       <form action={formAction} className="flex flex-col gap-4">
+        {callbackUrl ? (
+          <input type="hidden" name="callbackUrl" value={callbackUrl} />
+        ) : null}
         <PasswordField
           id="currentPassword"
           name="currentPassword"
