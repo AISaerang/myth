@@ -234,7 +234,7 @@ describe("not angka column alignment", () => {
     ].join("\n");
 
     const both = renderToStaticMarkup(
-      createElement(ChartBody, { content, mode: "both", renderKey: "intro-size" }),
+      createElement(ChartBody, { content, mode: "detail", renderKey: "intro-size" }),
     );
     const staffs = [...both.matchAll(/class="([^"]*notation-staff[^"]*)"/g)].map(
       (match) => match[1] ?? "",
@@ -264,13 +264,13 @@ describe("not angka column alignment", () => {
     expect(staffCss).not.toContain("JianpuASCII");
 
     const lyricsOnly = renderToStaticMarkup(
-      createElement(ChartBody, { content, mode: "lyrics", renderKey: "intro-lyrics" }),
+      createElement(ChartBody, { content, mode: "chord-notation", renderKey: "intro-notation" }),
     );
     expect(lyricsOnly.match(/notation-staff/g)).toHaveLength(3);
-    expect(lyricsOnly).not.toContain('data-chord="Csus4"');
+    expect(lyricsOnly).toContain('data-chord="Csus4"');
     expect(lyricsOnly).toContain('data-note="6"');
     expect(lyricsOnly).toContain('data-kind="bar"');
-    expect(lyricsOnly).toContain("Bapa");
+    expect(lyricsOnly).not.toContain("Bapa");
 
     const chordsOnly = renderToStaticMarkup(
       createElement(ChartBody, { content, mode: "chords", renderKey: "intro-chords" }),

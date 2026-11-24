@@ -45,8 +45,16 @@ import {
   notationLineError,
 } from "@/lib/jianpu-align";
 import { clampTextSize, getStageSections, moveStageSection } from "@/lib/chart-stage";
+import {
+  CHART_DISPLAY_MODE_KEY,
+  CHART_VIEW_MODES,
+  chartComment,
+  classifyChartLine,
+  readChartViewMode,
+  type ChartViewMode,
+} from "@/lib/chart-view-mode";
 
-type ViewMode = "both" | "lyrics" | "chords";
+type ViewMode = ChartViewMode;
 
 class SafeVoicingBoundary extends Component<
   { children: ReactNode; fallback?: string },
@@ -96,14 +104,14 @@ export function ChartViewPreferenceProvider({
   const [offset, setOffset] = useState(0);
   const [resetToC, setResetToC] = useState(false);
   const [useFlats, setUseFlats] = useState(false);
-  const [mode, setMode] = useState<ViewMode>("both");
+  const [mode, setMode] = useState<ViewMode>("detail");
   const [instrumentPov, setInstrumentPov] = useState<InstrumentPov>("chart");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   useEffect(() => {
     let savedOffset = 0;
     let savedResetToC = false;
     let savedFlats = false;
-    let savedMode: ViewMode = "both";
+    let savedMode: ViewMode = "detail";
     let savedInstrumentPov: InstrumentPov = "chart";
     try {
       const saved = window.localStorage.getItem(preferenceKey);
@@ -125,13 +133,6 @@ export function ChartViewPreferenceProvider({
             savedFlats = Boolean(prefs.flatsOverride ?? prefs.useFlats);
           }
           if (
-            prefs.mode === "both" ||
-            prefs.mode === "lyrics" ||
-            prefs.mode === "chords"
-          ) {
-            savedMode = prefs.mode;
-          }
-          if (
             prefs.instrumentPov === "chart" ||
             prefs.instrumentPov === "guitar" ||
             prefs.instrumentPov === "piano" ||
@@ -145,9 +146,15 @@ export function ChartViewPreferenceProvider({
           }
         }
       }
+      savedMode = readChartViewMode(
+        window.localStorage.getItem(CHART_DISPLAY_MODE_KEY),
+      );
     } catch (error) {
       console.warn("Preferensi tampilan chart tidak dapat dibaca.", error);
     }
+    savedMode = readChartViewMode(
+      window.localStorage.getItem(CHART_DISPLAY_MODE_KEY),
+    );
     const timer = window.setTimeout(() => {
       setOffset(savedOffset);
       setResetToC(savedResetToC);
@@ -168,7 +175,6 @@ export function ChartViewPreferenceProvider({
           viewerOffset: offset,
           flatsOverride: useFlats,
           instrumentPov,
-          mode,
         }),
       );
     } catch (error) {
@@ -183,6 +189,14 @@ export function ChartViewPreferenceProvider({
     instrumentPov,
     preferencesLoaded,
   ]);
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    try {
+      window.localStorage.setItem(CHART_DISPLAY_MODE_KEY, mode);
+    } catch (error) {
+      console.warn("Mode tampilan chart tidak dapat disimpan.", error);
+    }
+  }, [mode, preferencesLoaded]);
   return (
     <ChartViewPreferencesContext.Provider
       value={{
@@ -225,20 +239,7 @@ export interface SectionNoteAnnotations {
   general: ReactNode;
 }
 
-const MODES: { value: ViewMode; label: string }[] = [
-  { value: "both", label: "Lirik + Chord" },
-  { value: "lyrics", label: "Lirik saja" },
-  { value: "chords", label: "Chord saja" },
-];
-
-// Baris komentar ChordPro (`# ...`), dipakai catatan intro yang sudah
-// menjadi bagian chart. Bukan label bagian dan bukan not angka.
-function chartComment(line: string): string | null {
-  if (/[\[{]/.test(line)) return null;
-  const match = /^\s*#(.*)$/.exec(line);
-  if (!match) return null;
-  return (match[1] ?? "").trim();
-}
+const MODES = CHART_VIEW_MODES;
 
 function sectionLabelAt(lines: string[], index: number): string | null {
   const layout = layoutChordLine(lines[index] ?? "");
@@ -296,8 +297,13 @@ function renderChart(
   const lines = content.split("\n");
   return lines.map((line, index) => {
     const lineKey = `${key}-${index}`;
-    const comment = chartComment(line);
-    if (comment !== null) {
+    const kind = classifyChartLine(line);
+    if (kind === "empty") {
+      return <div key={lineKey} className="h-4" />;
+    }
+    if (kind === "comment") {
+      if (mode !== "detail") return null;
+      const comment = chartComment(line);
       if (!comment) return <div key={lineKey} className="h-2" />;
       return (
         <p
@@ -309,32 +315,7 @@ function renderChart(
         </p>
       );
     }
-
     const shownLabel = sectionLabelAt(lines, index);
-    if (mode === "chords") {
-      if (shownLabel) {
-        return (
-          <pre
-            key={lineKey}
-            data-section-label={shownLabel}
-            className="font-mono text-sm leading-7 whitespace-pre-wrap"
-          >
-            {`— ${shownLabel} —`}
-          </pre>
-        );
-      }
-      const extracted = extractChordLines(line)[0] ?? "";
-      if (!extracted.trim()) return <div key={lineKey} className="h-2" />;
-      return (
-        <pre
-          key={lineKey}
-          className="font-mono text-sm leading-7 whitespace-pre-wrap"
-        >
-          {renderChordTokens(extracted, onChordClick)}
-        </pre>
-      );
-    }
-
     const { chordLine, lyricLine, label, isEmpty } = layoutChordLine(line);
     if (isEmpty) return <div key={lineKey} className="h-4" />;
     if (label) {
@@ -351,34 +332,44 @@ function renderChart(
         </div>
       );
     }
-
-    const aligned = alignChordsToNotation(
-      mode === "lyrics" ? "" : chordLine,
-      lyricLine,
-    );
-    if (aligned) {
-      return (
-        <div key={lineKey} className="max-w-full">
-          <NotationLine alignment={aligned} onChordClick={onChordClick} />
-        </div>
-      );
-    }
-
-    if (mode === "lyrics") {
+    if (kind === "chords-only") {
+      const chordText =
+        mode === "chords"
+          ? extractChordLines(line)[0] ?? ""
+          : chordLine;
+      if (!chordText.trim()) return <div key={lineKey} className="h-2" />;
       return (
         <pre
           key={lineKey}
           className="font-mono text-sm leading-7 whitespace-pre-wrap"
         >
-          {lyricLine.trimEnd()}
+          {renderChordTokens(chordText, onChordClick)}
         </pre>
       );
     }
-
-    // Baris "kelihatan not angka" tapi gagal align: jangan diam-diam mentah —
-    // tampilkan alasan parser supaya MD tahu chart-nya perlu dirapikan.
-    const notationError = notationLineError(lyricLine);
-    if (notationError || looksLikeNoteLine(lyricLine)) {
+    if (kind === "notation") {
+      if (mode === "chord-lyric") return null;
+      if (mode === "chords") {
+        const extracted = extractChordLines(line)[0] ?? "";
+        if (!extracted.trim()) return <div key={lineKey} className="h-2" />;
+        return (
+          <pre
+            key={lineKey}
+            className="font-mono text-sm leading-7 whitespace-pre-wrap"
+          >
+            {renderChordTokens(extracted, onChordClick)}
+          </pre>
+        );
+      }
+      const aligned = alignChordsToNotation(chordLine, lyricLine);
+      if (aligned) {
+        return (
+          <div key={lineKey} className="max-w-full">
+            <NotationLine alignment={aligned} onChordClick={onChordClick} />
+          </div>
+        );
+      }
+      const notationError = notationLineError(lyricLine);
       return (
         <div key={lineKey} className="min-w-0 max-w-full">
           <div className="w-max font-mono text-sm leading-6 whitespace-pre">
@@ -389,45 +380,53 @@ function renderChart(
             ) : null}
             {lyricLine.trim() ? <div>{lyricLine}</div> : null}
           </div>
-          <p
-            data-notation-error=""
-            className="mt-1 text-xs text-red-600 dark:text-red-400"
-          >
-            Baris ini terlihat seperti not angka tapi gagal dirender
-            {notationError ? `: ${notationError}` : ", periksa pola nada 0–7."}
-          </p>        </div>
+          {mode === "detail" || mode === "chord-notation" ? (
+            <p
+              data-notation-error=""
+              className="mt-1 text-xs text-red-600 dark:text-red-400"
+            >
+              Baris ini terlihat seperti not angka tapi gagal dirender
+              {notationError ? `: ${notationError}` : ", periksa pola nada 0–7."}
+            </p>
+          ) : null}
+        </div>
       );
     }
-
-    return (
-      <div key={lineKey} className="min-w-0 max-w-full">
-        <div className="w-max font-mono text-sm leading-6 whitespace-pre">
-          {chordLine.trim() ? (
-            <div className="font-semibold text-sky-700 dark:text-sky-400">
-              {renderChordTokens(chordLine, onChordClick)}
-            </div>
-          ) : null}
-          {lyricLine.trim() ? <div>{lyricLine}</div> : null}
+    if (kind === "lyric") {
+      if (mode === "chord-notation") return null;
+      if (mode === "chords") {
+        const extracted = extractChordLines(line)[0] ?? "";
+        if (!extracted.trim()) return <div key={lineKey} className="h-2" />;
+        return (
+          <pre
+            key={lineKey}
+            className="font-mono text-sm leading-7 whitespace-pre-wrap"
+          >
+            {renderChordTokens(extracted, onChordClick)}
+          </pre>
+        );
+      }
+      return (
+        <div key={lineKey} className="min-w-0 max-w-full">
+          <div className="w-max font-mono text-sm leading-6 whitespace-pre">
+            {chordLine.trim() ? (
+              <div className="font-semibold text-sky-700 dark:text-sky-400">
+                {renderChordTokens(chordLine, onChordClick)}
+              </div>
+            ) : null}
+            {lyricLine.trim() ? <div>{lyricLine}</div> : null}
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+    return null;
   });
-}
-
-// Heuristik lokal "kelihatan notasi": angka 0-7 dengan tanda khas
-// `' , . ( ) [ ] # -`. Baris lirik biasa tetap jatuh ke cabang mentah.
-const NOTE_LOOK_RE = /^[#b(){}\[\]|.'’,0-9\s-]*$/;
-
-function looksLikeNoteLine(line: string): boolean {
-  const trimmed = line.trim();
-  if (!trimmed) return false;
-  return /[0-9]/.test(trimmed) && NOTE_LOOK_RE.test(trimmed);
 }
 
 /** Isi chart tanpa kontrol transpose, supaya rumus nada tidak diulang per bagian. */
 export function ChartBody({
   content,
-  mode = "both",
+  mode = "detail",
   renderKey,
   onChordClick,
 }: {
@@ -481,7 +480,7 @@ export function ChordViewer({
   const [localOffset, setLocalOffset] = useState(initialOffset);
   const [localResetToC, setLocalResetToC] = useState(false);
   const [localFlats, setLocalFlats] = useState(false);
-  const [localMode, setLocalMode] = useState<ViewMode>("both");
+  const [localMode, setLocalMode] = useState<ViewMode>("detail");
   const [localInstrumentPov, setLocalInstrumentPov] =
     useState<InstrumentPov>("chart");
   const [capoOverride, setCapoOverride] = useState<number | null>(null);
@@ -546,7 +545,6 @@ export function ChordViewer({
     let savedOffset = initialOffset;
     let savedResetToC = false;
     let savedFlats = false;
-    let savedMode: ViewMode = "both";
     let savedInstrumentPov: InstrumentPov = "chart";
     let savedCapoOverride: number | null = null;
     let savedCapoMode: CapoMode = defaultCapo > 0 ? "shape" : "sounding";
@@ -573,13 +571,6 @@ export function ChordViewer({
           }
           if (typeof (prefs.flatsOverride ?? prefs.useFlats) === "boolean") {
             savedFlats = Boolean(prefs.flatsOverride ?? prefs.useFlats);
-          }
-          if (
-            prefs.mode === "both" ||
-            prefs.mode === "lyrics" ||
-            prefs.mode === "chords"
-          ) {
-            savedMode = prefs.mode;
           }
           if (
             prefs.instrumentPov === "chart" ||
@@ -610,6 +601,9 @@ export function ChordViewer({
     } catch (error) {
       console.warn("Preferensi tampilan chart tidak dapat dibaca.", error);
     }
+    const savedMode = readChartViewMode(
+      window.localStorage.getItem(CHART_DISPLAY_MODE_KEY),
+    );
     const timer = window.setTimeout(() => {
       setLocalOffset(savedOffset);
       setLocalResetToC(savedResetToC);
@@ -686,7 +680,6 @@ export function ChordViewer({
           instrumentPov,
           capoOverride,
           capoMode: localCapoMode,
-          mode,
         }),
       );
     } catch (error) {
@@ -704,6 +697,14 @@ export function ChordViewer({
     hasSharedPreferences,
     localPreferencesLoaded,
   ]);
+  useEffect(() => {
+    if (!localPreferencesLoaded || hasSharedPreferences) return;
+    try {
+      window.localStorage.setItem(CHART_DISPLAY_MODE_KEY, mode);
+    } catch (error) {
+      console.warn("Mode tampilan chart tidak dapat disimpan.", error);
+    }
+  }, [mode, hasSharedPreferences, localPreferencesLoaded]);
   useEffect(() => {
     if (!hasSharedPreferences || !songPreferenceKey || !songPreferencesLoaded) {
       return;
@@ -897,9 +898,11 @@ export function ChordViewer({
           onReset={resetViewerToC}
           showResetButton={false}
         />
-        <div className="mt-2">
-          <NotationSymbolGuide compact />
-        </div>
+        {mode === "detail" || mode === "chord-notation" ? (
+          <div className="mt-2">
+            <NotationSymbolGuide compact />
+          </div>
+        ) : null}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1" role="group" aria-label="Mode tampil">

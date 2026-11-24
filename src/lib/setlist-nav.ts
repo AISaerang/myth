@@ -26,6 +26,35 @@ export interface SetlistNavResult {
   otherBatches: { id: string; name: string }[];
 }
 
+export type SetlistNavContext =
+  | { kind: "member"; eventId: string }
+  | { kind: "guest"; token: string };
+
+export function setlistSongHref(
+  songId: string,
+  batchId: string,
+  context: SetlistNavContext,
+): string {
+  const safeSongId = encodeURIComponent(songId);
+  const query = new URLSearchParams({ batchId });
+  if (context.kind === "guest") {
+    return `/e/${encodeURIComponent(context.token)}/tamu/lagu/${safeSongId}?${query.toString()}`;
+  }
+  query.set("eventId", context.eventId);
+  return `/songs/${safeSongId}?${query.toString()}`;
+}
+
+export function setlistListHref(
+  anchorId: string,
+  context: SetlistNavContext,
+): string {
+  if (context.kind === "guest") {
+    return `/e/${encodeURIComponent(context.token)}/tamu/lagu#${encodeURIComponent(anchorId)}`;
+  }
+  const query = new URLSearchParams({ eventId: context.eventId });
+  return `/songs?${query.toString()}#${encodeURIComponent(anchorId)}`;
+}
+
 export function resolveSetlistNav(
   songId: string,
   catalog: readonly BatchCatalog[],

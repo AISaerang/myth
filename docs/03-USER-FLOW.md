@@ -13,8 +13,10 @@
 3. Jika password masih sementara, user diarahkan ke ganti password dengan `callbackUrl=/e/{token}`, lalu kembali ke tautan setelah login ulang.
 4. Jika belum login, halaman menawarkan "Masuk dengan akun" (membawa `callbackUrl` yang hanya boleh berupa `/e/{token}`) atau "Lanjut sebagai Tamu".
 5. Tamu mengisi nama tampilan opsional; server membuat sesi tamu, menaruh token mentah di cookie HttpOnly `myth_share_guest`, memakai satu kuota, lalu membuka shell `/e/{token}/tamu`.
-6. Shell tamu hanya memuat ringkasan event, setlist/lirik/chord yang diizinkan, rehearsal, dan equipment. Revoke, kedaluwarsa, event ditutup, atau event dibatalkan langsung menggagalkan permintaan berikutnya.
-7. Tombol "Keluar dari mode tamu" menghapus cookie dan kembali ke halaman tautan; login dengan akun mengambil alih sesi tamu.
+6. Shell tamu hanya memuat ringkasan event, setlist/lirik/chord yang diizinkan, rehearsal, dan equipment. Pada halaman lagu tamu, panah prev/next dan kembali ke daftar mengikuti batch yang dipilih dan tetap berada di namespace `/e/{token}/tamu`; daftar lagu memiliki anchor batch untuk kembali ke posisi lagu yang benar.
+7. Tamu dapat memilih empat tampilan chart—Chord saja, Chord + lirik, Chord + notasi, atau Detail—tanpa mengubah nada atau data chart.
+8. Revoke, kedaluwarsa, event ditutup, atau event dibatalkan langsung menggagalkan permintaan berikutnya.
+9. Tombol "Keluar dari mode tamu" menghapus cookie dan kembali ke halaman tautan; login dengan akun mengambil alih sesi tamu.
 
 ## Admin membuat akun
 1. Buka People & Access → Tambah personel.

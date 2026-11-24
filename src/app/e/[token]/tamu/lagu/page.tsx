@@ -56,9 +56,13 @@ export default async function GuestSongsPage({
             >
               <ul className="flex flex-col gap-2">
                 {group.rows.map((row) => (
-                  <li key={row.song.id}>
+                  <li
+                    key={row.song.id}
+                    id={row.anchorId ?? undefined}
+                    className="scroll-mt-24"
+                  >
                     <Link
-                      href={`${base}/${row.song.id}`}
+                      href={`${base}/${row.song.id}${group.batchId ? `?${new URLSearchParams({ batchId: group.batchId }).toString()}` : ""}`}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                     >
                       <span className="flex min-w-0 items-center gap-2">

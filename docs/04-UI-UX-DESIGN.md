@@ -46,7 +46,7 @@ Song detail:
 
 Materi aktif harus mudah dikenali; versi lama ditandai superseded/archive.
 
-Chord viewer: chord bertumpuk sejajar di atas suku kata lirik (font monospace), label seksi ditandai, baris panjang scroll horizontal di mobile. Mode Lirik+Chord / Lirik saja / Chord saja, dengan transpose ±½ dan reset ke basis C. Admin dapat mengedit chart aktif langsung (konten basis C) atau menambah versi baru dari nada asal lain.
+Chord viewer: chord bertumpuk sejajar di atas suku kata lirik (font monospace), label seksi ditandai, baris panjang scroll horizontal di mobile. Mode tampilan: Chord saja, Chord + lirik, Chord + notasi, dan Detail; pilihan disimpan per perangkat dengan default Detail. Transpose ±½ dan reset ke basis C tetap tersedia. Komentar hanya tampil pada Detail. Admin dapat mengedit chart aktif langsung (konten basis C) atau menambah versi baru dari nada asal lain.
 
 Mode panggung: tampilkan chart layar penuh dengan tema gelap atau terang, lompat section bernomor, prev/next section, tombol A−/A+, dan auto-scroll kecepatan dapat disetel. Ukuran teks disimpan di perangkat. Tombol Escape atau Keluar menutup mode panggung.
 

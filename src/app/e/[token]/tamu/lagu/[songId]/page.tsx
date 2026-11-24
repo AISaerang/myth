@@ -10,6 +10,8 @@ import { MATERIAL_CATEGORY_LABEL } from "@/app/(app)/songs/material-labels";
 import { badgesForSong } from "@/lib/batch-badge";
 import { isAdjacentMedleyPair } from "@/lib/medley-groups";
 import { canGuestReadSong } from "@/lib/share-link";
+import { resolveSetlistNav } from "@/lib/setlist-nav";
+import { SetlistNav } from "@/components/SetlistNav";
 import { listEventBatchCatalog, listMedleyTransitions } from "@server/services/batch-service";
 import {
   getEventArrangementContent,
@@ -33,10 +35,13 @@ function Meta({ label, value }: { label: string; value?: string | null }) {
 
 export default async function GuestSongPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string; songId: string }>;
+  searchParams: Promise<{ batchId?: string }>;
 }) {
   const { token, songId } = await params;
+  const { batchId } = await searchParams;
   const guest = await loadGuestContext(token);
   if (!guest.ok) return null;
 
@@ -45,6 +50,10 @@ export default async function GuestSongPage({
   if (!song || !canGuestReadSong(song, link.includeDrafts)) notFound();
 
   const catalog = await listEventBatchCatalog(link.eventId);
+  const setlistNav = resolveSetlistNav(songId, catalog, {
+    publishedOnly: !link.includeDrafts,
+    batchId,
+  });
   const badges = badgesForSong(song.id, catalog, {
     publishedOnly: !link.includeDrafts,
   });
@@ -98,6 +107,11 @@ export default async function GuestSongPage({
           />
         ))}
       </div>
+      <SetlistNav
+        songId={song.id}
+        nav={setlistNav}
+        context={{ kind: "guest", token }}
+      />
       <Link href={backHref} className="text-sm font-medium underline">
         ← Kembali ke daftar lagu
       </Link>
