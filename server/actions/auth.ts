@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { sessionCookieOptions, SESSION_COOKIE_NAME } from "@/lib/session-cookie";
+import { sanitizeShareCallback } from "@/lib/share-token";
 import {
   changePasswordSchema,
   firstIssueMessage,
@@ -64,11 +65,20 @@ export async function loginAction(
     return { ok: false, error: GENERIC_LOGIN_ERROR };
   }
   clearLoginThrottle(key);
+  // Only /e/{token} is a safe return path; anything else falls back.
+  const callbackUrl = sanitizeShareCallback(formData.get("callbackUrl"));
   const token = await createSession(user.id);
   await touchLastLogin(user.id);
   const store = await cookies();
   store.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
-  redirect(user.mustChangePassword ? "/change-password" : "/dashboard");
+  if (user.mustChangePassword) {
+    redirect(
+      callbackUrl
+        ? `/change-password?callbackUrl=${encodeURIComponent(callbackUrl)}`
+        : "/change-password",
+    );
+  }
+  redirect(callbackUrl ?? "/dashboard");
 }
 
 export async function logoutAction(): Promise<void> {
@@ -100,7 +110,13 @@ export async function changePasswordAction(
   );
   if (!result.ok) return { ok: false, error: result.error };
   // Rotation: old sessions revoked, so re-login with the new password.
+  // Keep a safe share-link callback so membership grant stays in one place.
+  const callbackUrl = sanitizeShareCallback(formData.get("callbackUrl"));
   const store = await cookies();
   store.delete(SESSION_COOKIE_NAME);
-  redirect("/login?passwordChanged=1");
+  redirect(
+    callbackUrl
+      ? `/login?passwordChanged=1&callbackUrl=${encodeURIComponent(callbackUrl)}`
+      : "/login?passwordChanged=1",
+  );
 }

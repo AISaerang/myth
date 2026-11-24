@@ -349,3 +349,7 @@ Script `prisma/realign-event-2026-11-14.ts` (dry-run default, `APPLY=1`) menyela
 ## 22. Tambah materi tidak lagi 500
 
 Form "Tambah materi" di halaman lagu event mengirim `eventId` event yang sedang dibuka. Service menyimpan `null` bila event tidak dikirim (materi pustaka). Nilai `"library"` tidak ditulis: `SongMaterial.eventId` adalah foreign key ke `Event`, dan sentinel itu membuat Prisma melempar P2003 sampai error boundary ("Terjadi kesalahan"). Kegagalan simpan atau izin dikembalikan sebagai pesan form. Tidak ada migrasi.
+
+## 23. Tautan event (`/e/{token}`)
+
+Migration `20261124000000_event_share_link` bersifat additive: hanya membuat tabel `ShareLink` dan `ShareGuestSession`, indeks, serta foreign key ke `Event`/`ShareLink`. Jangan menjalankan `prisma migrate dev` atau SQL apa pun ke database produksi dari laptop. Setelah owner me-review dan merge perubahan ini, terapkan migration yang sudah ada dengan `npx.cmd prisma migrate deploy` **hanya** pada deploy produksi (alur `scripts/vercel-build.mjs` saat `VERCEL_ENV === "production"`). Token tautan dan token sesi tamu hanya disimpan sebagai SHA-256 hash; URL lengkap tampil sekali saat dibuat, jadi simpan segera.

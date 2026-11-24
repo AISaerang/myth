@@ -10,6 +10,8 @@ Membuat hub operasional untuk persiapan tim musik dari pembagian lagu hingga har
 
 **Observer/pemantau:** melihat semua lagu publish, progres semua personel di lagu publish, task/batch/rehearsal/equipment terkait, serta mengirim usulan (termasuk teknis per part) yang dimoderasi MD. Tidak bisa mengubah data musikal maupun akun.
 
+**Tamu (share link):** orang tanpa akun yang membuka tautan event khusus. Read-only, hanya melihat event yang ditautkan, tanpa `User`/`EventMembership`. Tidak melihat progres personel, kontak, invite, Pustaka Lagu, atau audit.
+
 **Panitia/PIC:** pemilik keputusan acara keseluruhan. Tidak perlu role aplikasi di MVP; role baca saja dapat ditambahkan bila dibutuhkan.
 
 ## Functional requirements
@@ -22,6 +24,9 @@ Membuat hub operasional untuk persiapan tim musik dari pembagian lagu hingga har
 
 ### Event brief
 Nama acara, tanggal/jam, lokasi, tema, target durasi, status konfirmasi, PIC panitia, link liturgi/rundown, notes. Data belum final diberi label Draft/Pending confirmation.
+
+### Event share link
+Admin/event admin dapat membuat tautan `/e/{token}` per event: label opsional, kedaluwarsa WIB, batas pemakaian, dan opsi menyertakan lagu draft internal. Token 256-bit ditampilkan sekali saat dibuat; DB hanya menyimpan SHA-256 hash. Akun yang membuka tautan valid otomatis menjadi `MEMBER` event tersebut (tanpa `SongAssignment`, tanpa perubahan `User.role`). Orang tanpa akun masuk sebagai tamu read-only lewat cookie `myth_share_guest` dengan batas 7 hari atau kedaluwarsa tautan. Tautan bisa ditarik; GET pendahulu tidak memakai kuota.
 
 ### Personnel
 Nama, username, asal jemaat opsional, skill/instrumen, status konfirmasi, assignment lagu, akun aktif/nonaktif. Kontak pribadi dibatasi.
@@ -69,4 +74,5 @@ Responsive, server-side authorization, validasi server, password hashing, secret
 5. Admin melihat progres semua personel dan blocker.
 6. Drive links mengikuti permission Google Drive.
 7. Final version jelas dan histori tidak hilang.
-8. Semua critical flows dites.
+8. Tautan event memberi akses akun sebagai MEMBER dan tamu sebagai pembaca event tertentu saja; tautan tidak valid/tertutup ditolak tanpa membocorkan nama event.
+9. Semua critical flows dites.

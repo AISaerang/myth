@@ -9,7 +9,9 @@ import { canManageEvent, canManageMembers, canWriteEventData, isAdmin } from "@/
 import { toJakartaDateInput } from "@/lib/datetime-local";
 import { formatJakarta } from "@/lib/format";
 import { getAccessibleEvent, getEventRole } from "@server/services/event-access";
+import { listShareLinks } from "@server/services/share-link-service";
 import { EventAccessControl } from "./EventAccessControl";
+import { ShareLinkAdmin } from "./ShareLinkAdmin";
 import { EventBrief } from "../EventBrief";
 import { EventForm, type EventFormDefaults } from "../EventForm";
 
@@ -55,6 +57,7 @@ async function EventDetailContent({
         select: { displayName: true },
       })
     : null;
+  const shareLinks = canControlAccess ? await listShareLinks(event.id) : [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -95,6 +98,7 @@ async function EventDetailContent({
             )}
           </div>
           <EventAccessControl eventId={event.id} accessClosedAt={event.accessClosedAt} />
+          <ShareLinkAdmin eventId={event.id} links={shareLinks} />
         </section>
       ) : event.accessClosedAt && !isAdmin(user) ? (
         <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">

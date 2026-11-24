@@ -7,6 +7,15 @@
 4. Setelah berhasil, user diarahkan ke dashboard sesuai role.
 5. Error login generik, tidak mengungkap username valid/tidak.
 
+## Membuka tautan event (`/e/{token}`)
+1. Seseorang membuka tautan yang dibagikan admin/event admin. GET awal hanya mengecek token; nama event ditampilkan bila tautan masih aktif, dan kuota belum terpakai.
+2. Jika sudah login dengan password final, server mengecek tautan, menambahkan `EventMembership` `MEMBER` bila belum ada, mencatat audit, mengaktifkan event, lalu mengarahkan ke `/event/{id}`. Tidak ada `SongAssignment` otomatis.
+3. Jika password masih sementara, user diarahkan ke ganti password dengan `callbackUrl=/e/{token}`, lalu kembali ke tautan setelah login ulang.
+4. Jika belum login, halaman menawarkan "Masuk dengan akun" (membawa `callbackUrl` yang hanya boleh berupa `/e/{token}`) atau "Lanjut sebagai Tamu".
+5. Tamu mengisi nama tampilan opsional; server membuat sesi tamu, menaruh token mentah di cookie HttpOnly `myth_share_guest`, memakai satu kuota, lalu membuka shell `/e/{token}/tamu`.
+6. Shell tamu hanya memuat ringkasan event, setlist/lirik/chord yang diizinkan, rehearsal, dan equipment. Revoke, kedaluwarsa, event ditutup, atau event dibatalkan langsung menggagalkan permintaan berikutnya.
+7. Tombol "Keluar dari mode tamu" menghapus cookie dan kembali ke halaman tautan; login dengan akun mengambil alih sesi tamu.
+
 ## Admin membuat akun
 1. Buka People & Access → Tambah personel.
 2. Isi display name, username, role, skill/instrumen, asal jemaat opsional.

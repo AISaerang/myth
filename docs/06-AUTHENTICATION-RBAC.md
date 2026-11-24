@@ -27,6 +27,17 @@ Example username `AISaerang` is fine if unique. The shared onboarding password i
 - First-use links land on mandatory password setup when `mustChangePassword` is set, so username+password remains as fallback login.
 - The admin `/broadcast` page composes copy-ready WhatsApp onboarding texts from live data (group message + per-person DM with role variant, skill list, assignment count). Each DM is prefilled with the same default temporary password and still has its own invite-link placeholder; "Buat link undangan" inserts that person's unique link.
 
+## Event share links (`/e/{token}`) — not personal invites
+- `/masuk/{token}` is a **personal invite**: single-use, binds to one `User`, redeems to a normal `mth_session`. `/e/{token}` is an **event share link**: reusable until revoked/expired/exhausted, does not create a `User`, and can be opened by an account holder or a guest.
+- Only global `ADMIN` or that event's `EVENT_ADMIN` (`requireEventAccessManager`) may create/revoke a share link from the event page. Create validates label, WIB expiry, positive `maxUses`, and `includeDrafts`; revoke only sets `revokedAt`.
+- The token is `randomBytes(32).toString("base64url")`; only its SHA-256 hash is stored. The full URL is shown once and cannot be reconstructed later. List views never expose token or hash.
+- Login accepts an optional `callbackUrl`, but only the exact relative shape `/e/{token}`. Absolute URLs, `//host`, backslashes, traversal, query strings, and hashes are rejected before redirect; the hidden field survives login and first-password-change.
+- A logged-in account with a final password opens `/e/{token}/continue`: a valid link adds exactly one `EventMembership` with role `MEMBER` (audit `EVENT_MEMBERSHIP_ADDED`, `source=SHARE_LINK`), sets the active-event cookie, clears any guest cookie, and redirects to `/event/{id}`. No `SongAssignment` and no `User.role` change; an invalid/closed/cancelled link adds nothing.
+- A logged-out visitor can log in and return to the same link, or choose "Lanjut sebagai Tamu". Guest start creates `ShareGuestSession` and sets `myth_share_guest` (HttpOnly, Secure in production, SameSite Lax, path `/`, max 7 days capped by link expiry). Only the SHA-256 hash is stored; the display name (2–100 chars) is a non-unique label.
+- Every guest page and guest action re-resolves the cookie and the route token; a cookie for event A cannot render event B. Revoke, expiry, closed/cancelled event, or expired session ends guest access on the next request. Guest sessions ignore `maxUses` after they have started, because their start already consumed the use.
+- Token lookups are throttled 5 failures / 10 min per IP with `login-throttle.ts` (`share::{ip}`); a successful lookup clears the bucket. The landing GET and chat previews never increment `useCount`; only a successful guest start or logged-in resolution does.
+- Audit actions: `SHARE_LINK_CREATED`, `SHARE_LINK_REVOKED`, `SHARE_LINK_GUEST_STARTED`, plus the existing membership audit. Metadata never contains a raw token, hash, password, or secret.
+
 ## Bootstrap admin
 Use environment variables or a secure one-time admin command. It must be idempotent, hash the password immediately, never log it, and be disabled/removed after setup. Never hardcode production credentials in source, seed data, docs, or OpenCode prompts.
 
@@ -81,5 +92,7 @@ For each server request: validate session; active account; role; event scope; ow
 | Decisions | Full | None | None |
 | Settings/roles/audit | Full | None | None |
 
+**Guest (share link, no account):** not a matrix column because it has no `User.role`. Via `/e/{token}/tamu` it reads only the linked event's brief (no `committeePicContact`), allowed setlist (drafts only when the link enables them), read-only chord chart/medley transitions, rehearsal list without attendance, and equipment list. No other event, Pustaka Lagu, people, broadcast, decisions, audit, contacts, invite links, individual progress, or mutations. All mutation actions require `mth_session`, so a guest cookie alone is rejected by `requireActionUser`.
+
 ## Required security tests
-Direct URL access by user denied; User A cannot mutate User B's progress; role cannot be self-updated; inactive account blocked; first login requires password change; logs contain no secrets.
+Direct URL access by user denied; User A cannot mutate User B's progress; role cannot be self-updated; inactive account blocked; first login requires password change; logs contain no secrets. Share link: unknown/revoked/expired/closed/cancelled tokens reveal no event name; callback allowlist rejects open redirects; a guest cookie cannot call mutations or read another event; a guest session is invalidated by revocation; raw tokens never appear in audit metadata; GET does not consume a use.

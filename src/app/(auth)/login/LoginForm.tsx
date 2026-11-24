@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { PasswordField } from "@/components/ui/PasswordField";
 import { loginAction } from "@server/actions/auth";
 
-export function LoginForm() {
+export function LoginForm({ callbackUrl }: { callbackUrl?: string | null }) {
   const [state, formAction, pending] = useActionState(loginAction, {
     ok: false,
   });
@@ -15,6 +15,9 @@ export function LoginForm() {
   return (
     <Card title="Masuk">
       <form action={formAction} className="flex flex-col gap-4">
+        {callbackUrl ? (
+          <input type="hidden" name="callbackUrl" value={callbackUrl} />
+        ) : null}
         <div className="flex flex-col gap-1">
           <label htmlFor="username" className="text-sm font-medium">
             Username
