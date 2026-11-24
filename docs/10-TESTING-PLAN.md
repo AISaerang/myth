@@ -17,6 +17,7 @@ Unit tests for validators/status transitions/permissions; integration tests for 
 - Chart stage helpers keep repeated sections, clamp text size, and prevent prev/next navigation from leaving section bounds.
 - Arrangement composition keeps item order/duplicates and applies label overrides.
 - Medley runs split on non-consecutive legacy members and on hidden/archived items; singleton runs are not medleys. A reorder recalculates runs from batch order.
+- Batch views: global ADMIN/EVENT_ADMIN Edit controls are visible; Preview, closed-event EVENT_ADMIN, MEMBER, and OBSERVER views are read-only; readers see only non-archived batches with published, non-archived songs; batch badge ranks still include hidden items.
 - Medley transition validation rejects malformed notation, same-song endpoints, and writes whose songs are not currently adjacent in one medley group.
 - Arrangement modulation defaults to zero, is limited to ±12 semitones, applies after the marked section, and transposes chords but not not-angka.
 - Key display derives from the event song key and persists display mode/transpose preferences locally.

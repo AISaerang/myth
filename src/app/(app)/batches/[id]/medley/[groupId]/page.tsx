@@ -1,8 +1,15 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { MedleyJoinedSheet } from "@/app/(app)/batches/MedleyJoinedSheet";
 import { groupMedleyRuns, visibleMedleyItems } from "@/lib/medley-groups";
 import { requireFreshUser } from "@/lib/auth";
-import { canReadDrafts, canWriteEventData, isAdmin } from "@/lib/permissions";
+import {
+  canManageEvent,
+  canWriteEventData,
+  isAdmin,
+} from "@/lib/permissions";
+import { canManageBatchUi, isBatchReadable } from "@/lib/batch-view";
+import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
 import { eventSongDisplayKey } from "@/lib/event-song";
 import { displaySectionLabel } from "@/lib/chart-arrangement";
 import { prisma } from "@/lib/db";
@@ -28,7 +35,17 @@ export default async function JoinedMedleyPage({
     select: { accessClosedAt: true },
   });
   if (!event) notFound();
-  const mayReadDrafts = canReadDrafts(eventRole);
+  const canWrite = canWriteEventData(
+    eventRole,
+    Boolean(event.accessClosedAt),
+    isAdmin(user),
+  );
+  const preview =
+    (isAdmin(user) || canManageEvent(eventRole)) &&
+    uiModeForEvent((await cookies()).get(UI_MODE_COOKIE)?.value, batch.eventId) ===
+      "preview";
+  const canManageUi = canManageBatchUi(canWrite, preview);
+  if (!canManageUi && !isBatchReadable(batch)) notFound();
   const transitions = await listMedleyTransitions(batchId);
   const runs = groupMedleyRuns(
     visibleMedleyItems(
@@ -38,7 +55,7 @@ export default async function JoinedMedleyPage({
         isPublished: item.song.isPublished,
         archived: item.song.archivedAt !== null,
       })),
-      !mayReadDrafts,
+      !canManageUi,
     ),
   );
   const [requestedGroupId, firstSongId] = runSlug.split("~");
@@ -173,11 +190,7 @@ export default async function JoinedMedleyPage({
       groupId={run.groupId}
       label={run.label}
       songs={songs}
-      canWrite={canWriteEventData(
-        eventRole,
-        Boolean(event.accessClosedAt),
-        isAdmin(user),
-      )}
+      canWrite={canManageUi}
     />
   );
 }

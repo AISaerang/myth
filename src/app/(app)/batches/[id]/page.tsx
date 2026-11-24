@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { BatchOrderBadge } from "@/components/BatchOrderBadge";
 import { Card } from "@/components/ui/Card";
@@ -6,7 +7,13 @@ import { prisma } from "@/lib/db";
 import { visibleMedleyItems } from "@/lib/medley-groups";
 import { badgeFromSortOrders, batchBadgeAnchor } from "@/lib/batch-badge";
 import { requireFreshUser } from "@/lib/auth";
-import { canReadDrafts, canWriteEventData, isAdmin } from "@/lib/permissions";
+import {
+  canManageEvent,
+  canWriteEventData,
+  isAdmin,
+} from "@/lib/permissions";
+import { canManageBatchUi, publishedBatchItems } from "@/lib/batch-view";
+import { UI_MODE_COOKIE, uiModeForEvent } from "@/lib/ui-mode";
 import { formatJakarta } from "@/lib/format";
 import { getBatch, listMedleyTransitions } from "@server/services/batch-service";
 import { listSongs } from "@server/services/song-service";
@@ -35,25 +42,35 @@ export default async function BatchDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireFreshUser();
-  // Non-admin (USER/OBSERVER): tampilan read-only, lagu Publish saja.
-  const observer = !isAdmin(user);
   const { id } = await params;
   const batch = await getBatch(id);
   if (!batch) notFound();
-  const [eventRole, event, transitions] = await Promise.all([
+  const [eventRole, event] = await Promise.all([
     getEventRole(user, batch.eventId),
     prisma.event.findUnique({
       where: { id: batch.eventId },
       select: { accessClosedAt: true },
     }),
-    listMedleyTransitions(batch.id),
   ]);
   if (!eventRole || !event) notFound();
-  const canWriteMedley = canWriteEventData(
+  const canWrite = canWriteEventData(
     eventRole,
     Boolean(event.accessClosedAt),
     isAdmin(user),
   );
+  const preview =
+    (isAdmin(user) || canManageEvent(eventRole)) &&
+    uiModeForEvent((await cookies()).get(UI_MODE_COOKIE)?.value, batch.eventId) ===
+      "preview";
+  const canManageUi = canManageBatchUi(canWrite, preview);
+  if (
+    !canManageUi &&
+    (batch.status === "ARCHIVED" ||
+      publishedBatchItems(batch.items).length === 0)
+  ) {
+    notFound();
+  }
+  const transitions = await listMedleyTransitions(batch.id);
   const medleyItems = visibleMedleyItems(
     batch.items.map((item) => ({
       ...item,
@@ -61,7 +78,7 @@ export default async function BatchDetailPage({
       isPublished: item.song.isPublished,
       archived: item.song.archivedAt !== null,
     })),
-    !canReadDrafts(eventRole),
+    !canManageUi,
   );
   const medleyCard = (
     <MedleyGroupCards
@@ -69,13 +86,13 @@ export default async function BatchDetailPage({
       eventId={batch.eventId}
       items={medleyItems}
       transitions={transitions}
-      canWrite={canWriteMedley}
+      canWrite={canManageUi}
     />
   );
 
   const sortOrders = batch.items.map((item) => item.sortOrder);
-  if (observer) {
-    const published = batch.items.filter((i) => i.song.isPublished);
+  if (!canManageUi) {
+    const published = publishedBatchItems(batch.items);
     return (
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -102,6 +119,9 @@ export default async function BatchDetailPage({
             </span>
           ) : null}
         </div>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Mode baca: hanya lagu publish yang belum diarsipkan.
+        </p>
         {medleyCard}
         <Card title={`Lagu publish dalam batch (${published.length})`}>
           {published.length === 0 ? (
