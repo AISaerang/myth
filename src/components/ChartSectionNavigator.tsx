@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import {
-  activeSectionFromVisibility,
   moveStageSection,
+  nextActiveSection,
   type StageSection,
 } from "@/lib/chart-stage";
 
@@ -24,6 +24,10 @@ export function ChartSectionNavigator({
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollFrameRef = useRef<number | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const pendingTargetRef = useRef<number | null>(null);
+  const pendingTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const root = scrollRootRef?.current ?? null;
@@ -37,20 +41,28 @@ export function ChartSectionNavigator({
       if (scrollFrameRef.current !== null) return;
       scrollFrameRef.current = window.requestAnimationFrame(() => {
         scrollFrameRef.current = null;
+        if (pendingTargetRef.current !== null) return;
         const header = document.querySelector<HTMLElement>(
           "[data-app-header]",
         );
         const activationLine = root
           ? root.getBoundingClientRect().top + 24
           : (header?.getBoundingClientRect().height ?? 72) + 16;
+        const visibility = targets.map(({ index, target }) => ({
+          index,
+          isIntersecting:
+            target.getBoundingClientRect().top <= activationLine,
+        }));
+        const atBottom = root
+          ? root.scrollTop + root.clientHeight >= root.scrollHeight - 2
+          : window.scrollY + window.innerHeight >=
+            document.documentElement.scrollHeight - 2;
         const next =
-          activeSectionFromVisibility(
-            targets.map(({ index, target }) => ({
-              index,
-              isIntersecting:
-                target.getBoundingClientRect().top <= activationLine,
-            })),
-          ) ?? 0;
+          nextActiveSection({
+            pendingTarget: pendingTargetRef.current,
+            visibility,
+            atBottom,
+          }) ?? 0;
         activeIndexRef.current = next;
         setActiveIndex((current) => (current === next ? current : next));
       });
@@ -63,11 +75,25 @@ export function ChartSectionNavigator({
     for (const { target } of targets) observer.observe(target);
     const scrollTarget: HTMLElement | Window = root ?? window;
     scrollTarget.addEventListener("scroll", scheduleUpdate, { passive: true });
+    const clearPending = () => {
+      pendingTargetRef.current = null;
+      if (pendingTimeoutRef.current !== null) {
+        window.clearTimeout(pendingTimeoutRef.current);
+        pendingTimeoutRef.current = null;
+      }
+      scheduleUpdate();
+    };
+    scrollTarget.addEventListener("scrollend", clearPending);
+    scrollTarget.addEventListener("wheel", clearPending, { passive: true });
+    scrollTarget.addEventListener("touchstart", clearPending, { passive: true });
     scheduleUpdate();
 
     return () => {
       observer.disconnect();
       scrollTarget.removeEventListener("scroll", scheduleUpdate);
+      scrollTarget.removeEventListener("scrollend", clearPending);
+      scrollTarget.removeEventListener("wheel", clearPending);
+      scrollTarget.removeEventListener("touchstart", clearPending);
       if (scrollFrameRef.current !== null) {
         window.cancelAnimationFrame(scrollFrameRef.current);
         scrollFrameRef.current = null;
@@ -93,10 +119,10 @@ export function ChartSectionNavigator({
         target.removeAttribute("data-chart-section-active");
       }
     }
-    const activeButton = document.querySelector<HTMLButtonElement>(
-      '[data-chart-section-nav] button[aria-pressed="true"]',
+    const activeButton = navRef.current?.querySelector<HTMLButtonElement>(
+      'button[aria-pressed="true"]',
     );
-    const strip = activeButton?.parentElement;
+    const strip = stripRef.current;
     if (activeButton && strip) {
       const stripRect = strip.getBoundingClientRect();
       const buttonRect = activeButton.getBoundingClientRect();
@@ -113,6 +139,14 @@ export function ChartSectionNavigator({
     const next = Math.min(sections.length - 1, Math.max(0, index));
     const target = document.getElementById(`${targetIdPrefix}-${next}`);
     if (!target) return;
+    pendingTargetRef.current = next;
+    if (pendingTimeoutRef.current !== null) {
+      window.clearTimeout(pendingTimeoutRef.current);
+    }
+    pendingTimeoutRef.current = window.setTimeout(() => {
+      pendingTargetRef.current = null;
+      pendingTimeoutRef.current = null;
+    }, 1000);
     activeIndexRef.current = next;
     setActiveIndex(next);
     target.scrollIntoView({
@@ -125,6 +159,7 @@ export function ChartSectionNavigator({
 
   return (
     <nav
+      ref={navRef}
       data-chart-section-nav=""
       aria-label="Pilih bagian lagu"
       className={`${
@@ -136,7 +171,7 @@ export function ChartSectionNavigator({
       <div className="mx-auto flex max-w-5xl items-center gap-2">
         <button
           type="button"
-          className="min-h-11 min-w-11 shrink-0 rounded-lg border border-zinc-300 px-2 text-lg font-semibold dark:border-zinc-700"
+          className="chart-toggle min-h-11 min-w-11 shrink-0 rounded-lg px-2 text-lg font-semibold"
           aria-label="Bagian sebelumnya"
           onClick={() =>
             jumpTo(moveStageSection(activeIndexRef.current, -1, sections.length))
@@ -145,18 +180,14 @@ export function ChartSectionNavigator({
         >
           ‹
         </button>
-        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1">
+        <div ref={stripRef} className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1">
           {sections.map((section) => (
             <button
               key={`${section.index}-${section.label}`}
               type="button"
               aria-pressed={activeIndex === section.index}
               aria-label={`Pilih bagian ${section.index + 1}: ${section.label}`}
-              className={`flex min-h-11 max-w-36 shrink-0 items-center gap-2 rounded-full px-3 text-xs font-medium ${
-                activeIndex === section.index
-                  ? "bg-sky-700 text-white"
-                  : "border border-zinc-300 bg-transparent dark:border-zinc-700"
-              }`}
+              className="chart-toggle flex min-h-11 max-w-36 shrink-0 items-center gap-2 rounded-full px-3 text-xs font-medium"
               onClick={() => jumpTo(section.index)}
             >
               <span
@@ -173,7 +204,7 @@ export function ChartSectionNavigator({
         </div>
         <button
           type="button"
-          className="min-h-11 min-w-11 shrink-0 rounded-lg border border-zinc-300 px-2 text-lg font-semibold dark:border-zinc-700"
+          className="chart-toggle min-h-11 min-w-11 shrink-0 rounded-lg px-2 text-lg font-semibold"
           aria-label="Bagian berikutnya"
           onClick={() =>
             jumpTo(moveStageSection(activeIndexRef.current, 1, sections.length))

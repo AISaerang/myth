@@ -86,6 +86,20 @@ export function classifyChartLine(line: string): ChartLineKind {
   if (layout.isEmpty) return "empty";
   if (layout.label) return "label";
 
+  const annotationRemoved = line
+    .replace(/\([^)]*\)/g, "")
+    .replace(/x\d+/gi, "")
+    .trim();
+  if (
+    annotationRemoved &&
+    annotationRemoved !== "|" &&
+    /^[\s[CDEFGABb#0-9\d♯♭mMdimDIMaug+-/|.%]+$/.test(annotationRemoved)
+  ) {
+    if (/[%/|.]/.test(annotationRemoved) || /\b[A-G][#b♯♭]?[mMdDim0-9()+/-]*\b/i.test(annotationRemoved)) {
+      return "chords-only";
+    }
+  }
+
   if (alignChordsToNotation(layout.chordLine, layout.lyricLine)) {
     return "notation";
   }

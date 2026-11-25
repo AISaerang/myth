@@ -71,3 +71,22 @@ export function getAutoScrollNextTop(
     currentTop + (safeSpeed * 12 * safeElapsed) / 1000;
   return Math.min(maxTop, Math.max(currentTop, nextTop));
 }
+
+export function nextActiveSection({
+  pendingTarget,
+  visibility,
+  atBottom,
+}: {
+  pendingTarget: number | null;
+  visibility: readonly SectionVisibility[];
+  atBottom: boolean;
+}): number | null {
+  if (pendingTarget !== null) return pendingTarget;
+  if (atBottom) {
+    const visible = visibility
+      .filter((section) => section.isIntersecting)
+      .sort((left, right) => left.index - right.index);
+    return visible.at(-1)?.index ?? null;
+  }
+  return activeSectionFromVisibility(visibility);
+}

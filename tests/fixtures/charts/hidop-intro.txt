@@ -1,0 +1,4 @@
+{Intro}
+(pickup ½ bar)  F |
+| F . | G . | C G/B | Am . |
+| Dm Em | F . | G . | G . |

@@ -56,6 +56,12 @@ describe("chart cell model", () => {
   it("marks only notation-only sections as instrumental", () => {
     expect(sectionIsInstrumental(["{Intro}", "1 2 3", "| C . |"])).toBe(true);
     expect(sectionIsInstrumental(["{Verse}", "[G]Bapa [C]kami"])).toBe(false);
+    expect(sectionIsInstrumental([
+      "{Intro}",
+      "(pickup ½ bar)  F |",
+      "| F . | G . | C G/B | Am . |",
+      "| Dm Em | F . | G . | G . |",
+    ])).toBe(true);
   });
 
   it("puts a notation chord and note in the same cell", () => {
@@ -67,13 +73,13 @@ describe("chart cell model", () => {
 
   it("groups a notation line with the following lyric line", () => {
     const models = buildSectionModels([
-      "3 4 | 5 5[C] #4 5 1'",
+      "3 4 | [C]5 5 #4 5 1'",
       "Sungguh inginkah engkau",
     ]);
     expect(models[0]?.kind).toBe("couplet");
     if (models[0]?.kind !== "couplet") return;
     expect(models[0].words.flatMap((word) => word.cells).some((cell) => cell.chord === "C")).toBe(true);
-    expect(models[0].words.flatMap((word) => word.cells).some((cell) => cell.text === "Sungguh")).toBe(true);
+    expect(models[0].words.flatMap((word) => word.cells).some((cell) => cell.text === "Sung")).toBe(true);
   });
 
   it("keeps hyphens and mid-word chords without inserted word gaps", () => {
@@ -87,5 +93,15 @@ describe("chart cell model", () => {
     expect(hyphen.kind).toBe("lyric");
     if (hyphen.kind !== "lyric") return;
     expect(hyphen.words[0]?.cells.some((cell) => cell.joinNext)).toBe(true);
+  });
+
+  it("keeps a trailing line-end chord inside the previous word", () => {
+    const model = buildLineModel("dalam rumah Tuhan    [G7]");
+    expect(model.kind).toBe("lyric");
+    if (model.kind !== "lyric") return;
+    expect(model.words).toHaveLength(3);
+    expect(model.words.at(-1)?.cells.some((cell) => (
+      cell.text === "" && cell.chord === "G7" && cell.trailing
+    ))).toBe(true);
   });
 });

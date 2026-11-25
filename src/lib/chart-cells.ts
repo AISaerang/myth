@@ -1,12 +1,17 @@
 import { alignChordsToNotation, notationLineError, type NotationToken } from "@/lib/jianpu-align";
 import { layoutChordLine, parseBarLine, splitChordBrackets } from "@/lib/chords";
 import { classifyChartLine, chartComment, type ChartLineKind } from "@/lib/chart-view-mode";
+import { syllabifyId } from "@/lib/syllabify-id";
 
 export interface ChartCell {
   chord: string | null;
   note: NotationToken | null;
   text: string;
   joinNext: boolean;
+  continues?: boolean;
+  trailing?: boolean;
+  wordIndex?: number;
+  syllableIndex?: number;
 }
 
 export interface ChartWord {
@@ -18,7 +23,7 @@ export type ChartLineModel =
   | { kind: "lyric"; words: ChartWord[] }
   | { kind: "notation"; words: ChartWord[] }
   | { kind: "bars"; words: ChartWord[] }
-  | { kind: "couplet"; words: ChartWord[] }
+  | { kind: "couplet"; words: ChartWord[]; paired: boolean; lyricText: string }
   | { kind: "label"; label: string }
   | { kind: "comment"; text: string }
   | { kind: "empty" }
@@ -127,8 +132,35 @@ export function buildLineModel(line: string): ChartLineModel {
 
   const flushWord = () => {
     if (pending.length) {
-      for (const chord of pending) {
-        current.push({ chord, note: null, text: "", joinNext: false });
+      if (current.length) {
+        for (const chord of pending) {
+          current.push({
+            chord,
+            note: null,
+            text: "",
+            joinNext: false,
+            trailing: true,
+          });
+        }
+      } else {
+        if (words.length) {
+          const last = words[words.length - 1];
+          if (last) {
+            for (const chord of pending) {
+              last.cells.push({
+                chord,
+                note: null,
+                text: "",
+                joinNext: false,
+                trailing: true,
+              });
+            }
+          }
+        } else {
+          for (const chord of pending) {
+            current.push({ chord, note: null, text: "", joinNext: false });
+          }
+        }
       }
       pending = [];
     }
@@ -162,6 +194,7 @@ export function buildLineModel(line: string): ChartLineModel {
             note: null,
             text: left,
             joinNext: true,
+            continues: true,
           });
         }
         if (right) {
@@ -173,6 +206,10 @@ export function buildLineModel(line: string): ChartLineModel {
           });
         }
       } else {
+        if (pending.length && current.length) {
+          const previous = current[current.length - 1];
+          if (previous) previous.continues = true;
+        }
         current.push({
           chord: pending.shift() ?? null,
           note: null,
@@ -204,42 +241,109 @@ export function buildSectionModels(lines: string[]): ChartLineModel[] {
         word.cells.some((cell) => cell.chord),
       )
     ) {
-      const notationCells = model.words.flatMap((word) =>
-        word.isBar ? [] : word.cells.filter((cell) => cell.note),
-      );
-      const lyricCells = nextModel.words.flatMap((word) => word.cells);
-      const mergedWords: ChartWord[] = [];
-      let lyricIndex = 0;
+      const lyricText =
+        (lines[index + 1] ?? "").replace(/\s+/g, " ").trim();
+      const lyricWords = lyricText ? lyricText.split(" ") : [];
+      const syllableItems: Array<{
+        text: string;
+        wordIndex: number;
+        syllableIndex: number;
+      }> = [];
 
+      lyricWords.forEach((word, wordIndex) => {
+        syllabifyId(word).forEach((text, syllableIndex) => {
+          syllableItems.push({ text, wordIndex, syllableIndex });
+        });
+      });
+
+      const slotCells: ChartCell[] = [];
+      const seenSlurs = new Set<number>();
       for (const word of model.words) {
-        if (word.isBar) {
-          mergedWords.push(word);
-          continue;
+        for (const cell of word.cells) {
+          if (!cell.note || cell.note.kind !== "note") continue;
+          if (cell.note.slurGroup) {
+            if (seenSlurs.has(cell.note.slurGroup)) continue;
+            seenSlurs.add(cell.note.slurGroup);
+          }
+          slotCells.push(cell);
         }
-        const cells = word.cells.map((cell) => {
-          if (!cell.note) return cell;
-          const lyric = lyricCells[lyricIndex++];
-          return lyric
-            ? { ...cell, text: lyric.text, joinNext: lyric.joinNext }
-            : { ...cell, text: "", joinNext: false };
-        });
-        mergedWords.push({ isBar: false, cells });
       }
 
-      if (lyricIndex < lyricCells.length) {
-        mergedWords.push({
+      const mergeFromRight = () => {
+        for (let indexFromRight = syllableItems.length - 2; indexFromRight >= 0; indexFromRight -= 1) {
+          const left = syllableItems[indexFromRight];
+          const right = syllableItems[indexFromRight + 1];
+          if (!left || !right || left.wordIndex !== right.wordIndex) continue;
+          if (
+            /[aiueo]$/i.test(left.text) &&
+            /^[aiueo]/i.test(right.text)
+          ) {
+            left.text += right.text;
+            syllableItems.splice(indexFromRight + 1, 1);
+            return true;
+          }
+        }
+        return false;
+      };
+      while (syllableItems.length > slotCells.length) {
+        if (!mergeFromRight()) break;
+      }
+
+      if (syllableItems.length === slotCells.length && slotCells.length > 0) {
+        const mergedWords: ChartWord[] = lyricWords.map(() => ({
           isBar: false,
-          cells: lyricCells.slice(lyricIndex).map((cell) => ({
-            chord: null,
-            note: null,
-            text: cell.text,
-            joinNext: cell.joinNext,
-          })),
+          cells: [],
+        }));
+        let slotIndex = 0;
+        const matchedSlurs = new Set<number>();
+        for (const word of model.words) {
+          if (word.isBar) {
+            mergedWords.push(word);
+            continue;
+          }
+          for (const cell of word.cells) {
+            if (!cell.note || cell.note.kind !== "note") continue;
+            if (cell.note.slurGroup) {
+              if (matchedSlurs.has(cell.note.slurGroup)) continue;
+              matchedSlurs.add(cell.note.slurGroup);
+            }
+            const item = syllableItems[slotIndex];
+            if (!item) break;
+            const wordIndex = item.wordIndex;
+            const target = mergedWords[wordIndex];
+            if (!target) continue;
+            target.cells.push({
+              ...cell,
+              text: item.text,
+              joinNext:
+                item.syllableIndex <
+                syllabifyId(lyricWords[wordIndex] ?? "").length - 1,
+              continues:
+                item.syllableIndex <
+                syllabifyId(lyricWords[wordIndex] ?? "").length - 1,
+              wordIndex,
+              syllableIndex: item.syllableIndex,
+            });
+            slotIndex += 1;
+          }
+        }
+        models.push({
+          kind: "couplet",
+          words: mergedWords,
+          paired: true,
+          lyricText,
         });
+        index += 1;
+        continue;
       }
 
-      if (notationCells.length > 0) {
-        models.push({ kind: "couplet", words: mergedWords });
+      if (slotCells.length > 0) {
+        models.push({
+          kind: "couplet",
+          words: model.words,
+          paired: false,
+          lyricText,
+        });
         index += 1;
         continue;
       }
@@ -252,8 +356,7 @@ export function buildSectionModels(lines: string[]): ChartLineModel[] {
 }
 
 export function sectionIsInstrumental(lines: string[]): boolean {
-  const body = lines.slice(1);
-  return !body.some((line) => {
+  return !lines.some((line) => {
     const layout = layoutChordLine(line);
     if (layout.label || layout.isEmpty) return false;
     return classifyChartLine(line) === "lyric";

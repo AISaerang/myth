@@ -96,6 +96,10 @@ body {
   padding-bottom: calc(9rem + env(safe-area-inset-bottom));
 }
 
+.chart-no-anchor {
+  overflow-anchor: none;
+}
+
 .chart-text-line {
   line-height: 1.714;
 }
@@ -139,9 +143,9 @@ body {
 }
 
 .chart-chord-button {
-  position: absolute;
-  width: 44px;
-  height: 44px;
+  position: relative;
+  min-width: 0;
+  min-height: 1.714em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -150,31 +154,41 @@ body {
   cursor: pointer;
   color: var(--chart-chord);
   font-weight: 700;
-  transform: translate(-0.2em, -50%);
+}
+
+.chart-chord-button::before {
+  content: "";
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .chart-couplet {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
-  max-width: 100%;
-}
-
-.chart-couplet-row {
-  display: flex;
-  flex-wrap: nowrap;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.chart-couplet-chords,
-.chart-couplet-notes {
-  min-height: 1.714em;
-}
-
-.chart-couplet-lyrics {
   flex-wrap: wrap;
-  row-gap: 0.15em;
+  column-gap: 0.5em;
+  row-gap: 0.25em;
+  max-width: 100%;
+  align-items: flex-end;
+}
+
+.chart-couplet .chart-word {
+  white-space: nowrap;
+  align-items: flex-end;
+  max-width: 100%;
+}
+
+.chart-couplet .chart-cell-chord .chart-chord-lane {
+  padding-inline-end: 0.4em;
+}
+
+.chart-couplet-fallback {
+  display: inline;
 }
 
 .chart-hyphen {
@@ -204,6 +218,23 @@ body {
   color: var(--chart-foreground);
 }
 
+.chart-toggle {
+  color: var(--chart-foreground);
+  border: 1px solid color-mix(in srgb, var(--chart-foreground) 55%, transparent);
+  background: var(--chart-surface);
+}
+
+.chart-toggle[aria-pressed="true"] {
+  color: var(--chart-surface);
+  border-color: var(--chart-foreground);
+  background: var(--chart-foreground);
+}
+
+.chart-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .chart-chord-ext,
 .chord-ext {
   font-size: 0.72em;
@@ -216,6 +247,7 @@ body {
 .chart-text-cell {
   display: inline-block;
   min-width: 1ch;
+  min-height: 1.714em;
   font-variant-numeric: tabular-nums;
 }
 
