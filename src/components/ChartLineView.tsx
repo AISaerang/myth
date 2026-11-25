@@ -119,7 +119,9 @@ export function ChartLineView({
               {model.words.map((word, wordIndex) => (
                 <span key={wordIndex} className="chart-word" data-chart-word={word.isBar ? "bar" : undefined}>
                   {word.isBar ? (
-                    layers.chords ? <span className="chart-bar">|</span> : null
+                    layers.chords || layers.notation ? (
+                      <span className="chart-bar">|</span>
+                    ) : null
                   ) : word.cells.map((cell, cellIndex) => (
                     <span
                       key={cellIndex}
@@ -174,9 +176,34 @@ export function ChartLineView({
       >
         {model.words.map((word, wordIndex) =>
           word.isBar ? (
-            layers.notation ? (
+            layers.notation || layers.chords ? (
               <span key={wordIndex} className="chart-word" data-chart-word="bar">
-                <span className="chart-bar">|</span>
+                <span className="chart-cell chart-cell-bar">
+                  {layers.chords ? (
+                    <span
+                      className="chart-chord-row chart-chord-lane"
+                      data-chart-lane="chord"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  {layers.notation ? (
+                    <span
+                      className="chart-notation-row"
+                      data-chart-lane="notation"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  {layers.lyrics ? (
+                    <span
+                      className="chart-text-cell"
+                      data-chart-lane="lyric"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  <span className="chart-bar" aria-hidden="true">
+                    |
+                  </span>
+                </span>
               </span>
             ) : null
           ) : (
@@ -193,6 +220,7 @@ export function ChartLineView({
                   data-chord={layers.chords && cell.chord ? cell.chord : undefined}
                   data-note={layers.notation && cell.note ? cell.note.raw : undefined}
                   data-trailing={cell.trailing ? "true" : undefined}
+                  data-melisma={cell.melisma ? "true" : undefined}
                 >
                   {layers.chords && cell.chord ? (
                     <span className="chart-chord-row chart-chord-lane" data-chart-lane="chord">
@@ -218,9 +246,19 @@ export function ChartLineView({
                     </span>
                   ) : layers.notation ? <span className="chart-notation-row" data-chart-lane="notation" aria-hidden="true">&nbsp;</span> : null}
                   {layers.lyrics ? (
-                    <span className="chart-text-cell" data-chart-lane="lyric">
-                      {cell.text || "\u00a0"}
-                      {hasVisibleHyphen(cell) ? <span className="chart-hyphen" aria-hidden="true">-</span> : null}
+                    <span
+                      className="chart-text-cell"
+                      data-chart-lane="lyric"
+                      data-melisma={cell.melisma ? "true" : undefined}
+                    >
+                      {cell.melisma ? (
+                        <span className="chart-melisma-line" aria-hidden="true" />
+                      ) : (
+                        cell.text || "\u00a0"
+                      )}
+                      {!cell.melisma && hasVisibleHyphen(cell) ? (
+                        <span className="chart-hyphen" aria-hidden="true">-</span>
+                      ) : null}
                     </span>
                   ) : null}
                 </span>
@@ -300,6 +338,7 @@ function chartCellClassName(
     cell.continues ? "chart-cell-continues" : "",
     cell.chord && nextCell?.chord ? "chart-cell-gap" : "",
     cell.trailing ? "chart-cell-trailing" : "",
+    cell.melisma ? "chart-cell-melisma" : "",
     cell.chord && cell.continues && !cell.joinNext ? "chart-cell-stretch" : "",
   ]
     .filter(Boolean)
@@ -311,11 +350,11 @@ function hasVisibleHyphen(cell: ChartCell): boolean {
 }
 
 function NotationGlyph({ note }: { note: JianpuNote }) {
+  // CssNote sudah menggambar tanda tahan (-) dan titik; jangan digandakan di
+  // sini supaya "5--" tetap dua garis, bukan empat.
   return (
     <span className="jianpu-glyph inline-flex items-baseline">
       <CssNote note={note} />
-      {note.extension > 0 ? "-".repeat(note.extension) : null}
-      {note.dotted ? "." : null}
     </span>
   );
 }
