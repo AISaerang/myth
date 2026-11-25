@@ -5,12 +5,12 @@ import { buildLineModel, buildSectionModels, sectionIsInstrumental } from "@/lib
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ChartLineView } from "@/components/ChartLineView";
-import { layersForMode } from "@/lib/chart-view-mode";
+import { layersForMode, type ChartViewMode } from "@/lib/chart-view-mode";
 import { transposeContent } from "@/lib/chords";
 
 function renderChartLine(
   model: ReturnType<typeof buildLineModel>,
-  mode: "lyrics-chords" | "detail" = "detail",
+  mode: ChartViewMode = "detail",
 ) {
   return renderToStaticMarkup(
     createElement(ChartLineView, {
@@ -69,6 +69,50 @@ describe("chart cell model", () => {
     const html = renderChartLine(model, "lyrics-chords");
 
     expect(html).toMatch(/class="[^"]*chart-cell-gap[^"]*" data-chord="C"/);
+  });
+
+  it("renders chord, notation, and lyric in explicit stacked lanes", () => {
+    const [model] = buildSectionModels(["[C]1 [G]2", "Mela"]);
+    if (!model || model.kind !== "couplet") throw new Error("Couplet missing");
+
+    const markup = renderChartLine(model, "detail");
+    const chordLane = markup.indexOf('data-chart-lane="chord"');
+    const notationLane = markup.indexOf('data-chart-lane="notation"');
+    const lyricLane = markup.indexOf('data-chart-lane="lyric"');
+
+    expect(chordLane).toBeGreaterThan(-1);
+    expect(notationLane).toBeGreaterThan(chordLane);
+    expect(lyricLane).toBeGreaterThan(notationLane);
+  });
+
+  it("shows only the selected stacked lanes in each chart mode", () => {
+    const [model] = buildSectionModels(["[C]1 [G]2", "Mela"]);
+    if (!model || model.kind !== "couplet") throw new Error("Couplet missing");
+
+    const notation = renderChartLine(model, "lyrics-notation");
+    expect(notation).not.toContain('data-chart-lane="chord"');
+    expect(notation).toContain('data-chart-lane="notation"');
+    expect(notation).toContain('data-chart-lane="lyric"');
+
+    const chords = renderChartLine(model, "lyrics-chords");
+    expect(chords).toContain('data-chart-lane="chord"');
+    expect(chords).not.toContain('data-chart-lane="notation"');
+    expect(chords).toContain('data-chart-lane="lyric"');
+
+    const lyrics = renderChartLine(model, "lyrics");
+    expect(lyrics).not.toContain('data-chart-lane="chord"');
+    expect(lyrics).not.toContain('data-chart-lane="notation"');
+    expect(lyrics).toContain('data-chart-lane="lyric"');
+  });
+
+  it("keeps notation chords inside a chord lane in Lirik + Chord mode", () => {
+    const html = renderChartLine(buildLineModel("[C]1 [G]2"), "lyrics-chords");
+
+    expect(html).toContain('data-chart-chords-only=""');
+    expect(html).toContain('data-chart-lane="chord"');
+    expect(html).toContain('data-chord="C"');
+    expect(html).toContain('data-chord="G"');
+    expect(html).not.toContain('data-chart-lane="notation"');
   });
 
   it("adds gaps to adjacent Hidop chord cells after transposition", () => {

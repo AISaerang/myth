@@ -36,4 +36,11 @@ describe("chart theme styles", () => {
     expect(css).toContain(".chart-cell-gap > .chart-chord-row");
     expect(css).not.toContain(".chart-couplet .chart-cell-chord");
   });
+
+  it("defines three stacked lane tracks for every chart cell", () => {
+    expect(css).toMatch(/grid-template-areas:\s*"chord"\s*"notation"\s*"lyric"/);
+    expect(css).toContain('.chart-cell > [data-chart-lane="chord"]');
+    expect(css).toContain('.chart-cell > [data-chart-lane="notation"]');
+    expect(css).toContain('.chart-cell > [data-chart-lane="lyric"]');
+  });
 });
