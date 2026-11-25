@@ -37,7 +37,6 @@ body {
   --chart-error: #b91c1c;
   --chart-surface: #fafafa;
   --chart-active-bg: #e0f2fe;
-  color: var(--chart-foreground);
 }
 
 [data-chart-theme="dark"] {
@@ -47,13 +46,19 @@ body {
   --chart-error: #fca5a5;
   --chart-surface: #18181b;
   --chart-active-bg: #0c4a6e;
-  color: var(--chart-foreground);
 }
 
 [data-chart-theme] .chart-surface,
 [data-chart-theme].chart-stage-overlay {
   background-color: var(--chart-surface);
   color: var(--chart-foreground);
+}
+
+.chart-page-controls {
+  --chart-foreground: var(--foreground);
+  --chart-surface: var(--background);
+  --chart-muted: color-mix(in srgb, var(--foreground) 62%, var(--background));
+  color: var(--foreground);
 }
 
 [data-chart-theme] .chart-section-nav {
@@ -183,8 +188,30 @@ body {
   max-width: 100%;
 }
 
-.chart-couplet .chart-cell-chord .chart-chord-lane {
+.chart-cell-gap > .chart-chord-row,
+.chart-cell-gap > .chart-chord-lane {
   padding-inline-end: 0.4em;
+}
+
+.chart-cell-trailing {
+  margin-inline-start: 0.4em;
+}
+
+.chart-cell-stretch {
+  align-items: stretch;
+}
+
+.chart-cell-stretch > .chart-text-cell {
+  display: flex;
+}
+
+.chart-cell-stretch .chart-hyphen {
+  flex: 1 0 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  padding: 0;
 }
 
 .chart-couplet-fallback {
@@ -215,7 +242,6 @@ body {
 [data-chart-theme="dark"] .chart-toolbar button,
 [data-chart-theme="dark"] .chart-toolbar label {
   border-color: rgba(161, 161, 170, 0.55);
-  color: var(--chart-foreground);
 }
 
 .chart-toggle {

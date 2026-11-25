@@ -46,7 +46,7 @@ export function InstrumentPovBar({
   trailingAction?: ReactNode;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2">
+    <div className="chart-page-controls flex min-w-0 flex-col gap-2">
       {showPov ? (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Sudut pandang instrumen">
           {([

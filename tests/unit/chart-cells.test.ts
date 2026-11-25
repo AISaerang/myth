@@ -6,6 +6,19 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ChartLineView } from "@/components/ChartLineView";
 import { layersForMode } from "@/lib/chart-view-mode";
+import { transposeContent } from "@/lib/chords";
+
+function renderChartLine(
+  model: ReturnType<typeof buildLineModel>,
+  mode: "lyrics-chords" | "detail" = "detail",
+) {
+  return renderToStaticMarkup(
+    createElement(ChartLineView, {
+      model,
+      layers: layersForMode(mode),
+    }),
+  );
+}
 
 describe("chart cell model", () => {
   it("builds lyric cells and starts a cell at each chord", () => {
@@ -24,6 +37,66 @@ describe("chart cell model", () => {
     const flat = model.words.flatMap((word) => word.cells);
     expect(flat.map((cell) => cell.chord).filter(Boolean)).toEqual(["F", "G", "C", "Am"]);
     expect(flat.at(-1)?.text).toBe("");
+  });
+
+  it("adds a gap and stretch to adjacent inline chords in the generic lyric renderer", () => {
+    const model = buildLineModel("Haleluya, [F]a[G]min");
+    const html = renderChartLine(model, "lyrics-chords");
+
+    expect(html).toMatch(/class="[^"]*chart-cell-gap[^"]*chart-cell-stretch[^"]*" data-chord="F"/);
+  });
+
+  it("adds a gap between adjacent chords inside a bar measure", () => {
+    const model = buildLineModel("| Dm Em | F . |");
+    const html = renderChartLine(model, "lyrics-chords");
+
+    expect(html).toMatch(/class="[^"]*chart-cell-gap[^"]*" data-chord="Dm"/);
+  });
+
+  it("uses the same gap class in paired notation and lyric cells", () => {
+    const model = {
+      kind: "couplet" as const,
+      paired: true,
+      lyricText: "haleluya",
+      words: [{
+        isBar: false,
+        cells: [
+          { chord: "C", note: null, text: "ha", joinNext: false },
+          { chord: "G", note: null, text: "leluya", joinNext: false },
+        ],
+      }],
+    };
+    const html = renderChartLine(model, "lyrics-chords");
+
+    expect(html).toMatch(/class="[^"]*chart-cell-gap[^"]*" data-chord="C"/);
+  });
+
+  it("adds gaps to adjacent Hidop chord cells after transposition", () => {
+    const fixture = readFileSync(
+      join(process.cwd(), "tests", "fixtures", "charts", "hidop-jadi-terang.txt"),
+      "utf8",
+    );
+    const models = buildSectionModels(transposeContent(fixture, 2).split("\n"));
+    let expectedGapCount = 0;
+    let renderedGapCount = 0;
+
+    for (const model of models) {
+      if (!("words" in model)) continue;
+      expectedGapCount += model.words.reduce(
+        (count, word) =>
+          count +
+          word.cells.slice(0, -1).filter((cell, index) => (
+            Boolean(cell.chord && word.cells[index + 1]?.chord)
+          )).length,
+        0,
+      );
+      renderedGapCount += (
+        renderChartLine(model, "lyrics-chords").match(/chart-cell-gap/g) ?? []
+      ).length;
+    }
+
+    expect(expectedGapCount).toBeGreaterThan(0);
+    expect(renderedGapCount).toBe(expectedGapCount);
   });
 
   it("keeps hyphenated syllables in one word", () => {
@@ -101,6 +174,14 @@ describe("chart cell model", () => {
     expect(hyphen.words[0]?.cells.some((cell) => cell.joinNext)).toBe(true);
   });
 
+  it("renders a hyphen in a stretched chord cell", () => {
+    const html = renderChartLine(buildLineModel("[G]Mela[C]yani"), "lyrics-chords");
+
+    expect(html).toMatch(
+      /class="[^"]*chart-cell-stretch[^"]*" data-chord="G"[^>]*>[\s\S]*?Mela<span class="chart-hyphen"/,
+    );
+  });
+
   it("keeps a trailing line-end chord inside the previous word", () => {
     const model = buildLineModel("dalam rumah Tuhan    [G7]");
     expect(model.kind).toBe("lyric");
@@ -109,6 +190,23 @@ describe("chart cell model", () => {
     expect(model.words.at(-1)?.cells.some((cell) => (
       cell.text === "" && cell.chord === "G7" && cell.trailing
     ))).toBe(true);
+  });
+
+  it("renders a trailing chord after the final lyric syllable with a gap", () => {
+    const rumah = renderChartLine(
+      buildLineModel("dalam rumah Tuhan    [G7]"),
+      "lyrics-chords",
+    );
+    const hidop = renderChartLine(
+      buildLineModel("bekeng bae [Em]pa [E7]samu[Am]a [A7]"),
+      "lyrics-chords",
+    );
+
+    expect(rumah).toMatch(
+      /class="[^"]*chart-cell-trailing[^"]*" data-chord="G7"[^>]* data-trailing="true"/,
+    );
+    expect(hidop).toMatch(/class="[^"]*chart-cell-gap[^"]*" data-chord="Am"/);
+    expect(hidop).toMatch(/class="[^"]*chart-cell-trailing[^"]*" data-chord="A7"[^>]* data-trailing="true"/);
   });
 
   it("loads fixtures and preserves NKB 212 couplets and Hidop instrumental body", () => {

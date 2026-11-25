@@ -27,10 +27,10 @@ export function KeyTransposeBar({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         <span className="font-medium">Nada: {currentKey}</span>
-        <span className="text-zinc-500">(basis {baseKey})</span>
+        <span className="text-[color:var(--chart-muted)]">(basis {baseKey})</span>
         {formula ? (
           <span
-            className="font-mono text-zinc-600 dark:text-zinc-300"
+            className="font-mono text-[color:var(--chart-muted)]"
             data-key-formula=""
           >
             {formula}
@@ -65,7 +65,7 @@ export function KeyTransposeBar({
           type="button"
           onClick={() => onFlats(!useFlats)}
           aria-pressed={useFlats}
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
         >
           {useFlats ? "Mol (♭)" : "Kres (♯)"}
         </button>
