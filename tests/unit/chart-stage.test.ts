@@ -110,4 +110,13 @@ describe("chart stage helpers", () => {
     expect(position).toBeGreaterThanOrEqual(23);
     expect(position).toBeLessThanOrEqual(25);
   });
+
+  it("keeps each auto-scroll frame below 4px and applies speed changes immediately", () => {
+    const firstFrame = getAutoScrollNextTop(0, 5, 50, 1000);
+    const nextFrameAfterSpeedChange = getAutoScrollNextTop(firstFrame, 1, 50, 1000);
+
+    expect(firstFrame).toBe(3);
+    expect(firstFrame).toBeLessThanOrEqual(4);
+    expect(nextFrameAfterSpeedChange - firstFrame).toBeCloseTo(0.6);
+  });
 });

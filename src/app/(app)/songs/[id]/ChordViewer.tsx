@@ -589,7 +589,7 @@ export function ChordViewer({
         {stage ? (
           <button
             type="button"
-            className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-medium"
             onClick={() => {
               setAutoScroll(false);
               setStageActive(false);
@@ -1304,7 +1304,7 @@ export function ChordViewer({
           showCapo={showCapo}
         />
       ) : null}
-      <div data-chart-controls="">
+      <div data-chart-controls="" className="chart-page-controls">
         <KeyTransposeBar
           baseKey={displayBaseKey}
           offset={offset}
@@ -1321,7 +1321,7 @@ export function ChordViewer({
           </div>
         ) : null}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="chart-page-controls flex flex-wrap items-center justify-between gap-2">
         <div className="hidden flex-wrap gap-1 sm:flex" role="group" aria-label="Mode tampil">
           {MODES.map((item) => (
             <button
