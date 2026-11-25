@@ -68,7 +68,6 @@ export function ChartLineView({
   if (model.kind === "bars" && !layers.chords) return null;
 
   if (model.kind === "couplet") {
-    const lyricWords = model.words.filter((word) => !word.isBar);
     if (!model.paired) {
       return (
         <div
@@ -109,49 +108,62 @@ export function ChartLineView({
         data-chart-paired="true"
         data-lyric-text={model.lyricText}
       >
-        {lyricWords.map((word, wordIndex) => (
-          <span key={wordIndex} className="chart-word" data-chart-word="" data-chart-lyric-word={wordIndex}>
-            {word.cells.map((cell, cellIndex) => (
-              <span
-                key={cellIndex}
-                className={`chart-cell${cell.chord ? " chart-cell-chord" : ""}${cell.continues ? " chart-cell-continues" : ""}`}
-                data-chord={layers.chords && cell.chord ? cell.chord : undefined}
-                data-note={layers.notation && cell.note ? cell.note.raw : undefined}
-                data-trailing={cell.trailing ? "true" : undefined}
-              >
-                {layers.chords && cell.chord ? (
-                  <span className="chart-chord-row chart-chord-lane">
-                    {onChordClick ? (
-                      <button
-                        type="button"
-                        className="chart-chord-button"
-                        aria-label={`Tampilkan voicing ${cell.chord}`}
-                        onClick={() => onChordClick(cell.chord as string)}
-                      >
-                        <ChordSymbol token={cell.chord} simplify={simplify} />
-                      </button>
-                    ) : (
-                      <span className="chart-chord" data-chord={cell.chord}>
-                        <ChordSymbol token={cell.chord} simplify={simplify} />
-                      </span>
-                    )}
-                  </span>
-                ) : layers.chords ? <span className="chart-chord-row chart-chord-lane" aria-hidden="true" /> : null}
-                {layers.notation && cell.note?.note ? (
-                  <span className="chart-notation-row" aria-label={cell.note.raw}>
-                    <NotationGlyph note={cell.note.note} />
-                  </span>
-                ) : layers.notation ? <span className="chart-notation-row" aria-hidden="true">&nbsp;</span> : null}
-                {layers.lyrics ? (
-                  <span className="chart-text-cell">
-                    {cell.text || "\u00a0"}
-                    {cell.joinNext ? <span className="chart-hyphen" aria-hidden="true">-</span> : null}
-                  </span>
-                ) : null}
+        {model.words.map((word, wordIndex) =>
+          word.isBar ? (
+            layers.notation ? (
+              <span key={wordIndex} className="chart-word" data-chart-word="bar">
+                <span className="chart-bar">|</span>
               </span>
-            ))}
-          </span>
-        ))}
+            ) : null
+          ) : (
+            <span
+              key={wordIndex}
+              className="chart-word"
+              data-chart-word=""
+              data-chart-lyric-word={word.cells[0]?.wordIndex ?? wordIndex}
+            >
+              {word.cells.map((cell, cellIndex) => (
+                <span
+                  key={cellIndex}
+                  className={`chart-cell${cell.chord ? " chart-cell-chord" : ""}${cell.continues ? " chart-cell-continues" : ""}`}
+                  data-chord={layers.chords && cell.chord ? cell.chord : undefined}
+                  data-note={layers.notation && cell.note ? cell.note.raw : undefined}
+                  data-trailing={cell.trailing ? "true" : undefined}
+                >
+                  {layers.chords && cell.chord ? (
+                    <span className="chart-chord-row chart-chord-lane">
+                      {onChordClick ? (
+                        <button
+                          type="button"
+                          className="chart-chord-button"
+                          aria-label={`Tampilkan voicing ${cell.chord}`}
+                          onClick={() => onChordClick(cell.chord as string)}
+                        >
+                          <ChordSymbol token={cell.chord} simplify={simplify} />
+                        </button>
+                      ) : (
+                        <span className="chart-chord" data-chord={cell.chord}>
+                          <ChordSymbol token={cell.chord} simplify={simplify} />
+                        </span>
+                      )}
+                    </span>
+                  ) : layers.chords ? <span className="chart-chord-row chart-chord-lane" aria-hidden="true" /> : null}
+                  {layers.notation && cell.note?.note ? (
+                    <span className="chart-notation-row" aria-label={cell.note.raw}>
+                      <NotationGlyph note={cell.note.note} />
+                    </span>
+                  ) : layers.notation ? <span className="chart-notation-row" aria-hidden="true">&nbsp;</span> : null}
+                  {layers.lyrics ? (
+                    <span className="chart-text-cell">
+                      {cell.text || "\u00a0"}
+                      {cell.joinNext ? <span className="chart-hyphen" aria-hidden="true">-</span> : null}
+                    </span>
+                  ) : null}
+                </span>
+              ))}
+            </span>
+          ),
+        )}
         <span className="sr-only">{model.lyricText}</span>
       </div>
     );

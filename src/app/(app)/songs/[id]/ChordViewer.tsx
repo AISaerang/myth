@@ -513,7 +513,7 @@ export function ChordViewer({
           </button>
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
             onClick={() => setOffset(offset + 1)}
             aria-label="Naikkan setengah nada"
           >
@@ -521,7 +521,7 @@ export function ChordViewer({
           </button>
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] rounded-lg px-3 text-xs"
             onClick={resetViewerToC}
           >
             Reset nada
@@ -529,7 +529,7 @@ export function ChordViewer({
         </div>
         <button
           type="button"
-          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-medium"
           onClick={() => setSimplify((enabled) => !enabled)}
           aria-label="Sederhanakan chord"
           aria-pressed={simplify}
@@ -538,7 +538,7 @@ export function ChordViewer({
         </button>
         <button
           type="button"
-          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-sm"
           onClick={() => setTextScale((scale) => clampTextScale(scale - 10))}
           disabled={textScale <= 80}
         >
@@ -547,7 +547,7 @@ export function ChordViewer({
         <span className="shrink-0 text-xs">{textScale}%</span>
         <button
           type="button"
-          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-sm"
           onClick={() => setTextScale((scale) => clampTextScale(scale + 10))}
           disabled={textScale >= 200}
         >
@@ -555,7 +555,7 @@ export function ChordViewer({
         </button>
         <button
           type="button"
-          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-medium"
           onClick={() =>
             setThemeOverride(chartTheme === "dark" ? "light" : "dark")
           }
@@ -1377,7 +1377,7 @@ export function ChordViewer({
       >
         <button
           type="button"
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium"
           onClick={() => setControlsCollapsed((collapsed) => !collapsed)}
           aria-expanded={!controlsCollapsed}
         >
@@ -1387,19 +1387,19 @@ export function ChordViewer({
         <>
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium"
             onClick={() => setSimplify((enabled) => !enabled)}
             aria-label="Sederhanakan chord"
             aria-pressed={simplify}
           >
             {simplify ? "Chord sederhana aktif" : "Sederhanakan chord"}
           </button>
-          <button type="button" className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
-          <button type="button" className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
+          <button type="button" className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
+          <button type="button" className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
           <span className="text-xs text-zinc-500">{textScale}%</span>
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium"
             onClick={() => setThemeOverride(chartTheme === "dark" ? "light" : "dark")}
             aria-label={`Gunakan tema ${chartTheme === "dark" ? "terang" : "gelap"}`}
             aria-pressed={themeOverride !== null}
@@ -1434,7 +1434,7 @@ export function ChordViewer({
       {!stageActive ? renderMobileControls(false) : null}
       <div
         data-chart-body=""
-        className={`chart-surface chart-scroll-content min-w-0 max-w-full rounded-lg p-4${autoScroll ? " chart-no-anchor" : ""}`}
+        className="chart-surface chart-scroll-content chart-no-anchor min-w-0 max-w-full rounded-lg p-4"
         style={{ "--chart-text-scale": textScale / 100 } as CSSProperties}
       >
         {sections ? (
@@ -1674,19 +1674,19 @@ export function ChordViewer({
           <div className="hidden min-h-14 flex-wrap items-center gap-2 border-b border-zinc-700/40 px-3 py-2 sm:flex">
             <button
               type="button"
-              className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
+              className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
               onClick={() => setSimplify((enabled) => !enabled)}
               aria-label="Sederhanakan chord"
               aria-pressed={simplify}
             >
               {simplify ? "Chord ringkas" : "Sederhanakan chord"}
             </button>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
+            <button type="button" className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
+            <button type="button" className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
             <span className="text-xs">{textScale}%</span>
             <button
               type="button"
-              className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
+              className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
               onClick={() =>
                 setThemeOverride(chartTheme === "dark" ? "light" : "dark")
               }
@@ -1704,7 +1704,7 @@ export function ChordViewer({
             </label>
             <button
               type="button"
-              className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
+              className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
               onClick={() => {
                 setAutoScroll(false);
                 setStageActive(false);
@@ -1722,7 +1722,7 @@ export function ChordViewer({
           <div
             ref={stageScrollRef}
             data-chart-body=""
-            className={`chart-scroll-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-8${autoScroll ? " chart-no-anchor" : ""}`}
+            className="chart-scroll-content chart-no-anchor min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-8"
             style={{ "--chart-text-scale": textScale / 100 } as CSSProperties}
           >
             {sections ? (

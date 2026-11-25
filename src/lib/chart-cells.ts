@@ -225,16 +225,26 @@ export function buildLineModel(line: string): ChartLineModel {
 
 export function buildSectionModels(lines: string[]): ChartLineModel[] {
   const models: ChartLineModel[] = [];
+  const normalizedLines = lines.map((line) => line.replace(/\r$/, ""));
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const model = buildLineModel(lines[index] ?? "");
+  for (let index = 0; index < normalizedLines.length; index += 1) {
+    const model = buildLineModel(normalizedLines[index] ?? "");
     if (model.kind !== "notation") {
       models.push(model);
       continue;
     }
 
+    let lyricIndex = index + 1;
+    while (
+      lyricIndex < lines.length &&
+      buildLineModel(normalizedLines[lyricIndex] ?? "").kind === "empty"
+    ) {
+      lyricIndex += 1;
+    }
     const nextModel =
-      index + 1 < lines.length ? buildLineModel(lines[index + 1] ?? "") : null;
+      lyricIndex < lines.length
+        ? buildLineModel(normalizedLines[lyricIndex] ?? "")
+        : null;
     if (
       nextModel?.kind === "lyric" &&
       !nextModel.words.some((word) =>
@@ -242,7 +252,7 @@ export function buildSectionModels(lines: string[]): ChartLineModel[] {
       )
     ) {
       const lyricText =
-        (lines[index + 1] ?? "").replace(/\s+/g, " ").trim();
+        (normalizedLines[lyricIndex] ?? "").replace(/\s+/g, " ").trim();
       const lyricWords = lyricText ? lyricText.split(" ") : [];
       const syllableItems: Array<{
         text: string;
@@ -327,13 +337,32 @@ export function buildSectionModels(lines: string[]): ChartLineModel[] {
             slotIndex += 1;
           }
         }
+        const trailingCells = model.words.flatMap((word) =>
+          word.isBar
+            ? []
+            : word.cells.filter(
+                (cell) => cell.note === null && cell.chord !== null,
+              ),
+        );
+        if (trailingCells.length && lyricWords.length) {
+          const lastWord = mergedWords[lyricWords.length - 1];
+          if (lastWord) {
+            lastWord.cells.push(
+              ...trailingCells.map((cell) => ({
+                ...cell,
+                text: "",
+                trailing: true,
+              })),
+            );
+          }
+        }
         models.push({
           kind: "couplet",
           words: mergedWords,
           paired: true,
           lyricText,
         });
-        index += 1;
+        index = lyricIndex;
         continue;
       }
 
@@ -344,7 +373,7 @@ export function buildSectionModels(lines: string[]): ChartLineModel[] {
           paired: false,
           lyricText,
         });
-        index += 1;
+        index = lyricIndex;
         continue;
       }
     }

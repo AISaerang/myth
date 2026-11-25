@@ -146,7 +146,7 @@ export function ChartSectionNavigator({
     pendingTimeoutRef.current = window.setTimeout(() => {
       pendingTargetRef.current = null;
       pendingTimeoutRef.current = null;
-    }, 1000);
+    }, 3000);
     activeIndexRef.current = next;
     setActiveIndex(next);
     target.scrollIntoView({
