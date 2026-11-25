@@ -297,7 +297,7 @@ function renderChart(
       }
       const instrumental =
         mode === "lyrics" &&
-        sectionIsInstrumental(lines.slice(index, blockEnd));
+        sectionIsInstrumental(lines.slice(labelSourceIndex, blockEnd));
       return (
         <div
           key={lineKey}
@@ -478,6 +478,8 @@ export function ChordViewer({
   const [controlsCollapsed, setControlsCollapsed] = useState(false);
   const activeSectionRef = useRef(0);
   const stageScrollRef = useRef<HTMLDivElement>(null);
+  const scrollPosRef = useRef(0);
+  const lastWrittenScrollRef = useRef(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const chartTheme = themeOverride ?? systemTheme;
   const renderMobileControls = (stage = false) => (
@@ -494,11 +496,7 @@ export function ChordViewer({
               type="button"
               onClick={() => setMode(item.value)}
               aria-pressed={mode === item.value}
-              className={`min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-medium ${
-                mode === item.value
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "border border-zinc-300 dark:border-zinc-700"
-              }`}
+              className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-medium"
             >
               {item.label}
             </button>
@@ -507,7 +505,7 @@ export function ChordViewer({
         <div className="flex shrink-0 gap-1" role="group" aria-label="Transpose nada">
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
             onClick={() => setOffset(offset - 1)}
             aria-label="Turunkan setengah nada"
           >
@@ -515,7 +513,7 @@ export function ChordViewer({
           </button>
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
             onClick={() => setOffset(offset + 1)}
             aria-label="Naikkan setengah nada"
           >
@@ -523,7 +521,7 @@ export function ChordViewer({
           </button>
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-xs dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] rounded-lg px-3 text-xs"
             onClick={resetViewerToC}
           >
             Reset nada
@@ -531,7 +529,7 @@ export function ChordViewer({
         </div>
         <button
           type="button"
-          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-medium"
           onClick={() => setSimplify((enabled) => !enabled)}
           aria-label="Sederhanakan chord"
           aria-pressed={simplify}
@@ -540,7 +538,7 @@ export function ChordViewer({
         </button>
         <button
           type="button"
-          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-sm"
           onClick={() => setTextScale((scale) => clampTextScale(scale - 10))}
           disabled={textScale <= 80}
         >
@@ -549,7 +547,7 @@ export function ChordViewer({
         <span className="shrink-0 text-xs">{textScale}%</span>
         <button
           type="button"
-          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-sm"
           onClick={() => setTextScale((scale) => clampTextScale(scale + 10))}
           disabled={textScale >= 200}
         >
@@ -557,7 +555,7 @@ export function ChordViewer({
         </button>
         <button
           type="button"
-          className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] shrink-0 rounded-lg px-3 text-xs font-medium"
           onClick={() =>
             setThemeOverride(chartTheme === "dark" ? "light" : "dark")
           }
@@ -568,7 +566,7 @@ export function ChordViewer({
         </button>
         <button
           type="button"
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] min-w-[9.5rem] rounded-lg px-3 text-sm font-medium"
           onClick={() => setAutoScroll((enabled) => !enabled)}
           aria-pressed={autoScroll}
           disabled={reducedMotion}
@@ -1078,7 +1076,15 @@ export function ChordViewer({
     };
     updateOffset();
     window.addEventListener("resize", updateOffset);
-    return () => window.removeEventListener("resize", updateOffset);
+    const observer = new ResizeObserver(updateOffset);
+    const header = document.querySelector<HTMLElement>("[data-app-header]");
+    const toolbar = document.querySelector<HTMLElement>("[data-chart-controls]");
+    if (header) observer.observe(header);
+    if (toolbar) observer.observe(toolbar);
+    return () => {
+      window.removeEventListener("resize", updateOffset);
+      observer.disconnect();
+    };
   }, [controlsCollapsed, stageActive]);
 
   useEffect(() => {
@@ -1127,6 +1133,12 @@ export function ChordViewer({
     if (!autoScroll) return;
     if (reducedMotion) return;
 
+    const initialPosition = stageActive
+      ? (stageScrollRef.current?.scrollTop ?? 0)
+      : window.scrollY;
+    scrollPosRef.current = initialPosition;
+    lastWrittenScrollRef.current = initialPosition;
+
     let frame = 0;
     let previousTime = 0;
     const scroll = (time: number) => {
@@ -1140,27 +1152,42 @@ export function ChordViewer({
           return;
         }
         const maxTop = element.scrollHeight - element.clientHeight;
-        element.scrollTop = getAutoScrollNextTop(
-          element.scrollTop,
+        const realPosition = element.scrollTop;
+        if (
+          Math.abs(realPosition - lastWrittenScrollRef.current) > 2
+        ) {
+          scrollPosRef.current = realPosition;
+        }
+        scrollPosRef.current = getAutoScrollNextTop(
+          scrollPosRef.current,
           scrollSpeedRef.current,
           elapsed,
           maxTop,
         );
-        if (element.scrollTop >= maxTop - 1) {
+        const roundedPosition = Math.round(scrollPosRef.current);
+        element.scrollTop = roundedPosition;
+        lastWrittenScrollRef.current = roundedPosition;
+        if (roundedPosition >= maxTop - 1) {
           setAutoScroll(false);
           return;
         }
       } else {
         const root = document.documentElement;
         const maxTop = root.scrollHeight - window.innerHeight;
-        const nextTop = getAutoScrollNextTop(
-          window.scrollY,
+        const realPosition = window.scrollY;
+        if (Math.abs(realPosition - lastWrittenScrollRef.current) > 2) {
+          scrollPosRef.current = realPosition;
+        }
+        scrollPosRef.current = getAutoScrollNextTop(
+          scrollPosRef.current,
           scrollSpeedRef.current,
           elapsed,
           maxTop,
         );
-        window.scrollTo({ top: nextTop, behavior: "auto" });
-        if (window.scrollY >= maxTop - 1) {
+        const roundedPosition = Math.round(scrollPosRef.current);
+        window.scrollTo({ top: roundedPosition, behavior: "auto" });
+        lastWrittenScrollRef.current = roundedPosition;
+        if (roundedPosition >= maxTop - 1) {
           setAutoScroll(false);
           return;
         }
@@ -1302,11 +1329,7 @@ export function ChordViewer({
               type="button"
               onClick={() => setMode(item.value)}
               aria-pressed={mode === item.value}
-              className={`min-h-[44px] rounded-lg px-3 text-sm font-medium ${
-                mode === item.value
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "border border-zinc-300 dark:border-zinc-700"
-              }`}
+              className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium"
             >
               {item.label}
             </button>
@@ -1330,7 +1353,7 @@ export function ChordViewer({
             trailingAction={
               <button
                 type="button"
-                className="min-h-[44px] rounded-lg border px-3 text-sm font-medium"
+                className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium"
                 onClick={() => {
                   setStageActive(true);
                   window.requestAnimationFrame(() => {
@@ -1354,7 +1377,7 @@ export function ChordViewer({
       >
         <button
           type="button"
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium"
           onClick={() => setControlsCollapsed((collapsed) => !collapsed)}
           aria-expanded={!controlsCollapsed}
         >
@@ -1364,19 +1387,19 @@ export function ChordViewer({
         <>
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium"
             onClick={() => setSimplify((enabled) => !enabled)}
             aria-label="Sederhanakan chord"
             aria-pressed={simplify}
           >
             {simplify ? "Chord sederhana aktif" : "Sederhanakan chord"}
           </button>
-          <button type="button" className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
-          <button type="button" className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
+          <button type="button" className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
+          <button type="button" className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
           <span className="text-xs text-zinc-500">{textScale}%</span>
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm font-medium"
             onClick={() => setThemeOverride(chartTheme === "dark" ? "light" : "dark")}
             aria-label={`Gunakan tema ${chartTheme === "dark" ? "terang" : "gelap"}`}
             aria-pressed={themeOverride !== null}
@@ -1385,7 +1408,7 @@ export function ChordViewer({
           </button>
           <button
             type="button"
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+            className="chart-toggle min-h-[44px] min-w-[9.5rem] rounded-lg px-3 text-sm font-medium"
             onClick={() => setAutoScroll((enabled) => !enabled)}
             aria-pressed={autoScroll}
             disabled={reducedMotion}
@@ -1411,7 +1434,7 @@ export function ChordViewer({
       {!stageActive ? renderMobileControls(false) : null}
       <div
         data-chart-body=""
-        className="chart-surface chart-scroll-content min-w-0 max-w-full rounded-lg p-4"
+        className="chart-surface chart-scroll-content chart-no-anchor min-w-0 max-w-full rounded-lg p-4"
         style={{ "--chart-text-scale": textScale / 100 } as CSSProperties}
       >
         {sections ? (
@@ -1651,19 +1674,19 @@ export function ChordViewer({
           <div className="hidden min-h-14 flex-wrap items-center gap-2 border-b border-zinc-700/40 px-3 py-2 sm:flex">
             <button
               type="button"
-              className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
+              className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
               onClick={() => setSimplify((enabled) => !enabled)}
               aria-label="Sederhanakan chord"
               aria-pressed={simplify}
             >
               {simplify ? "Chord ringkas" : "Sederhanakan chord"}
             </button>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
+            <button type="button" className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
+            <button type="button" className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
             <span className="text-xs">{textScale}%</span>
             <button
               type="button"
-              className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
+              className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
               onClick={() =>
                 setThemeOverride(chartTheme === "dark" ? "light" : "dark")
               }
@@ -1672,7 +1695,7 @@ export function ChordViewer({
             >
               {chartTheme === "dark" ? "Tema terang" : "Tema gelap"}
             </button>
-            <button type="button" className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm" onClick={() => setAutoScroll((enabled) => !enabled)} aria-pressed={autoScroll} disabled={reducedMotion}>
+            <button type="button" className="chart-toggle min-h-[44px] min-w-[9.5rem] rounded-lg px-3 text-sm" onClick={() => setAutoScroll((enabled) => !enabled)} aria-pressed={autoScroll} disabled={reducedMotion}>
               {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
             </button>
             <label className="flex items-center gap-2 text-xs">
@@ -1681,7 +1704,7 @@ export function ChordViewer({
             </label>
             <button
               type="button"
-              className="min-h-[44px] rounded-lg border border-zinc-500/50 px-3 text-sm"
+              className="chart-toggle min-h-[44px] rounded-lg px-3 text-sm"
               onClick={() => {
                 setAutoScroll(false);
                 setStageActive(false);
@@ -1699,7 +1722,7 @@ export function ChordViewer({
           <div
             ref={stageScrollRef}
             data-chart-body=""
-            className="chart-scroll-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-8"
+            className="chart-scroll-content chart-no-anchor min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-8"
             style={{ "--chart-text-scale": textScale / 100 } as CSSProperties}
           >
             {sections ? (
@@ -1721,7 +1744,7 @@ export function ChordViewer({
                         mode,
                         `stage-${sectionOffset}-${useFlats}-${mode}-${section.id}-${index}`,
                         undefined,
-                        "chart-section",
+                        "stage-chart-label",
                         simplify,
                       )}
                     </section>
@@ -1737,6 +1760,7 @@ export function ChordViewer({
                 simplify={simplify}
               />
             )}
+            <div aria-hidden="true" className="h-[70vh] shrink-0" />
           </div>
           {renderMobileControls(true)}
           <ChartSectionNavigator

@@ -4,6 +4,7 @@ import {
   clampTextScale,
   clampTextSize,
   getAutoScrollNextTop,
+  nextActiveSection,
   getStageSections,
   moveStageSection,
 } from "../../src/lib/chart-stage";
@@ -79,5 +80,34 @@ describe("chart stage helpers", () => {
       getAutoScrollNextTop(240, 1, 16, 1000),
     );
     expect(getAutoScrollNextTop(240, 5, 16, 100)).toBe(240);
+  });
+
+  it("keeps a pending pill and selects the bottom section", () => {
+    expect(
+      nextActiveSection({
+        pendingTarget: 8,
+        visibility: [{ index: 7, isIntersecting: true }],
+        atBottom: false,
+      }),
+    ).toBe(8);
+    expect(
+      nextActiveSection({
+        pendingTarget: null,
+        visibility: [
+          { index: 8, isIntersecting: true },
+          { index: 9, isIntersecting: true },
+        ],
+        atBottom: true,
+      }),
+    ).toBe(9);
+  });
+
+  it("accumulates sub-pixel auto-scroll speed across frames", () => {
+    let position = 0;
+    for (let index = 0; index < 60; index += 1) {
+      position = getAutoScrollNextTop(position, 2, 16.67, 1000);
+    }
+    expect(position).toBeGreaterThanOrEqual(23);
+    expect(position).toBeLessThanOrEqual(25);
   });
 });

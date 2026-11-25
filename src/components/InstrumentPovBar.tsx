@@ -10,7 +10,7 @@ export type InstrumentPov =
 export type CapoMode = "shape" | "sounding";
 
 const buttonClass =
-  "min-h-[44px] rounded-lg border px-3 text-sm font-medium aria-pressed:bg-zinc-900 aria-pressed:text-white dark:aria-pressed:bg-zinc-100 dark:aria-pressed:text-zinc-900";
+  "chart-toggle min-h-[44px] rounded-lg border px-3 text-sm font-medium";
 
 export function InstrumentPovBar({
   instrumentPov,

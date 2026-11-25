@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { buildLineModel, buildSectionModels, sectionIsInstrumental } from "@/lib/chart-cells";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ChartLineView } from "@/components/ChartLineView";
+import { layersForMode } from "@/lib/chart-view-mode";
 
 describe("chart cell model", () => {
   it("builds lyric cells and starts a cell at each chord", () => {
@@ -56,6 +62,12 @@ describe("chart cell model", () => {
   it("marks only notation-only sections as instrumental", () => {
     expect(sectionIsInstrumental(["{Intro}", "1 2 3", "| C . |"])).toBe(true);
     expect(sectionIsInstrumental(["{Verse}", "[G]Bapa [C]kami"])).toBe(false);
+    expect(sectionIsInstrumental([
+      "{Intro}",
+      "(pickup ½ bar)  F |",
+      "| F . | G . | C G/B | Am . |",
+      "| Dm Em | F . | G . | G . |",
+    ])).toBe(true);
   });
 
   it("puts a notation chord and note in the same cell", () => {
@@ -67,13 +79,13 @@ describe("chart cell model", () => {
 
   it("groups a notation line with the following lyric line", () => {
     const models = buildSectionModels([
-      "3 4 | 5 5[C] #4 5 1'",
+      "3 4 | [C]5 5 #4 5 1'",
       "Sungguh inginkah engkau",
     ]);
     expect(models[0]?.kind).toBe("couplet");
     if (models[0]?.kind !== "couplet") return;
     expect(models[0].words.flatMap((word) => word.cells).some((cell) => cell.chord === "C")).toBe(true);
-    expect(models[0].words.flatMap((word) => word.cells).some((cell) => cell.text === "Sungguh")).toBe(true);
+    expect(models[0].words.flatMap((word) => word.cells).some((cell) => cell.text === "Sung")).toBe(true);
   });
 
   it("keeps hyphens and mid-word chords without inserted word gaps", () => {
@@ -87,5 +99,66 @@ describe("chart cell model", () => {
     expect(hyphen.kind).toBe("lyric");
     if (hyphen.kind !== "lyric") return;
     expect(hyphen.words[0]?.cells.some((cell) => cell.joinNext)).toBe(true);
+  });
+
+  it("keeps a trailing line-end chord inside the previous word", () => {
+    const model = buildLineModel("dalam rumah Tuhan    [G7]");
+    expect(model.kind).toBe("lyric");
+    if (model.kind !== "lyric") return;
+    expect(model.words).toHaveLength(3);
+    expect(model.words.at(-1)?.cells.some((cell) => (
+      cell.text === "" && cell.chord === "G7" && cell.trailing
+    ))).toBe(true);
+  });
+
+  it("loads fixtures and preserves NKB 212 couplets and Hidop instrumental body", () => {
+    const fixtureDir = join(process.cwd(), "tests", "fixtures", "charts");
+    const bait = readFileSync(join(fixtureDir, "nkb-212-bait-1.txt"), "utf8");
+    const reff = readFileSync(join(fixtureDir, "nkb-212-reff.txt"), "utf8");
+    const intro = readFileSync(join(fixtureDir, "hidop-intro.txt"), "utf8");
+
+    const baitModels = buildSectionModels(bait.split("\n"));
+    expect(baitModels.some((model) => model.kind === "couplet")).toBe(true);
+    expect(buildSectionModels(reff.split("\n")).some((model) => model.kind === "couplet")).toBe(true);
+    expect(sectionIsInstrumental(intro.split("\n"))).toBe(true);
+  });
+
+  it("pairs NKB 212 syllables to the exact notation slots", () => {
+    const models = buildSectionModels([
+      "3 4 | [C]5 5 #4 5 1'",
+      "Sungguh inginkah engkau",
+    ]);
+    const couplet = models[0];
+    expect(couplet?.kind).toBe("couplet");
+    if (couplet?.kind !== "couplet") return;
+    expect(couplet.paired).toBe(true);
+    expect(couplet.lyricText).toBe("Sungguh inginkah engkau");
+    const lyricWords = couplet.words.filter((word) => !word.isBar);
+    expect(lyricWords).toHaveLength(3);
+    expect(lyricWords[0]?.cells.map((cell) => cell.text)).toEqual(["Sung", "guh"]);
+    expect(lyricWords[1]?.cells.map((cell) => cell.text)).toEqual(["i", "ngin", "kah"]);
+    expect(lyricWords[2]?.cells.map((cell) => cell.text)).toEqual(["eng", "kau"]);
+  });
+
+  it("renders NKB 212 coupled words with preserved lyric text in all modes", () => {
+    const models = buildSectionModels([
+      "3 4 | [C]5 5 #4 5 1'",
+      "Sungguh inginkah engkau",
+    ]);
+    const couplet = models[0];
+    if (couplet?.kind !== "couplet") throw new Error("NKB couplet missing");
+
+    for (const mode of ["lyrics", "lyrics-notation", "lyrics-chords", "detail"] as const) {
+      const html = renderToStaticMarkup(
+        createElement(ChartLineView, {
+          model: couplet,
+          layers: layersForMode(mode),
+        }),
+      );
+      expect(html).toContain('data-lyric-text="Sungguh inginkah engkau"');
+      expect(html).toContain("Sung");
+      expect(html).toContain("inginkah".replace("inginkah", "ngin"));
+      expect(html).not.toContain("data-notation-error");
+    }
   });
 });

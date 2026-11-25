@@ -38,6 +38,7 @@ describe("chart view mode", () => {
     expect(classifyChartLine("[Csus4]")).toBe("chords-only");
     expect(classifyChartLine("| . . . . |")).toBe("chords-only");
     expect(classifyChartLine("C   .   G")).toBe("chords-only");
+    expect(classifyChartLine("(pickup ½ bar)  F |")).toBe("chords-only");
     expect(classifyChartLine("[C]5- / [5 6] .5")).toBe("notation");
     expect(classifyChartLine("|")).toBe("lyric");
     expect(classifyChartLine("")).toBe("empty");
