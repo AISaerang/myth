@@ -133,11 +133,28 @@ body {
 
 .chart-cell {
   position: relative;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  min-width: 0;
+  display: inline-grid;
+  grid-template-areas:
+    "chord"
+    "notation"
+    "lyric";
+  grid-template-columns: max-content;
+  grid-template-rows: auto auto auto;
+  align-items: start;
+  min-width: 1ch;
   line-height: 1.714;
+}
+
+.chart-cell > [data-chart-lane="chord"] {
+  grid-area: chord;
+}
+
+.chart-cell > [data-chart-lane="notation"] {
+  grid-area: notation;
+}
+
+.chart-cell > [data-chart-lane="lyric"] {
+  grid-area: lyric;
 }
 
 .chart-chord-row {

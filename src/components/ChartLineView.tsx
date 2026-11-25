@@ -56,14 +56,52 @@ export function ChartLineView({
 
   if (model.kind === "notation" && !layers.notation) {
     if (!layers.chords) return null;
-    const chordCells = model.words.flatMap((word) =>
-      word.cells.flatMap((cell) =>
-        cell.chord
-          ? [<ChordSymbol key={`${word.cells.indexOf(cell)}-${cell.chord}`} token={cell.chord} simplify={simplify} />]
-          : [],
-      ),
+    return (
+      <div className="chart-line chart-notation-chords" data-chart-chords-only="">
+        {model.words.map((word, wordIndex) =>
+          word.isBar ? (
+            <span key={wordIndex} className="chart-word" data-chart-word="bar">
+              <span className="chart-bar">|</span>
+            </span>
+          ) : (
+            <span key={wordIndex} className="chart-word">
+              {word.cells.map((cell, cellIndex) => (
+                <span
+                  key={cellIndex}
+                  className={chartCellClassName(cell, word.cells[cellIndex + 1])}
+                  data-chord={cell.chord ?? undefined}
+                >
+                  {cell.chord ? (
+                    <span className="chart-chord-row chart-chord-lane" data-chart-lane="chord">
+                      {onChordClick ? (
+                        <button
+                          type="button"
+                          className="chart-chord-button"
+                          aria-label={`Tampilkan voicing ${cell.chord}`}
+                          onClick={() => onChordClick(cell.chord as string)}
+                        >
+                          <ChordSymbol token={cell.chord} simplify={simplify} />
+                        </button>
+                      ) : (
+                        <span className="chart-chord">
+                          <ChordSymbol token={cell.chord} simplify={simplify} />
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span
+                      className="chart-chord-row chart-chord-lane"
+                      data-chart-lane="chord"
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+              ))}
+            </span>
+          ),
+        )}
+      </div>
     );
-    return <div className="chart-line chart-notation-chords" data-chart-chords-only="">{chordCells}</div>;
   }
   if (model.kind === "bars" && !layers.chords) return null;
 
@@ -91,7 +129,7 @@ export function ChartLineView({
                       data-trailing={cell.trailing ? "true" : undefined}
                     >
                       {layers.chords && cell.chord ? (
-                        <span className="chart-chord-row">
+                        <span className="chart-chord-row" data-chart-lane="chord">
                           {onChordClick ? (
                             <button
                               type="button"
@@ -108,7 +146,7 @@ export function ChartLineView({
                         </span>
                       ) : null}
                       {layers.notation && cell.note?.note ? (
-                        <span className="chart-notation-row">
+                        <span className="chart-notation-row" data-chart-lane="notation">
                           <NotationGlyph note={cell.note.note} />
                         </span>
                       ) : null}
@@ -157,7 +195,7 @@ export function ChartLineView({
                   data-trailing={cell.trailing ? "true" : undefined}
                 >
                   {layers.chords && cell.chord ? (
-                    <span className="chart-chord-row chart-chord-lane">
+                    <span className="chart-chord-row chart-chord-lane" data-chart-lane="chord">
                       {onChordClick ? (
                         <button
                           type="button"
@@ -173,14 +211,14 @@ export function ChartLineView({
                         </span>
                       )}
                     </span>
-                  ) : layers.chords ? <span className="chart-chord-row chart-chord-lane" aria-hidden="true" /> : null}
+                  ) : layers.chords ? <span className="chart-chord-row chart-chord-lane" data-chart-lane="chord" aria-hidden="true" /> : null}
                   {layers.notation && cell.note?.note ? (
-                    <span className="chart-notation-row" aria-label={cell.note.raw}>
+                    <span className="chart-notation-row" data-chart-lane="notation" aria-label={cell.note.raw}>
                       <NotationGlyph note={cell.note.note} />
                     </span>
-                  ) : layers.notation ? <span className="chart-notation-row" aria-hidden="true">&nbsp;</span> : null}
+                  ) : layers.notation ? <span className="chart-notation-row" data-chart-lane="notation" aria-hidden="true">&nbsp;</span> : null}
                   {layers.lyrics ? (
-                    <span className="chart-text-cell">
+                    <span className="chart-text-cell" data-chart-lane="lyric">
                       {cell.text || "\u00a0"}
                       {hasVisibleHyphen(cell) ? <span className="chart-hyphen" aria-hidden="true">-</span> : null}
                     </span>
@@ -215,7 +253,7 @@ export function ChartLineView({
                 data-trailing={cell.trailing ? "true" : undefined}
               >
                 {layers.chords && cell.chord ? (
-                  <span className="chart-chord-row">
+                  <span className="chart-chord-row" data-chart-lane="chord">
                     {onChordClick ? (
                       <button
                         type="button"
@@ -233,12 +271,12 @@ export function ChartLineView({
                   </span>
                 ) : null}
                 {layers.notation && cell.note?.note ? (
-                  <span className="chart-notation-row" aria-label={cell.note.raw}>
+                  <span className="chart-notation-row" data-chart-lane="notation" aria-label={cell.note.raw}>
                     <NotationGlyph note={cell.note.note} />
                   </span>
                 ) : null}
                 {layers.lyrics && model.kind !== "bars" ? (
-                  <span className="chart-text-cell">
+                  <span className="chart-text-cell" data-chart-lane="lyric">
                     {cell.text}
                     {hasVisibleHyphen(cell) ? <span className="chart-hyphen" aria-hidden="true">-</span> : null}
                   </span>
