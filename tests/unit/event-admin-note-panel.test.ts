@@ -41,28 +41,26 @@ function markup(opts: {
 }
 
 describe("song page note panel for EVENT_ADMIN", () => {
-  it("shows Semua personel and Tambah catatan umum without a global admin flag", () => {
+  it("does not render an empty general-personnel box", () => {
     const html = markup({
       admin: false,
       canWriteNotes: true,
       canModerateNotes: true,
     });
 
-    expect(html).toContain("Semua personel");
-    expect(html).toContain("Tambah catatan umum");
-    expect(html).toContain("Catatan per instrumen");
-    expect(html).toContain("Tambah catatan instrumen");
+    expect(html).not.toContain("Semua personel");
+    expect(html).not.toContain("Tambah catatan umum");
   });
 
-  it("still shows the panel when the chart section id is not a master id", () => {
+  it("does not show an empty legacy panel", () => {
     const html = markup({
       canWriteNotes: true,
       canModerateNotes: true,
       displaySectionId: "legacy-synthetic-id",
     });
 
-    expect(html).toContain("Semua personel");
-    expect(html).toContain("Tambah catatan umum");
+    expect(html).not.toContain("Semua personel");
+    expect(html).not.toContain("Tambah catatan umum");
   });
 
   it("does not add that editor box for a member or observer", () => {
@@ -77,7 +75,7 @@ describe("song page note panel for EVENT_ADMIN", () => {
       displaySectionId: "legacy-synthetic-id",
     });
 
-    expect(member.match(/Tambah catatan umum/g)?.length ?? 0).toBe(1);
+    expect(member).not.toContain("Tambah catatan umum");
     expect(observer).not.toContain("Tambah catatan umum");
     expect(observer).not.toContain("Semua personel");
   });

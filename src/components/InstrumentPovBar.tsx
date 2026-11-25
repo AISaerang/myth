@@ -1,4 +1,5 @@
 import type { ArrangementRoleSlug } from "@/lib/arrangement-roles";
+import type { ReactNode } from "react";
 import { ARRANGEMENT_ROLE_CATALOG } from "@/lib/arrangement-roles";
 
 export type InstrumentPov =
@@ -26,6 +27,7 @@ export function InstrumentPovBar({
   showKeyControls = true,
   showCapo = true,
   visibleRoleTabs = [],
+  trailingAction,
 }: {
   instrumentPov: InstrumentPov;
   onInstrumentPov: (value: InstrumentPov) => void;
@@ -41,6 +43,7 @@ export function InstrumentPovBar({
   showKeyControls?: boolean;
   showCapo?: boolean;
   visibleRoleTabs?: readonly ArrangementRoleSlug[];
+  trailingAction?: ReactNode;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -74,6 +77,7 @@ export function InstrumentPovBar({
               {role.label}
             </button>
           ))}
+          {trailingAction}
         </div>
       ) : null}
       {showKeyControls ? (

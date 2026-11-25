@@ -3,6 +3,7 @@ import {
   activeSectionFromVisibility,
   clampTextScale,
   clampTextSize,
+  getAutoScrollNextTop,
   getStageSections,
   moveStageSection,
 } from "../../src/lib/chart-stage";
@@ -70,5 +71,13 @@ describe("chart stage helpers", () => {
         { index: 0, isIntersecting: false },
       ]),
     ).toBeNull();
+  });
+
+  it("changes live auto-scroll speed without resetting or lowering the position", () => {
+    expect(getAutoScrollNextTop(240, 2, 16, 1000)).toBeGreaterThan(240);
+    expect(getAutoScrollNextTop(240, 5, 16, 1000)).toBeGreaterThan(
+      getAutoScrollNextTop(240, 1, 16, 1000),
+    );
+    expect(getAutoScrollNextTop(240, 5, 16, 100)).toBe(240);
   });
 });

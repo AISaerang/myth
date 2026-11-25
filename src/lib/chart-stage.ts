@@ -57,3 +57,17 @@ export function moveStageSection(
   if (sectionCount <= 0) return 0;
   return Math.min(sectionCount - 1, Math.max(0, current + direction));
 }
+
+export function getAutoScrollNextTop(
+  currentTop: number,
+  speed: number,
+  elapsedMs: number,
+  maxTop: number,
+): number {
+  if (currentTop >= maxTop) return currentTop;
+  const safeSpeed = Math.min(5, Math.max(1, speed));
+  const safeElapsed = Math.min(50, Math.max(0, elapsedMs));
+  const nextTop =
+    currentTop + (safeSpeed * 12 * safeElapsed) / 1000;
+  return Math.min(maxTop, Math.max(currentTop, nextTop));
+}

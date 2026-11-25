@@ -18,6 +18,7 @@ export type ChartLineModel =
   | { kind: "lyric"; words: ChartWord[] }
   | { kind: "notation"; words: ChartWord[] }
   | { kind: "bars"; words: ChartWord[] }
+  | { kind: "couplet"; words: ChartWord[] }
   | { kind: "label"; label: string }
   | { kind: "comment"; text: string }
   | { kind: "empty" }
@@ -54,12 +55,14 @@ export function buildLineModel(line: string): ChartLineModel {
       const chords = alignment.chords
         .filter((chord) => chord.renderCol === token.renderCol)
         .map((chord) => chord.token);
-      for (const chord of chords) {
-        current.push({ chord, note: null, text: "", joinNext: false });
-      }
       const inBeam = token.beamGroup !== null;
       const inSlur = token.slurGroup !== null;
-      current.push({ chord: null, note: token, text: "", joinNext: inBeam || inSlur });
+      current.push({
+        chord: chords[0] ?? null,
+        note: token,
+        text: "",
+        joinNext: inBeam || inSlur,
+      });
       if (!inBeam && !inSlur) {
         if (token.renderWidth > 0) {
           words.push({ isBar: false, cells: current });
@@ -181,6 +184,71 @@ export function buildLineModel(line: string): ChartLineModel {
   }
   flushWord();
   return { kind: "lyric", words };
+}
+
+export function buildSectionModels(lines: string[]): ChartLineModel[] {
+  const models: ChartLineModel[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const model = buildLineModel(lines[index] ?? "");
+    if (model.kind !== "notation") {
+      models.push(model);
+      continue;
+    }
+
+    const nextModel =
+      index + 1 < lines.length ? buildLineModel(lines[index + 1] ?? "") : null;
+    if (
+      nextModel?.kind === "lyric" &&
+      !nextModel.words.some((word) =>
+        word.cells.some((cell) => cell.chord),
+      )
+    ) {
+      const notationCells = model.words.flatMap((word) =>
+        word.isBar ? [] : word.cells.filter((cell) => cell.note),
+      );
+      const lyricCells = nextModel.words.flatMap((word) => word.cells);
+      const mergedWords: ChartWord[] = [];
+      let lyricIndex = 0;
+
+      for (const word of model.words) {
+        if (word.isBar) {
+          mergedWords.push(word);
+          continue;
+        }
+        const cells = word.cells.map((cell) => {
+          if (!cell.note) return cell;
+          const lyric = lyricCells[lyricIndex++];
+          return lyric
+            ? { ...cell, text: lyric.text, joinNext: lyric.joinNext }
+            : { ...cell, text: "", joinNext: false };
+        });
+        mergedWords.push({ isBar: false, cells });
+      }
+
+      if (lyricIndex < lyricCells.length) {
+        mergedWords.push({
+          isBar: false,
+          cells: lyricCells.slice(lyricIndex).map((cell) => ({
+            chord: null,
+            note: null,
+            text: cell.text,
+            joinNext: cell.joinNext,
+          })),
+        });
+      }
+
+      if (notationCells.length > 0) {
+        models.push({ kind: "couplet", words: mergedWords });
+        index += 1;
+        continue;
+      }
+    }
+
+    models.push(model);
+  }
+
+  return models;
 }
 
 export function sectionIsInstrumental(lines: string[]): boolean {

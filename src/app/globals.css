@@ -123,15 +123,12 @@ body {
 }
 
 .chart-cell {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
   min-width: 0;
   line-height: 1.714;
-}
-
-.chart-cell[data-chord]:not([data-chord=""]) {
-  padding-inline-end: 0.4em;
 }
 
 .chart-chord-row {
@@ -142,9 +139,9 @@ body {
 }
 
 .chart-chord-button {
-  position: relative;
-  min-height: 44px;
-  min-width: 44px;
+  position: absolute;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -153,6 +150,58 @@ body {
   cursor: pointer;
   color: var(--chart-chord);
   font-weight: 700;
+  transform: translate(-0.2em, -50%);
+}
+
+.chart-couplet {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 100%;
+}
+
+.chart-couplet-row {
+  display: flex;
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chart-couplet-chords,
+.chart-couplet-notes {
+  min-height: 1.714em;
+}
+
+.chart-couplet-lyrics {
+  flex-wrap: wrap;
+  row-gap: 0.15em;
+}
+
+.chart-hyphen {
+  display: inline;
+  padding-inline: 0.02em;
+}
+
+.chart-comment-inline {
+  display: inline-block;
+  min-height: 1.2em;
+  margin-inline-end: 0.5em;
+  font-size: 0.75em;
+  line-height: 1.2;
+  opacity: 0.75;
+}
+
+.chart-toolbar {
+  background: var(--chart-surface);
+  border-color: color-mix(in srgb, var(--chart-foreground) 18%, transparent);
+  color: var(--chart-foreground);
+  backdrop-filter: blur(10px);
+}
+
+[data-chart-theme="dark"] .chart-toolbar button,
+[data-chart-theme="dark"] .chart-toolbar label {
+  border-color: rgba(161, 161, 170, 0.55);
+  color: var(--chart-foreground);
 }
 
 .chart-chord-ext,
