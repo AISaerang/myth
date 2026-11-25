@@ -144,6 +144,14 @@ export function ChordChartSection({
       // Legacy ids are not master sections. Event editors still get the
       // general-note box; members keep the previous "no panel" result.
       if (!canModerateNotes) return undefined;
+      const hasGeneralNote = notes.some(
+        (note) =>
+          !note.sectionId &&
+          !note.parentId &&
+          note.status === "OPEN" &&
+          !note.targetInstrumentSkillId,
+      );
+      if (!hasGeneralNote) return undefined;
       return {
         targeted: null,
         general: (
@@ -157,9 +165,15 @@ export function ChordChartSection({
       sectionId: section.id,
       notes: sectionNotes,
     };
+    const hasGeneralNote = sectionNotes.some(
+      (note) =>
+        !note.parentId &&
+        note.status === "OPEN" &&
+        !note.targetInstrumentSkillId,
+    );
     return {
       targeted: <SectionTargetNoteCallout {...props} />,
-      general: <SectionGeneralNotePanel {...props} />,
+      general: hasGeneralNote ? <SectionGeneralNotePanel {...props} /> : null,
     };
   };
 
@@ -191,7 +205,14 @@ export function ChordChartSection({
         </div>
       ) : null}
 
-      {canModerateNotes ? (
+      {canModerateNotes &&
+      notes.some(
+        (note) =>
+          !note.sectionId &&
+          !note.parentId &&
+          note.status === "OPEN" &&
+          !note.targetInstrumentSkillId,
+      ) ? (
         <div className="mb-4 flex flex-col gap-3">
           <SectionGeneralNotePanel
             {...noteProps}

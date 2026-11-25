@@ -147,7 +147,7 @@ export function NotAngka({ value, className = "" }: { value: string; className?:
   );
 }
 
-function CssNote({ note }: { note: JianpuNote }) {
+export function CssNote({ note }: { note: JianpuNote }) {
   const marks = Math.abs(note.octave);
   const up = note.octave > 0;
   return (

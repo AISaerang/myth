@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLineModel, sectionIsInstrumental } from "@/lib/chart-cells";
+import { buildLineModel, buildSectionModels, sectionIsInstrumental } from "@/lib/chart-cells";
 
 describe("chart cell model", () => {
   it("builds lyric cells and starts a cell at each chord", () => {
@@ -56,5 +56,36 @@ describe("chart cell model", () => {
   it("marks only notation-only sections as instrumental", () => {
     expect(sectionIsInstrumental(["{Intro}", "1 2 3", "| C . |"])).toBe(true);
     expect(sectionIsInstrumental(["{Verse}", "[G]Bapa [C]kami"])).toBe(false);
+  });
+
+  it("puts a notation chord and note in the same cell", () => {
+    const model = buildLineModel("[C]1 [G/B]2 3");
+    expect(model.kind).toBe("notation");
+    if (model.kind !== "notation") return;
+    expect(model.words[0]?.cells.some((cell) => cell.chord === "C" && cell.note?.raw === "1")).toBe(true);
+  });
+
+  it("groups a notation line with the following lyric line", () => {
+    const models = buildSectionModels([
+      "3 4 | 5 5[C] #4 5 1'",
+      "Sungguh inginkah engkau",
+    ]);
+    expect(models[0]?.kind).toBe("couplet");
+    if (models[0]?.kind !== "couplet") return;
+    expect(models[0].words.flatMap((word) => word.cells).some((cell) => cell.chord === "C")).toBe(true);
+    expect(models[0].words.flatMap((word) => word.cells).some((cell) => cell.text === "Sungguh")).toBe(true);
+  });
+
+  it("keeps hyphens and mid-word chords without inserted word gaps", () => {
+    const model = buildLineModel("[G]Mela[C]yani");
+    expect(model.kind).toBe("lyric");
+    if (model.kind !== "lyric") return;
+    const cells = model.words.flatMap((word) => word.cells);
+    expect(cells.map((cell) => cell.text).join("")).toBe("Melayani");
+
+    const hyphen = buildLineModel("ladang-Nya");
+    expect(hyphen.kind).toBe("lyric");
+    if (hyphen.kind !== "lyric") return;
+    expect(hyphen.words[0]?.cells.some((cell) => cell.joinNext)).toBe(true);
   });
 });

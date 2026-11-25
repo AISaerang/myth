@@ -44,6 +44,7 @@ import {
 import {
   clampTextScale,
   getStageSections,
+  getAutoScrollNextTop,
   moveStageSection,
 } from "@/lib/chart-stage";
 import {
@@ -53,7 +54,11 @@ import {
   readChartViewMode,
   type ChartViewMode,
 } from "@/lib/chart-view-mode";
-import { buildLineModel, sectionIsInstrumental } from "@/lib/chart-cells";
+import {
+  buildLineModel,
+  buildSectionModels,
+  sectionIsInstrumental,
+} from "@/lib/chart-cells";
 
 type ViewMode = ChartViewMode;
 
@@ -263,16 +268,26 @@ function renderChart(
   simplify = false,
 ) {
   const lines = content.split("\n");
+  const models = buildSectionModels(lines);
   let sectionIndex = 0;
   const layers = layersForMode(mode);
-  return lines.map((line, index) => {
+  let sourceIndex = 0;
+  return models.map((model, index) => {
     const lineKey = `${key}-${index}`;
-    const model = buildLineModel(line);
+    while (
+      sourceIndex < lines.length &&
+      buildLineModel(lines[sourceIndex] ?? "").kind === "empty"
+    ) {
+      sourceIndex += 1;
+    }
+    if (model.kind !== "empty") sourceIndex += 1;
+    if (model.kind === "couplet") sourceIndex += 1;
     if (model.kind === "label") {
-      const shownLabel = sectionLabelAt(lines, index);
+      const labelSourceIndex = Math.max(0, sourceIndex - 1);
+      const shownLabel = sectionLabelAt(lines, labelSourceIndex);
       const shown = shownLabel ?? model.label;
       const currentSectionIndex = sectionIndex++;
-      const blockStart = index + 1;
+      const blockStart = labelSourceIndex + 1;
       let blockEnd = lines.length;
       for (let cursor = blockStart; cursor < lines.length; cursor += 1) {
         if (layoutChordLine(lines[cursor] ?? "").label) {
@@ -289,7 +304,7 @@ function renderChart(
           id={`${sectionIdPrefix}-${currentSectionIndex}`}
           data-section-label={shown}
           data-chart-section-index={currentSectionIndex}
-          className={`chart-section-label mt-3 scroll-mt-20 text-xs font-semibold tracking-wide first:mt-0 ${
+          className={`chart-section-label mt-3 scroll-mt-[var(--chart-scroll-offset,5rem)] text-xs font-semibold tracking-wide first:mt-0 ${
             shown === "Intro" ? "normal-case" : "uppercase"
           }`}
         >
@@ -459,12 +474,14 @@ export function ChordViewer({
   const [simplify, setSimplify] = useState(false);
   const [simplifyLoaded, setSimplifyLoaded] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState(2);
+  const scrollSpeedRef = useRef(2);
+  const [controlsCollapsed, setControlsCollapsed] = useState(false);
   const activeSectionRef = useRef(0);
   const stageScrollRef = useRef<HTMLDivElement>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const chartTheme = themeOverride ?? systemTheme;
   const renderMobileControls = (stage = false) => (
-    <div className="chart-mobile-controls fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[70] sm:hidden">
+    <div className="chart-mobile-controls sticky inset-x-0 top-[var(--app-header-height,4rem)] z-[70] sm:hidden">
       <div
         role="toolbar"
         aria-label="Kontrol chart"
@@ -549,32 +566,28 @@ export function ChordViewer({
         >
           {chartTheme === "dark" ? "Tema terang" : "Tema gelap"}
         </button>
-        {stage ? (
-          <>
-            <button
-              type="button"
-              className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-3 text-xs font-medium dark:border-zinc-700"
-              onClick={() => setAutoScroll((enabled) => !enabled)}
-              aria-pressed={autoScroll}
-              disabled={reducedMotion}
-              title={reducedMotion ? "Nonaktif saat pengurangan gerakan aktif" : undefined}
-            >
-              {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
-            </button>
-            <label className="flex shrink-0 items-center gap-2 px-2 text-xs">
-              Kecepatan
-              <input
-                type="range"
-                min={1}
-                max={5}
-                value={scrollSpeed}
-                onChange={(event) => setScrollSpeed(Number(event.target.value))}
-                aria-label="Kecepatan auto-scroll"
-                disabled={reducedMotion}
-              />
-            </label>
-          </>
-        ) : null}
+        <button
+          type="button"
+          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+          onClick={() => setAutoScroll((enabled) => !enabled)}
+          aria-pressed={autoScroll}
+          disabled={reducedMotion}
+        >
+          {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
+        </button>
+        <label className="flex min-h-[44px] items-center gap-2 rounded-lg border border-zinc-300 px-2 text-xs dark:border-zinc-700">
+          Kecepatan
+          <input
+            type="range"
+            min={1}
+            max={5}
+            value={scrollSpeed}
+            onChange={(event) => setScrollSpeed(Number(event.target.value))}
+            aria-label="Kecepatan auto-scroll"
+            disabled={reducedMotion}
+          />
+          <span>{scrollSpeed}</span>
+        </label>
         {stage ? (
           <button
             type="button"
@@ -1004,6 +1017,71 @@ export function ChordViewer({
   }, [textScale, textScaleLoaded]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        setControlsCollapsed(
+          window.localStorage.getItem("myth_chart_controls_collapsed") === "true",
+        );
+        const key = songId
+          ? `myth_chart_auto_scroll_speed_${songId}`
+          : "myth_chart_auto_scroll_speed";
+        const saved = Number(window.localStorage.getItem(key));
+        if (Number.isInteger(saved) && saved >= 1 && saved <= 5) {
+          setScrollSpeed(saved);
+          scrollSpeedRef.current = saved;
+        }
+      } catch (error) {
+        console.warn("Preferensi kontrol chart tidak dapat dibaca.", error);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [songId]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "myth_chart_controls_collapsed",
+        String(controlsCollapsed),
+      );
+    } catch {}
+  }, [controlsCollapsed]);
+
+  useEffect(() => {
+    scrollSpeedRef.current = scrollSpeed;
+  }, [scrollSpeed]);
+
+  useEffect(() => {
+    try {
+      const key = songId
+        ? `myth_chart_auto_scroll_speed_${songId}`
+        : "myth_chart_auto_scroll_speed";
+      window.localStorage.setItem(key, String(scrollSpeed));
+    } catch (error) {
+      console.warn("Kecepatan auto-scroll tidak dapat disimpan.", error);
+    }
+  }, [scrollSpeed, songId]);
+
+  useEffect(() => {
+    const updateOffset = () => {
+      const header = document.querySelector<HTMLElement>("[data-app-header]");
+      const headerHeight = header?.getBoundingClientRect().height ?? 72;
+      document.documentElement.style.setProperty(
+        "--app-header-height",
+        `${headerHeight}px`,
+      );
+      const toolbar = document.querySelector<HTMLElement>("[data-chart-controls]");
+      const toolbarHeight = toolbar?.getBoundingClientRect().height ?? 0;
+      document.documentElement.style.setProperty(
+        "--chart-scroll-offset",
+        `${headerHeight + toolbarHeight + 16}px`,
+      );
+    };
+    updateOffset();
+    window.addEventListener("resize", updateOffset);
+    return () => window.removeEventListener("resize", updateOffset);
+  }, [controlsCollapsed, stageActive]);
+
+  useEffect(() => {
     if (!stageActive) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -1061,9 +1139,13 @@ export function ChordViewer({
           frame = window.requestAnimationFrame(scroll);
           return;
         }
-        const nextTop = element.scrollTop + (scrollSpeed * 12 * elapsed) / 1000;
         const maxTop = element.scrollHeight - element.clientHeight;
-        element.scrollTop = Math.min(nextTop, maxTop);
+        element.scrollTop = getAutoScrollNextTop(
+          element.scrollTop,
+          scrollSpeedRef.current,
+          elapsed,
+          maxTop,
+        );
         if (element.scrollTop >= maxTop - 1) {
           setAutoScroll(false);
           return;
@@ -1071,7 +1153,13 @@ export function ChordViewer({
       } else {
         const root = document.documentElement;
         const maxTop = root.scrollHeight - window.innerHeight;
-        window.scrollBy(0, (scrollSpeed * 12 * elapsed) / 1000);
+        const nextTop = getAutoScrollNextTop(
+          window.scrollY,
+          scrollSpeedRef.current,
+          elapsed,
+          maxTop,
+        );
+        window.scrollTo({ top: nextTop, behavior: "auto" });
         if (window.scrollY >= maxTop - 1) {
           setAutoScroll(false);
           return;
@@ -1081,7 +1169,7 @@ export function ChordViewer({
     };
     frame = window.requestAnimationFrame(scroll);
     return () => window.cancelAnimationFrame(frame);
-  }, [autoScroll, reducedMotion, scrollSpeed, stageActive]);
+  }, [autoScroll, reducedMotion, stageActive]);
 
   useEffect(() => {
     if (!autoScroll) return;
@@ -1239,63 +1327,88 @@ export function ChordViewer({
             onCapoMode={chooseCapoMode}
             showKeyControls={false}
             showCapo={false}
+            trailingAction={
+              <button
+                type="button"
+                className="min-h-[44px] rounded-lg border px-3 text-sm font-medium"
+                onClick={() => {
+                  setStageActive(true);
+                  window.requestAnimationFrame(() => {
+                    document.getElementById(`stage-section-${activeSectionRef.current}`)?.scrollIntoView({
+                      block: "start",
+                      behavior: "auto",
+                    });
+                  });
+                }}
+              >
+                Mode panggung
+              </button>
+            }
           />
         ) : null}
       </div>
-      <div className="hidden flex-wrap items-center gap-2 sm:flex">
+      <div
+        data-chart-controls=""
+        className="chart-toolbar sticky z-40 hidden flex-wrap items-center gap-2 rounded-lg border px-2 py-2 sm:flex"
+        style={{ top: "var(--app-header-height, 4rem)" }}
+      >
         <button
           type="button"
           className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
-          onClick={() => setSimplify((enabled) => !enabled)}
-          aria-label="Sederhanakan chord"
-          aria-pressed={simplify}
+          onClick={() => setControlsCollapsed((collapsed) => !collapsed)}
+          aria-expanded={!controlsCollapsed}
         >
-          {simplify ? "Chord sederhana aktif" : "Sederhanakan chord"}
+          {controlsCollapsed ? "Tampilkan kontrol" : "Sembunyikan kontrol"}
         </button>
-        <button
-          type="button"
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
-          onClick={() => setTextScale((scale) => clampTextScale(scale - 10))}
-          disabled={textScale <= 80}
-        >
-          A−
-        </button>
-        <button
-          type="button"
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
-          onClick={() => setTextScale((scale) => clampTextScale(scale + 10))}
-          disabled={textScale >= 200}
-        >
-          A+
-        </button>
-        <span className="text-xs text-zinc-500">{textScale}%</span>
-        <button
-          type="button"
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
-          onClick={() =>
-            setThemeOverride(chartTheme === "dark" ? "light" : "dark")
-          }
-          aria-label={`Gunakan tema ${chartTheme === "dark" ? "terang" : "gelap"}`}
-          aria-pressed={themeOverride !== null}
-        >
-          {chartTheme === "dark" ? "Tema terang" : "Tema gelap"}
-        </button>
-        <button
-          type="button"
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
-          onClick={() => {
-            setStageActive(true);
-            window.requestAnimationFrame(() => {
-              document.getElementById(`stage-section-${activeSectionRef.current}`)?.scrollIntoView({
-                block: "start",
-                behavior: "auto",
-              });
-            });
-          }}
-        >
-          Mode panggung
-        </button>
+        {controlsCollapsed ? null : (
+        <>
+          <button
+            type="button"
+            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+            onClick={() => setSimplify((enabled) => !enabled)}
+            aria-label="Sederhanakan chord"
+            aria-pressed={simplify}
+          >
+            {simplify ? "Chord sederhana aktif" : "Sederhanakan chord"}
+          </button>
+          <button type="button" className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700" onClick={() => setTextScale((scale) => clampTextScale(scale - 10))} disabled={textScale <= 80}>A−</button>
+          <button type="button" className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700" onClick={() => setTextScale((scale) => clampTextScale(scale + 10))} disabled={textScale >= 200}>A+</button>
+          <span className="text-xs text-zinc-500">{textScale}%</span>
+          <button
+            type="button"
+            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+            onClick={() => setThemeOverride(chartTheme === "dark" ? "light" : "dark")}
+            aria-label={`Gunakan tema ${chartTheme === "dark" ? "terang" : "gelap"}`}
+            aria-pressed={themeOverride !== null}
+          >
+            {chartTheme === "dark" ? "Tema terang" : "Tema gelap"}
+          </button>
+          <button
+            type="button"
+            className="min-h-[44px] rounded-lg border border-zinc-300 px-3 text-sm font-medium dark:border-zinc-700"
+            onClick={() => setAutoScroll((enabled) => !enabled)}
+            aria-pressed={autoScroll}
+            disabled={reducedMotion}
+          >
+            {autoScroll ? "Jeda gulir" : "Gulir otomatis"}
+          </button>
+          <label className="flex min-h-[44px] items-center gap-2 rounded-lg border border-zinc-300 px-2 text-xs dark:border-zinc-700">
+            Kecepatan
+            <input
+              type="range"
+              min={1}
+              max={5}
+              value={scrollSpeed}
+              onChange={(event) => setScrollSpeed(Number(event.target.value))}
+              aria-label="Kecepatan auto-scroll"
+              disabled={reducedMotion}
+            />
+            <span>{scrollSpeed}</span>
+          </label>
+        </>
+        )}
       </div>
+      {!stageActive ? renderMobileControls(false) : null}
       <div
         data-chart-body=""
         className="chart-surface chart-scroll-content min-w-0 max-w-full rounded-lg p-4"
@@ -1341,11 +1454,17 @@ export function ChordViewer({
                   id={`chart-section-${index}`}
                   data-chart-section={section.id}
                   data-chart-section-index={index}
-                  className="min-w-0 scroll-mt-20 border-b border-zinc-200 pb-4 last:border-b-0 last:pb-0 dark:border-zinc-800 [content-visibility:auto] [contain:content]"
+                  className="min-w-0 scroll-mt-[var(--chart-scroll-offset,5rem)] border-b border-zinc-200 pb-4 last:border-b-0 last:pb-0 dark:border-zinc-800"
                 >
                   <div className="mb-2 flex min-w-0 flex-col gap-2">
                     <h3 className="chart-section-label text-xs font-semibold tracking-wide">
                       {section.label}
+                      {mode === "lyrics" &&
+                      sectionIsInstrumental(section.content.split("\n")) ? (
+                        <span className="ml-2 normal-case font-normal text-zinc-500 dark:text-zinc-400">
+                          (instrumental)
+                        </span>
+                      ) : null}
                     </h3>
                     {roleSection ? (
                       <SafeVoicingBoundary fallback="Konten tab belum bisa ditampilkan">
@@ -1521,8 +1640,6 @@ export function ChordViewer({
           </div>
         )}
       </div>
-      {/* Normal view intentionally has no floating stage navigation or auto-scroll. */}
-      {!stageActive ? renderMobileControls(false) : null}
       {stageActive ? (
         <div
           data-chart-theme={chartTheme}

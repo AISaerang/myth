@@ -93,6 +93,20 @@ export function ChartSectionNavigator({
         target.removeAttribute("data-chart-section-active");
       }
     }
+    const activeButton = document.querySelector<HTMLButtonElement>(
+      '[data-chart-section-nav] button[aria-pressed="true"]',
+    );
+    const strip = activeButton?.parentElement;
+    if (activeButton && strip) {
+      const stripRect = strip.getBoundingClientRect();
+      const buttonRect = activeButton.getBoundingClientRect();
+      if (buttonRect.left < stripRect.left || buttonRect.right > stripRect.right) {
+        strip.scrollLeft +=
+          buttonRect.left -
+          stripRect.left -
+          (stripRect.width - buttonRect.width) / 2;
+      }
+    }
   }, [activeIndex, sections, targetIdPrefix]);
 
   function jumpTo(index: number) {
