@@ -11,4 +11,23 @@ describe("Indonesian syllable splitting", () => {
     expect(syllabifyId("kasih-Nya")).toEqual(["ka", "sih", "Nya"]);
     expect(syllabifyId("Sung-guh")).toEqual(["Sung", "guh"]);
   });
+
+  it("keeps one consonant between vowels as the next syllable onset", () => {
+    expect(syllabifyId("Bapa")).toEqual(["Ba", "pa"]);
+    expect(syllabifyId("Yesu")).toEqual(["Ye", "su"]);
+    expect(syllabifyId("Tuhan")).toEqual(["Tu", "han"]);
+    expect(syllabifyId("bersyukur")).toEqual(["ber", "syu", "kur"]);
+    expect(syllabifyId("memuji")).toEqual(["me", "mu", "ji"]);
+    expect(syllabifyId("benar")).toEqual(["be", "nar"]);
+  });
+
+  it("treats ng/ny/kh/sy as an onset when they stand alone between vowels", () => {
+    expect(syllabifyId("dengan")).toEqual(["de", "ngan"]);
+    expect(syllabifyId("jangan")).toEqual(["ja", "ngan"]);
+    expect(syllabifyId("bangun")).toEqual(["ba", "ngun"]);
+    expect(syllabifyId("akhir")).toEqual(["a", "khir"]);
+    expect(syllabifyId("asyik")).toEqual(["a", "syik"]);
+    expect(syllabifyId("tunggu")).toEqual(["tung", "gu"]);
+    expect(syllabifyId("bangsa")).toEqual(["bang", "sa"]);
+  });
 });

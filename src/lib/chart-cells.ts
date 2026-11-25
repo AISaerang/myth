@@ -10,6 +10,7 @@ export interface ChartCell {
   joinNext: boolean;
   continues?: boolean;
   trailing?: boolean;
+  melisma?: boolean;
   wordIndex?: number;
   syllableIndex?: number;
 }
@@ -279,35 +280,70 @@ export function buildSectionModels(lines: string[]): ChartLineModel[] {
         }
       }
 
-      const mergeFromRight = () => {
+      const mergeAdjacent = (
+        matches: (
+          left: (typeof syllableItems)[number],
+          right: (typeof syllableItems)[number],
+        ) => boolean,
+      ) => {
         for (let indexFromRight = syllableItems.length - 2; indexFromRight >= 0; indexFromRight -= 1) {
           const left = syllableItems[indexFromRight];
           const right = syllableItems[indexFromRight + 1];
           if (!left || !right || left.wordIndex !== right.wordIndex) continue;
-          if (
-            /[aiueo]$/i.test(left.text) &&
-            /^[aiueo]/i.test(right.text)
-          ) {
-            left.text += right.text;
-            syllableItems.splice(indexFromRight + 1, 1);
-            return true;
-          }
+          if (!matches(left, right)) continue;
+          left.text += right.text;
+          syllableItems.splice(indexFromRight + 1, 1);
+          return true;
         }
         return false;
       };
       while (syllableItems.length > slotCells.length) {
-        if (!mergeFromRight()) break;
+        if (
+          !mergeAdjacent(
+            (left, right) =>
+              /[aiueo]$/i.test(left.text) && /^[aiueo]/i.test(right.text),
+          ) &&
+          !mergeAdjacent(() => true)
+        ) {
+          break;
+        }
       }
 
-      if (syllableItems.length === slotCells.length && slotCells.length > 0) {
-        const mergedWords: ChartWord[] = lyricWords.map(() => ({
-          isBar: false,
-          cells: [],
-        }));
+      // Not lebih banyak dari suku kata = melisma: suku kata terakhir
+      // ditahan melewati not berikutnya, bukan memaksa lirik turun ke baris
+      // fallback. Ini yang membuat couplet tetap sejajar seperti MuseScore.
+      if (syllableItems.length <= slotCells.length && slotCells.length > 0) {
+        // Tanda hubung dihitung setelah penggabungan, supaya kata yang suku
+        // katanya sudah digabung tidak menyisakan hyphen menggantung.
+        const groupTotals = new Map<number, number>();
+        for (const item of syllableItems) {
+          groupTotals.set(
+            item.wordIndex,
+            (groupTotals.get(item.wordIndex) ?? 0) + 1,
+          );
+        }
+        const groupSeen = new Map<number, number>();
+        const joinFlags = syllableItems.map((item) => {
+          const seen = groupSeen.get(item.wordIndex) ?? 0;
+          groupSeen.set(item.wordIndex, seen + 1);
+          return seen < (groupTotals.get(item.wordIndex) ?? 1) - 1;
+        });
+
+        const mergedWords: ChartWord[] = [];
+        let current: ChartWord | null = null;
+        let currentWordIndex: number | null = null;
         let slotIndex = 0;
         const matchedSlurs = new Set<number>();
+
+        const flushCurrent = () => {
+          if (current) mergedWords.push(current);
+          current = null;
+          currentWordIndex = null;
+        };
+
         for (const word of model.words) {
           if (word.isBar) {
+            flushCurrent();
             mergedWords.push(word);
             continue;
           }
@@ -318,25 +354,36 @@ export function buildSectionModels(lines: string[]): ChartLineModel[] {
               matchedSlurs.add(cell.note.slurGroup);
             }
             const item = syllableItems[slotIndex];
-            if (!item) break;
-            const wordIndex = item.wordIndex;
-            const target = mergedWords[wordIndex];
-            if (!target) continue;
-            target.cells.push({
-              ...cell,
-              text: item.text,
-              joinNext:
-                item.syllableIndex <
-                syllabifyId(lyricWords[wordIndex] ?? "").length - 1,
-              continues:
-                item.syllableIndex <
-                syllabifyId(lyricWords[wordIndex] ?? "").length - 1,
-              wordIndex,
-              syllableIndex: item.syllableIndex,
-            });
-            slotIndex += 1;
+            if (item) {
+              if (!current || currentWordIndex !== item.wordIndex) {
+                flushCurrent();
+                current = { isBar: false, cells: [] };
+                currentWordIndex = item.wordIndex;
+              }
+              current.cells.push({
+                ...cell,
+                text: item.text,
+                joinNext: joinFlags[slotIndex] ?? false,
+                continues: joinFlags[slotIndex] ?? false,
+                wordIndex: item.wordIndex,
+                syllableIndex: item.syllableIndex,
+              });
+              slotIndex += 1;
+            } else if (current) {
+              // Not berlebih: tahan suku kata terakhir (melisma) tanpa
+              // mengulang teks lirik.
+              current.cells.push({
+                ...cell,
+                text: "",
+                joinNext: false,
+                continues: false,
+                melisma: true,
+              });
+            }
           }
         }
+        flushCurrent();
+
         const trailingCells = model.words.flatMap((word) =>
           word.isBar
             ? []
@@ -344,9 +391,10 @@ export function buildSectionModels(lines: string[]): ChartLineModel[] {
                 (cell) => cell.note === null && cell.chord !== null,
               ),
         );
-        if (trailingCells.length && lyricWords.length) {
-          const lastWord = mergedWords[lyricWords.length - 1];
-          if (lastWord) {
+        if (trailingCells.length) {
+          for (let indexFromRight = mergedWords.length - 1; indexFromRight >= 0; indexFromRight -= 1) {
+            const lastWord = mergedWords[indexFromRight];
+            if (!lastWord || lastWord.isBar) continue;
             lastWord.cells.push(
               ...trailingCells.map((cell) => ({
                 ...cell,
@@ -354,6 +402,7 @@ export function buildSectionModels(lines: string[]): ChartLineModel[] {
                 trailing: true,
               })),
             );
+            break;
           }
         }
         models.push({

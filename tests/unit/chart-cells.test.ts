@@ -303,4 +303,75 @@ describe("chart cell model", () => {
       expect(html).not.toContain("data-notation-error");
     }
   });
+
+  it("pairs every lyric line in the stacked editor screenshot, including melisma", () => {
+    const models = buildSectionModels([
+      "[G]0 3 3 4 | [C]5 5-- 3' 3' 2' | 1' 5-",
+      "Ya Allah Bapa, ya Yesu Tuhan,",
+      "[G7]3 6- 5 | 5 4-",
+      "ya Rohul Kudus,",
+      "[A7]0 2 2 3 | [Dm]4 4-- 2' 2' 1' | [G]7 7-",
+      "aku bersyukur, aku memuji",
+    ]);
+    const couplets = models.filter((model) => model.kind === "couplet");
+    expect(couplets).toHaveLength(3);
+
+    for (const couplet of couplets) {
+      if (couplet.kind !== "couplet") continue;
+      expect(couplet.paired).toBe(true);
+    }
+
+    const first = couplets[0];
+    if (first?.kind !== "couplet") throw new Error("First couplet missing");
+    const firstCells = first.words.flatMap((word) => word.cells);
+    expect(firstCells.filter((cell) => cell.melisma)).toHaveLength(1);
+    expect(firstCells.at(-1)?.melisma).toBe(true);
+    expect(
+      first.words
+        .filter((word) => !word.isBar)
+        .map((word) => word.cells.map((cell) => cell.text).join("")),
+    ).toEqual(["Ya", "Allah", "Ba", "pa,", "ya", "Yesu", "Tu", "han,"]);
+
+    const html = renderChartLine(first, "detail");
+    expect(html).toContain('data-melisma="true"');
+    expect(html).toContain("chart-melisma-line");
+  });
+
+  it("keeps bar words between measures in a paired couplet", () => {
+    const [model] = buildSectionModels(["[G7]3 6- 5 | 5 4-", "ya Rohul Kudus,"]);
+    if (model?.kind !== "couplet") throw new Error("Couplet missing");
+
+    const barIndex = model.words.findIndex((word) => word.isBar);
+    expect(barIndex).toBeGreaterThan(0);
+    expect(barIndex).toBeLessThan(model.words.length - 1);
+    expect(model.words.at(-1)?.isBar).toBe(false);
+  });
+
+  it("renders a duration extension only once", () => {
+    const html = renderChartLine(buildLineModel("[C]5--"), "detail");
+    const text = html.replace(/<[^>]+>/g, "");
+
+    expect(text).toContain("5--");
+    expect(text).not.toContain("5----");
+  });
+
+  it("keeps bar lines visible in chord and notation modes", () => {
+    const [model] = buildSectionModels(["[G7]3 6- 5 | 5 4-", "ya Rohul Kudus,"]);
+    if (model?.kind !== "couplet") throw new Error("Couplet missing");
+
+    for (const mode of ["lyrics-chords", "lyrics-notation", "detail"] as const) {
+      expect(renderChartLine(model, mode)).toContain('data-chart-word="bar"');
+    }
+    expect(renderChartLine(model, "lyrics")).not.toContain('data-chart-word="bar"');
+  });
+
+  it("renders an unpaired couplet lyric as a block below the notation", () => {
+    const [model] = buildSectionModels(["[C]1", "Ya Allah Bapa"]);
+    if (model?.kind !== "couplet") throw new Error("Couplet missing");
+
+    expect(model.paired).toBe(false);
+    const html = renderChartLine(model, "detail");
+    expect(html).toContain('data-chart-text-row=""');
+    expect(html).toContain("Ya Allah Bapa");
+  });
 });

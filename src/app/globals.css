@@ -157,6 +157,26 @@ body {
   grid-area: lyric;
 }
 
+/* Tanda birama menempati satu kolom dan merentang setinggi semua lane yang
+   aktif, sehingga tetap terlihat sebagai garis birama, bukan teks lirik. */
+.chart-cell-bar > .chart-bar {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  /* Grid container memakai align-items: start; tanpa stretch, bar hanya
+     setinggi glyph dan menempel di lane chord. */
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0.15em;
+  color: var(--chart-muted);
+}
+
+.chart-line > .chart-word > .chart-bar {
+  color: var(--chart-muted);
+  padding-inline: 0.15em;
+}
+
 .chart-chord-row {
   height: 1.714em;
   display: inline-flex;
@@ -232,12 +252,37 @@ body {
 }
 
 .chart-couplet-fallback {
-  display: inline;
+  display: block;
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 0.25em;
 }
 
 .chart-hyphen {
   display: inline;
   padding-inline: 0.02em;
+}
+
+/* Suku kata yang ditahan melewati not berikutnya (melisma). Garis ini
+   menggantikan teks lirik di lane lirik, seperti extender line di MuseScore. */
+.chart-cell-melisma .chart-text-cell {
+  position: relative;
+}
+
+.chart-melisma-line {
+  display: block;
+  position: relative;
+  height: 1.714em;
+}
+
+.chart-melisma-line::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0.85em;
+  border-top: 1px solid currentColor;
+  opacity: 0.55;
 }
 
 .chart-comment-inline {

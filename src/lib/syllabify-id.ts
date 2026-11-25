@@ -70,10 +70,19 @@ function splitPlainSegment(segment: string): string[] {
     const between = core.slice(vowel + 1, nextVowel).toLowerCase();
     if (!between) continue;
 
-    let splitOffset = 1;
+    // Satu konsonan di antara dua vokal selalu jadi onset suku kata
+    // berikutnya (Ba-pa, Ye-su, Tu-han). Untuk gugus dua konsonan:
+    // - "ng/ny/kh/sy" tepat dua huruf = onset utuh (de-ngan, a-khir),
+    // - gugus lain = konsonan pertama menutup suku kata (Al-lah, sam-pai),
+    // - "ng" yang diikuti konsonan menutup suku kata (Sung-guh, tung-gu).
+    let splitOffset = 0;
     if (between.length >= 2) {
       const cluster = between.slice(0, 2);
-      splitOffset = CLUSTERS.includes(cluster) ? 2 : 1;
+      if (CLUSTERS.includes(cluster)) {
+        splitOffset = between.length === 2 ? 0 : 2;
+      } else {
+        splitOffset = 1;
+      }
     }
     const boundary = vowel + 1 + splitOffset;
     syllables.push({ start, end: boundary });
